@@ -56,7 +56,7 @@ export interface Barista {
   bayNumber: number;
   name: string;
   canHandleSpecial?: boolean;
-  coefficient: number; // e.g. 0.93
+  coefficient: number; // initial: SP-capable 0.97, others 1.05
   coefficientColor: 'green' | 'orange' | 'blue' | 'purple';
   status: 'brewing' | 'imminent' | 'standby' | 'ready';
   remainingStr: string; // "01:48 残り"
