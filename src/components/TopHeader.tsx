@@ -1,15 +1,11 @@
 import React from 'react';
-import { Volume2, VolumeX, Plus, Play, Pause, RotateCcw, Undo2 } from 'lucide-react';
-import { BeanCode } from '../types';
-import { BEAN_LEGENDS } from '../data/initialData';
+import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2 } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface TopHeaderProps {
   timeStr: string;
   unassignedCups: number;
   totalWaitingCups: number;
-  selectedBeanFilter: BeanCode | null;
-  onSelectBeanFilter: (code: BeanCode | null) => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
   isRunning: boolean;
@@ -20,15 +16,12 @@ interface TopHeaderProps {
   canUndo: boolean;
   undoLabel: string | null;
   onUndo: () => void;
-  onOpenNewOrder: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
   timeStr,
   unassignedCups,
   totalWaitingCups,
-  selectedBeanFilter,
-  onSelectBeanFilter,
   soundEnabled,
   onToggleSound,
   isRunning,
@@ -39,7 +32,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   canUndo,
   undoLabel,
   onUndo,
-  onOpenNewOrder,
 }) => {
   return (
     <header className="h-[56px] bg-white border-b border-[#e2e8f0] px-4 flex items-center justify-between shadow-xs select-none shrink-0">
@@ -102,45 +94,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right side: Bean Legend Badges & Quick Action */}
+      {/* Right side: only persistent operational controls */}
       <div className="flex items-center gap-3">
-        {/* Bean Legend list */}
-        <div className="hidden xl:flex items-center gap-1.5">
-          {BEAN_LEGENDS.map((bean) => {
-            const isSelected = selectedBeanFilter === bean.code;
-            return (
-              <button
-                key={bean.code}
-                id={`legend-filter-${bean.code.toLowerCase()}`}
-                onClick={() => onSelectBeanFilter(isSelected ? null : bean.code)}
-                className={`flex items-center gap-1 px-2 py-1 rounded border text-[11px] font-semibold transition-all ${
-                  isSelected
-                    ? 'ring-2 ring-blue-500 scale-105 shadow-xs font-bold'
-                    : 'opacity-90 hover:opacity-100 hover:scale-102'
-                } ${
-                  bean.code === 'ORE'
-                    ? 'bg-[#18181b] text-white border-[#27272a]'
-                    : bean.code === 'SP'
-                    ? 'bg-[#064e3b] text-white border-[#059669]'
-                    : `${bean.badgeBg} text-slate-800 ${bean.borderColor}`
-                }`}
-                title={`${bean.subLabel} で絞り込み`}
-              >
-                <span className="font-bold tracking-tight">{bean.subLabel}</span>
-              </button>
-            );
-          })}
-          {selectedBeanFilter && (
-            <button
-              onClick={() => onSelectBeanFilter(null)}
-              className="text-[10px] text-blue-600 hover:underline px-1 py-0.5 ml-1"
-            >
-              解除
-            </button>
-          )}
-        </div>
-
-        {/* Quick Order Button */}
         <button
           id="btn-undo"
           type="button"
@@ -151,16 +106,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         >
           <Undo2 className="w-4 h-4" />
           <span>1つ戻す</span>
-        </button>
-
-        {/* Quick Order Button */}
-        <button
-          id="btn-add-order"
-          onClick={onOpenNewOrder}
-          className="min-h-[44px] flex items-center gap-1.5 bg-[#0f172a] hover:bg-[#1e293b] text-white text-xs font-bold px-3 rounded-lg shadow-xs transition-colors touch-manipulation"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>オーダー追加</span>
         </button>
 
         {/* Sound toggle */}

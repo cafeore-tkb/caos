@@ -19,7 +19,6 @@ import { DispatchBoard } from './components/DispatchBoard';
 import { UnassignedOrdersPanel } from './components/UnassignedOrdersPanel';
 import { TicketDetailModal } from './components/TicketDetailModal';
 import { AssignSlotModal } from './components/AssignSlotModal';
-import { NewOrderModal } from './components/NewOrderModal';
 import { BaysOverviewView } from './components/BaysOverviewView';
 import { BeanQueueView } from './components/BeanQueueView';
 import { AiConfigView } from './components/AiConfigView';
@@ -151,14 +150,14 @@ export default function App() {
   const [completedCount, setCompletedCount] = useState<number>(0);
 
   // Filters & Toggles
-  const [selectedBeanFilter, setSelectedBeanFilter] = useState<BeanCode | null>(null);
   const [selectedQueueBean, setSelectedQueueBean] = useState<BeanCode | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
   // Modals
   const [selectedTicket, setSelectedTicket] = useState<OrderTicket | null>(null);
   const [assignSlotData, setAssignSlotData] = useState<{ bayId: number | null; order: UnassignedOrder | null } | null>(null);
-  const [isNewOrderOpen, setIsNewOrderOpen] = useState<boolean>(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const sidebarTimerRef = useRef<number | null>(null);
 
   // Simulation Clock (starts at 08:04:15 -> 29055 seconds)
   const [simTimeSec, setSimTimeSec] = useState<number>(8 * 3600 + 4 * 60 + 15);
@@ -178,6 +177,19 @@ export default function App() {
     const clock = window.setInterval(() => setRealTime(new Date()), 1000);
     return () => window.clearInterval(clock);
   }, []);
+
+  const restartSidebarTimer = () => {
+    if (sidebarTimerRef.current !== null) window.clearTimeout(sidebarTimerRef.current);
+    sidebarTimerRef.current = window.setTimeout(() => setSidebarOpen(false), 6000);
+  };
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    restartSidebarTimer();
+    return () => {
+      if (sidebarTimerRef.current !== null) window.clearTimeout(sidebarTimerRef.current);
+    };
+  }, [sidebarOpen]);
 
   // Mock the register sending one complete order at a time.
   useEffect(() => {
@@ -512,35 +524,6 @@ export default function App() {
     soundManager.playDispatch();
   };
 
-  // Add new custom mock order
-  const handleAddNewOrder = (newOrd: {
-    beanCode: BeanCode;
-    beanName: string;
-    cupCount: number;
-    tag: string;
-    predictedTimeStr: string;
-    recommendedBaristas: string;
-    recommendedBayIds: number[];
-    preferredBaristaId?: number;
-  }) => {
-    const nextIdNum = 172 + Math.floor(Math.random() * 50);
-    const created: UnassignedOrder = {
-      id: `#${nextIdNum}`,
-      beanCode: newOrd.beanCode,
-      beanName: newOrd.beanName,
-      cupCount: newOrd.cupCount,
-      badgeTag: `${newOrd.cupCount}杯 ${newOrd.tag}`,
-      predictedTimeStr: newOrd.predictedTimeStr,
-      recommendedBaristas: newOrd.recommendedBaristas,
-      recommendedBayIds: newOrd.recommendedBayIds,
-      preferredBaristaId: newOrd.preferredBaristaId,
-      cardColor: newOrd.beanCode === 'ICE' ? 'cyan' : newOrd.beanCode === 'KEN' ? 'peach' : newOrd.beanCode === 'SP' ? 'emerald' : 'blue',
-    };
-    captureUndo(`${created.id}の追加`);
-    setUnassignedOrders((prev) => [...prev, ...splitIntoDripUnits([created])]);
-    soundManager.playDispatch();
-  };
-
   // Live cup totals shown in the header
   const unassignedCardCups = unassignedOrders.reduce((acc, cur) => acc + cur.cupCount, 0);
   const totalUnassignedDisplay = unassignedCardCups;
@@ -554,14 +537,31 @@ export default function App() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f0f4fa] text-[#0f172a] select-none font-sans">
       {/* 1. Left Navigation Rail */}
-      <Sidebar
-        activeTab={activeTab}
-        onSelectTab={setActiveTab}
-        controlViewMode={controlViewMode}
-        onSelectControlViewMode={setControlViewMode}
-        activeBayCount={baristas.filter((b) => b.queue.length > 0).length}
-        totalBays={6}
-      />
+      <div
+        className={`h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out ${sidebarOpen ? 'w-[82px]' : 'w-0'}`}
+        onPointerDown={restartSidebarTimer}
+      >
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={setActiveTab}
+          controlViewMode={controlViewMode}
+          onSelectControlViewMode={setControlViewMode}
+          activeBayCount={baristas.filter((b) => b.queue.length > 0).length}
+          totalBays={6}
+        />
+      </div>
+
+      {!sidebarOpen && (
+        <button
+          type="button"
+          aria-label="メニューを開く"
+          title="メニューを開く"
+          onClick={() => setSidebarOpen(true)}
+          className="fixed left-0 top-1/2 z-[110] flex h-14 w-6 -translate-y-1/2 items-center justify-center rounded-r-full border border-l-0 border-slate-300 bg-white/95 shadow-md touch-manipulation"
+        >
+          <span className="h-2.5 w-2.5 rounded-full bg-slate-800" />
+        </button>
+      )}
 
       {/* 2. Main Workstation Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
@@ -570,8 +570,6 @@ export default function App() {
           timeStr={`${realTime.getHours().toString().padStart(2, '0')}:${realTime.getMinutes().toString().padStart(2, '0')}:${realTime.getSeconds().toString().padStart(2, '0')}`}
           unassignedCups={totalUnassignedDisplay}
           totalWaitingCups={totalWaitingCupsDisplay}
-          selectedBeanFilter={selectedBeanFilter}
-          onSelectBeanFilter={setSelectedBeanFilter}
           soundEnabled={soundEnabled}
           onToggleSound={() => setSoundEnabled(!soundEnabled)}
           isRunning={isRunning}
@@ -582,7 +580,6 @@ export default function App() {
           canUndo={Boolean(undoLabel)}
           undoLabel={undoLabel}
           onUndo={handleUndo}
-          onOpenNewOrder={() => setIsNewOrderOpen(true)}
         />
 
         {/* Dynamic Tab Body */}
@@ -592,7 +589,7 @@ export default function App() {
                   {/* Master 6-Bay Dispatch Board (Top 2/3) */}
                   <DispatchBoard
                     baristas={baristas}
-                    highlightFilter={selectedBeanFilter}
+                    highlightFilter={null}
                     selectedOrderId={selectedQueueBean ? null : selectedOrderId}
                     onSelectOrder={handleToggleOrderSelection}
                     onAdvanceBay={handleAdvanceBay}
@@ -630,7 +627,7 @@ export default function App() {
                   unassignedOrders={sortedUnassignedOrders}
                   simTimeSec={realTimeSec}
                   selectedOrderId={selectedOrderId}
-                  highlightFilter={selectedBeanFilter}
+                  highlightFilter={null}
                   onSelectOrder={handleToggleOrderSelection}
                   onSelectQueueOrder={(order) => {
                     setSelectedOrderId(order.id);
@@ -705,13 +702,6 @@ export default function App() {
         />
       )}
 
-      {/* New Order Modal */}
-      {isNewOrderOpen && (
-        <NewOrderModal
-          onClose={() => setIsNewOrderOpen(false)}
-          onAddOrder={handleAddNewOrder}
-        />
-      )}
     </div>
   );
 }
