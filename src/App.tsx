@@ -63,14 +63,15 @@ const arrangeQueue = (
   const ordered = existingActive ? [existingActive, ...scheduled] : scheduled;
   if (ordered.length === 0) return ordered;
 
-  const first = activateFirst
+  const shouldActivateFirst = activateFirst || !existingActive;
+  const first = shouldActivateFirst
     ? {
         ...ordered[0],
         status: 'brewing' as const,
         startTimeSec: nowSec,
         timeRemainingSec: Math.round(ordered[0].totalDurationSec * coefficient),
       }
-    : ordered[0];
+    : existingActive!;
   const result: OrderTicket[] = [first];
   const firstEnd = first.status === 'brewing'
     ? Math.max(nowSec, (first.startTimeSec ?? nowSec) + first.totalDurationSec)
@@ -439,7 +440,11 @@ export default function App() {
     const key = ticketKey(ticket);
     setBaristas((prev) => prev.map((bay) => ({
       ...bay,
-      queue: bay.queue.filter((item) => ticketKey(item) !== key),
+      queue: arrangeQueue(
+        bay.queue.filter((item) => ticketKey(item) !== key),
+        bay.coefficient,
+        realTimeSec
+      ),
     })));
     setUnassignedOrders((prev) => [{
       id: ticket.id,
