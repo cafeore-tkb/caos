@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
 import { OrderTicket, BeanCode } from '../types';
 
@@ -30,6 +30,10 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   widthPx,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+  const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const suppressNextClick = useRef(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
+  const [dragTargetBay, setDragTargetBay] = useState<number | null>(null);
   const isMatchFilter = !highlightFilter || highlightFilter === ticket.beanCode;
   const isOrderSelected = selectedOrderId === ticket.id;
 
@@ -53,10 +57,30 @@ export const TicketCard: React.FC<TicketCardProps> = ({
     return () => document.removeEventListener('pointerdown', closeOnOutsidePress);
   }, [isActionOpen, onCloseAction]);
 
+  const bayAtPoint = (clientX: number, clientY: number) => {
+    const lane = document.elementsFromPoint(clientX, clientY)
+      .map((element) => element.closest<HTMLElement>('[data-bay-target]'))
+      .find((element) => {
+        const bayId = Number(element?.dataset.bayTarget);
+        return element && bayId >= 1 && bayId <= 6 && bayId !== currentBayId;
+      });
+    return lane ? Number(lane.dataset.bayTarget) : null;
+  };
+
+  const finishDrag = () => {
+    dragStart.current = null;
+    setDragOffset(null);
+    setDragTargetBay(null);
+  };
+
   return (
     <div
       ref={cardRef}
       onClick={() => {
+        if (suppressNextClick.current) {
+          suppressNextClick.current = false;
+          return;
+        }
         if (ticket.status !== 'scheduled') return;
         if (isActionOpen) {
           onReturnToUnassigned(ticket);
@@ -65,9 +89,44 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         }
         onOpenDetail(ticket);
       }}
+      onPointerDown={(event) => {
+        if (ticket.status !== 'scheduled') return;
+        if ((event.target as HTMLElement).closest('button')) return;
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+        event.currentTarget.setPointerCapture(event.pointerId);
+        dragStart.current = { x: event.clientX, y: event.clientY };
+      }}
+      onPointerMove={(event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId) || !dragStart.current) return;
+        const x = event.clientX - dragStart.current.x;
+        const y = event.clientY - dragStart.current.y;
+        if (!dragOffset && Math.hypot(x, y) < 10) return;
+        event.preventDefault();
+        setDragOffset({ x, y });
+        setDragTargetBay(bayAtPoint(event.clientX, event.clientY));
+      }}
+      onPointerUp={(event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        event.currentTarget.releasePointerCapture(event.pointerId);
+        const start = dragStart.current;
+        const moved = start ? Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 10 : false;
+        const targetBay = moved ? bayAtPoint(event.clientX, event.clientY) : null;
+        finishDrag();
+        if (moved) {
+          suppressNextClick.current = true;
+          if (targetBay && (!ticket.preferredBaristaId || ticket.preferredBaristaId === targetBay)) {
+            onMoveTicket(ticket, targetBay);
+            onCloseAction();
+          }
+        }
+      }}
+      onPointerCancel={finishDrag}
       id={`ticket-${ticket.ticketUid || ticket.id.replace('#', '')}`}
-      style={widthPx ? { width: `${widthPx}px` } : undefined}
-      className={`relative group h-full ${isActionOpen ? 'overflow-visible z-[80]' : 'overflow-hidden'} shrink-0 min-w-[135px] rounded-lg border-2 border-l-[5px] ${leftBorderColor} px-2 py-1.5 transition-[box-shadow,border-color] select-none touch-manipulation flex flex-col justify-center ${ticket.status === 'scheduled' ? 'cursor-pointer' : 'cursor-default'} ${
+      style={{
+        ...(widthPx ? { width: `${widthPx}px` } : {}),
+        ...(dragOffset ? { transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)` } : {}),
+      }}
+      className={`relative group h-full ${dragOffset ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : isActionOpen ? 'overflow-visible z-[80]' : 'overflow-hidden'} shrink-0 min-w-[135px] rounded-lg border-2 border-l-[5px] ${leftBorderColor} px-2 py-1.5 transition-[box-shadow,border-color] select-none flex flex-col justify-center ${ticket.status === 'scheduled' ? 'cursor-grab active:cursor-grabbing touch-none' : 'cursor-default touch-manipulation'} ${
         isCompleted
           ? 'bg-slate-100 border-slate-200 text-slate-500 opacity-50 hover:opacity-70'
           : isNamed
@@ -79,6 +138,11 @@ export const TicketCard: React.FC<TicketCardProps> = ({
           : ''
       } ${!isMatchFilter ? 'opacity-25 blur-[0.5px]' : ''}`}
     >
+      {dragOffset && dragTargetBay && (
+        <div className="absolute right-1 top-1 z-[130] rounded-full bg-blue-700 px-2 py-1 font-mono text-[12px] font-black text-white shadow-md pointer-events-none">
+          → {dragTargetBay}
+        </div>
+      )}
       {isActionOpen && (
         <>
           {[1, 2, 3].map((bayId, index) => {
