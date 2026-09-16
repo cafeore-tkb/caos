@@ -29,6 +29,11 @@ import { soundManager } from './utils/audio';
 import { X } from 'lucide-react';
 
 type ControlViewMode = 'current' | 'new';
+type UndoSnapshot = {
+  baristas: Barista[];
+  unassignedOrders: UnassignedOrder[];
+  label: string;
+};
 
 const makeCleanBaristas = (): Barista[] => INITIAL_BARISTAS.map((barista) => ({
   ...barista,
@@ -139,6 +144,9 @@ export default function App() {
   const [beans, setBeans] = useState<BeanItem[]>(INITIAL_BEANS);
   const [unassignedOrders, setUnassignedOrders] = useState<UnassignedOrder[]>([]);
   const mockOrderCursor = useRef(0);
+  const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
+  const arrivalsAfterUndoSnapshotRef = useRef<UnassignedOrder[]>([]);
+  const [undoLabel, setUndoLabel] = useState<string | null>(null);
   const [learningLogs, setLearningLogs] = useState<LearningEngineLog[]>(INITIAL_LEARNING_LOGS);
   const [completedCount, setCompletedCount] = useState<number>(0);
 
@@ -176,11 +184,39 @@ export default function App() {
     const incoming = window.setInterval(() => {
       const group = MOCK_ORDER_GROUPS[mockOrderCursor.current];
       if (!group) return;
-      setUnassignedOrders((prev) => [...prev, ...group.map((order) => ({ ...order }))]);
+      const incomingOrders = group.map((order) => ({ ...order }));
+      if (undoSnapshotRef.current) {
+        arrivalsAfterUndoSnapshotRef.current.push(...incomingOrders);
+      }
+      setUnassignedOrders((prev) => [...prev, ...incomingOrders]);
       mockOrderCursor.current += 1;
     }, 4000);
     return () => window.clearInterval(incoming);
   }, []);
+
+  const captureUndo = (label: string) => {
+    undoSnapshotRef.current = { baristas, unassignedOrders, label };
+    arrivalsAfterUndoSnapshotRef.current = [];
+    setUndoLabel(label);
+  };
+
+  const handleUndo = () => {
+    const snapshot = undoSnapshotRef.current;
+    if (!snapshot) return;
+    const restoredKeys = new Set(snapshot.unassignedOrders.map((order) => order.ticketUid || order.id));
+    const arrivals = arrivalsAfterUndoSnapshotRef.current.filter(
+      (order) => !restoredKeys.has(order.ticketUid || order.id)
+    );
+    setBaristas(snapshot.baristas);
+    setUnassignedOrders([...snapshot.unassignedOrders, ...arrivals]);
+    setSelectedOrderId(null);
+    setSelectedQueueBean(null);
+    setSelectedTicket(null);
+    undoSnapshotRef.current = null;
+    arrivalsAfterUndoSnapshotRef.current = [];
+    setUndoLabel(null);
+    soundManager.playDispatch();
+  };
 
   const handleToggleOrderSelection = (orderId: string) => {
     if (!orderId) {
@@ -250,6 +286,7 @@ export default function App() {
 
     const targetBarista = baristas.find((b) => b.id === bayId);
     if (!targetBarista || targetBarista.queue.length === 0) return;
+    captureUndo(`${targetBarista.bayNumber}の「次へ」`);
 
     const completedTicket = targetBarista.queue[0];
 
@@ -313,6 +350,7 @@ export default function App() {
     );
     if (!orderToAssign) return;
     if (orderToAssign.preferredBaristaId && orderToAssign.preferredBaristaId !== targetBayId) return;
+    captureUndo(`${orderToAssign.id}の割当`);
 
     // Remove from unassigned
     setUnassignedOrders((prev) =>
@@ -364,6 +402,7 @@ export default function App() {
   const handleMoveScheduledTicket = (ticket: OrderTicket, targetBayId: number) => {
     if (ticket.status !== 'scheduled') return;
     if (ticket.preferredBaristaId && ticket.preferredBaristaId !== targetBayId) return;
+    captureUndo(`${ticket.id}の割当変更`);
     const key = ticketKey(ticket);
     setBaristas((prev) => {
       return prev.map((bay) => ({
@@ -384,6 +423,7 @@ export default function App() {
 
   const handleReturnScheduledTicket = (ticket: OrderTicket) => {
     if (ticket.status !== 'scheduled') return;
+    captureUndo(`${ticket.id}を未割当に戻す`);
     const key = ticketKey(ticket);
     setBaristas((prev) => prev.map((bay) => ({
       ...bay,
@@ -419,11 +459,12 @@ export default function App() {
   };
 
   const handleMergeUnassignedOrders = (firstUid: string, secondUid: string) => {
+    const first = unassignedOrders.find((order) => (order.ticketUid || order.id) === firstUid);
+    const second = unassignedOrders.find((order) => (order.ticketUid || order.id) === secondUid);
+    if (!first || !second || first.cupCount !== 1 || second.cupCount !== 1 || first.beanCode !== second.beanCode) return;
+    if (first.preferredBaristaId !== second.preferredBaristaId) return;
+    captureUndo(`${first.id}と${second.id}の統合`);
     setUnassignedOrders((prev) => {
-      const first = prev.find((order) => (order.ticketUid || order.id) === firstUid);
-      const second = prev.find((order) => (order.ticketUid || order.id) === secondUid);
-      if (!first || !second || first.cupCount !== 1 || second.cupCount !== 1 || first.beanCode !== second.beanCode) return prev;
-      if (first.preferredBaristaId !== second.preferredBaristaId) return prev;
       const sourceOrderIds = Array.from(new Set([...(first.sourceOrderIds || [first.id]), ...(second.sourceOrderIds || [second.id])])).sort((a, b) => orderNumber(a) - orderNumber(b));
       const merged: UnassignedOrder = {
         ...first,
@@ -495,6 +536,7 @@ export default function App() {
       preferredBaristaId: newOrd.preferredBaristaId,
       cardColor: newOrd.beanCode === 'ICE' ? 'cyan' : newOrd.beanCode === 'KEN' ? 'peach' : newOrd.beanCode === 'SP' ? 'emerald' : 'blue',
     };
+    captureUndo(`${created.id}の追加`);
     setUnassignedOrders((prev) => [...prev, ...splitIntoDripUnits([created])]);
     soundManager.playDispatch();
   };
@@ -537,6 +579,9 @@ export default function App() {
           simSpeed={simSpeed}
           onChangeSpeed={setSimSpeed}
           onResetData={handleResetData}
+          canUndo={Boolean(undoLabel)}
+          undoLabel={undoLabel}
+          onUndo={handleUndo}
           onOpenNewOrder={() => setIsNewOrderOpen(true)}
         />
 
