@@ -26,6 +26,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const [openPadUid, setOpenPadUid] = useState<string | null>(null);
   const [hoveredBay, setHoveredBay] = useState<number | null>(null);
+  const [dragVisual, setDragVisual] = useState<{ uid: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!openPadUid) return;
@@ -44,7 +45,12 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
 
   const orderUid = (order: UnassignedOrder) => order.ticketUid || order.id;
   const bayAtPoint = (clientX: number, clientY: number) => {
-    const target = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>('[data-bay-target]');
+    const target = document.elementsFromPoint(clientX, clientY)
+      .map((element) => element.closest<HTMLElement>('[data-bay-target]'))
+      .find((element) => {
+        const bayId = Number(element?.dataset.bayTarget);
+        return element && bayId >= 1 && bayId <= 6;
+      });
     const bayId = Number(target?.dataset.bayTarget);
     return bayId >= 1 && bayId <= 6 ? bayId : null;
   };
@@ -128,7 +134,9 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
                   const start = dragStart.current;
                   if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) < 12) return;
-                  setHoveredBay(bayAtPoint(event.clientX, event.clientY));
+                  const bayId = bayAtPoint(event.clientX, event.clientY);
+                  setHoveredBay(bayId);
+                  setDragVisual({ uid: orderUid(order), x: event.clientX - start.x, y: event.clientY - start.y });
                 }}
                 onPointerUp={(event) => {
                   if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -138,17 +146,29 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   const moved = start ? Math.hypot(event.clientX - start.x, event.clientY - start.y) >= 12 : false;
                   const bayId = moved ? bayAtPoint(event.clientX, event.clientY) : null;
                   dragStart.current = null;
+                  setDragVisual(null);
                   if (bayId) {
                     suppressNextClick.current = true;
                     assignToBay(order, bayId);
                   }
                 }}
-                className={`rounded-lg border p-2 min-h-0 flex flex-col justify-between transition-[box-shadow,border-color] hover:shadow-md cursor-pointer touch-manipulation select-none relative ${openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
+                onPointerCancel={() => {
+                  dragStart.current = null;
+                  setDragVisual(null);
+                  setHoveredBay(null);
+                }}
+                style={dragVisual?.uid === orderUid(order) ? { transform: `translate3d(${dragVisual.x}px, ${dragVisual.y}px, 0)` } : undefined}
+                className={`rounded-lg border p-2 min-h-0 flex flex-col justify-between transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing touch-none select-none relative ${dragVisual?.uid === orderUid(order) ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
                   isSelected
                     ? 'ring-4 ring-amber-400 border-amber-500 shadow-lg z-10'
                     : ''
                 }`}
               >
+                {dragVisual?.uid === orderUid(order) && hoveredBay && (
+                  <div className="absolute right-1 top-1 z-[130] rounded-full bg-blue-700 px-2 py-1 font-mono text-[12px] font-black text-white shadow-md pointer-events-none">
+                    → {hoveredBay}
+                  </div>
+                )}
                 {isOrderBoundary && (
                   <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-slate-500" aria-hidden="true" />
                 )}
