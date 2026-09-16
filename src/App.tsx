@@ -31,7 +31,29 @@ type ControlViewMode = 'current' | 'new';
 type UndoSnapshot = {
   baristas: Barista[];
   unassignedOrders: UnassignedOrder[];
+  shiftRosterIndex: number;
   label: string;
+};
+
+type ShiftMember = { name: string; canHandleSpecial: boolean };
+
+const SHIFT_ROSTERS: ShiftMember[][] = [
+  [{ name: '山本', canHandleSpecial: true }, { name: '中村', canHandleSpecial: false }, { name: '小林', canHandleSpecial: true }, { name: '松本', canHandleSpecial: false }, { name: '井上', canHandleSpecial: false }, { name: '木村', canHandleSpecial: false }],
+  [{ name: '吉田', canHandleSpecial: true }, { name: '加藤', canHandleSpecial: true }, { name: '山田', canHandleSpecial: true }, { name: '斎藤', canHandleSpecial: false }, { name: '清水', canHandleSpecial: false }, { name: '森', canHandleSpecial: false }],
+  [{ name: '池田', canHandleSpecial: true }, { name: '橋本', canHandleSpecial: false }, { name: '阿部', canHandleSpecial: false }, { name: '石川', canHandleSpecial: false }, { name: '山下', canHandleSpecial: false }, { name: '藤田', canHandleSpecial: false }],
+];
+
+const placeShiftMembers = (members: ShiftMember[]) => {
+  const special = members.filter((member) => member.canHandleSpecial);
+  const regular = members.filter((member) => !member.canHandleSpecial);
+  const placed: Array<ShiftMember | undefined> = Array(6).fill(undefined);
+  if (special[0]) placed[0] = special.shift();
+  if (special[0]) placed[5] = special.shift();
+  [...special, ...regular].forEach((member) => {
+    const openIndex = placed.findIndex((placedMember) => !placedMember);
+    if (openIndex >= 0) placed[openIndex] = member;
+  });
+  return placed as ShiftMember[];
 };
 
 const makeCleanBaristas = (): Barista[] => INITIAL_BARISTAS.map((barista) => ({
@@ -147,6 +169,8 @@ export default function App() {
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
   const arrivalsAfterUndoSnapshotRef = useRef<UnassignedOrder[]>([]);
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
+  const [shiftRosterIndex, setShiftRosterIndex] = useState(0);
+  const lastAutomaticShiftHour = useRef(new Date().getHours());
   const [learningLogs, setLearningLogs] = useState<LearningEngineLog[]>(INITIAL_LEARNING_LOGS);
   const [completedCount, setCompletedCount] = useState<number>(0);
 
@@ -208,7 +232,7 @@ export default function App() {
   }, []);
 
   const captureUndo = (label: string) => {
-    undoSnapshotRef.current = { baristas, unassignedOrders, label };
+    undoSnapshotRef.current = { baristas, unassignedOrders, shiftRosterIndex, label };
     arrivalsAfterUndoSnapshotRef.current = [];
     setUndoLabel(label);
   };
@@ -222,6 +246,7 @@ export default function App() {
     );
     setBaristas(snapshot.baristas);
     setUnassignedOrders([...snapshot.unassignedOrders, ...arrivals]);
+    setShiftRosterIndex(snapshot.shiftRosterIndex);
     setSelectedOrderId(null);
     setSelectedQueueBean(null);
     setSelectedTicket(null);
@@ -434,6 +459,44 @@ export default function App() {
     soundManager.playDispatch();
   };
 
+  const changeShift = (allowUndo: boolean) => {
+    if (allowUndo) {
+      captureUndo('シフト交代');
+    } else {
+      undoSnapshotRef.current = null;
+      arrivalsAfterUndoSnapshotRef.current = [];
+      setUndoLabel(null);
+    }
+    const roster = placeShiftMembers(SHIFT_ROSTERS[shiftRosterIndex % SHIFT_ROSTERS.length]);
+    setBaristas((prev) => [...prev]
+      .sort((a, b) => a.bayNumber - b.bayNumber)
+      .map((barista, index) => {
+        const member = roster[index];
+        return {
+          ...barista,
+          name: member.name,
+          canHandleSpecial: member.canHandleSpecial || undefined,
+          coefficient: member.canHandleSpecial ? 0.97 : 1.05,
+          coefficientColor: member.canHandleSpecial ? 'green' : 'orange',
+        };
+      }));
+    setShiftRosterIndex((index) => (index + 1) % SHIFT_ROSTERS.length);
+    setSelectedTicket(null);
+    setSelectedOrderId(null);
+    setSelectedQueueBean(null);
+    soundManager.playDispatch();
+  };
+
+  useEffect(() => {
+    const hour = realTime.getHours();
+    if (hour === lastAutomaticShiftHour.current) return;
+    lastAutomaticShiftHour.current = hour;
+    changeShift(false);
+  }, [realTime.getHours()]);
+
+  const nextShiftHour = (realTime.getHours() + 1) % 24;
+  const nextShiftLabel = `${nextShiftHour.toString().padStart(2, '0')}:00`;
+
   const handleReturnScheduledTicket = (ticket: OrderTicket) => {
     if (ticket.status !== 'scheduled') return;
     captureUndo(`${ticket.id}を未割当に戻す`);
@@ -526,6 +589,7 @@ export default function App() {
     setCompletedCount(0);
     setSelectedOrderId(null);
     setSelectedQueueBean(null);
+    setShiftRosterIndex(0);
     soundManager.playDispatch();
   };
 
@@ -657,7 +721,7 @@ export default function App() {
               </button>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-3">
-              {activeTab === 'bays' && <BaysOverviewView baristas={baristas} onSelectBayForDispatch={() => setActiveTab('control')} />}
+              {activeTab === 'bays' && <BaysOverviewView baristas={baristas} nextShiftLabel={nextShiftLabel} onChangeShift={() => changeShift(true)} />}
               {activeTab === 'beans' && (
                 <BeanQueueView
                   beans={beans}
