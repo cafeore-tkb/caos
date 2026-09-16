@@ -13,7 +13,6 @@ interface HumanCenteredControlViewProps {
   unassignedOrders: UnassignedOrder[];
   simTimeSec: number;
   selectedOrderId: string | null;
-  selectedQueueBean: BeanCode | null;
   highlightFilter: BeanCode | null;
   onSelectOrder: (orderId: string) => void;
   onSelectQueueOrder: (order: UnassignedOrder) => void;
@@ -43,22 +42,12 @@ const getRemainingSeconds = (barista: Barista, simTimeSec: number) => {
   return Math.round(current.totalDurationSec * barista.coefficient);
 };
 
-const getServiceLabel = (order: Pick<UnassignedOrder, 'badgeTag' | 'beanCode'>) => {
-  if (order.beanCode === 'SP' || order.badgeTag.includes('SP')) return 'SP';
-  if (order.beanCode === 'ICE' || order.badgeTag.includes('急冷')) return 'ICE';
-  if (order.beanCode === 'MILK' || order.badgeTag.includes('牛')) return 'MILK';
-  if (order.badgeTag.includes('BATCH')) return 'BATCH';
-  return 'HOT';
-};
-
-const getTicketTag = (ticket: OrderTicket) => ticket.tag || (ticket.beanCode === 'SP' ? '★SP' : 'HOT');
 
 export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> = ({
   baristas,
   unassignedOrders,
   simTimeSec,
   selectedOrderId,
-  selectedQueueBean,
   highlightFilter,
   onSelectOrder,
   onSelectQueueOrder,
@@ -112,7 +101,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
   const totalUnassignedCups = unassignedOrders.reduce((sum, order) => sum + order.cupCount, 0);
 
   return (
-    <section className="h-full flex flex-col gap-2 min-h-0 overflow-hidden" aria-label="新案コントロール画面">
+    <section className="h-full flex flex-col gap-2 min-h-0 overflow-hidden" aria-label="Bコントロール画面">
       <div className="bg-white border border-slate-300 rounded-lg shadow-xs overflow-hidden shrink-0">
         <div className="h-[40px] px-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-w-0">
@@ -195,11 +184,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                 <button
                   type="button"
                   disabled={!current}
-                  onClick={() => {
-                    if (!current) return;
-                    onSelectOrder(current.id);
-                    onOpenTicketDetail(current);
-                  }}
+                  onClick={() => undefined}
                   className={`w-full text-left rounded-md border p-2 min-h-[104px] transition-colors touch-manipulation ${
                     current
                       ? isImminent
@@ -217,8 +202,8 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                         <div className="min-w-0">
                           <div className="text-[15px] leading-tight font-black truncate">{current.beanName}</div>
                           <div className="mt-0.5 flex items-center gap-1 text-[10px] font-bold opacity-85">
-                            <span>{getTicketTag(current)}</span>
-                            <span>×{current.cupCount}</span>
+                            <span className="rounded bg-white px-1.5 py-0.5 text-[14px] leading-none font-mono text-slate-950 opacity-100">{current.cupCount}杯</span>
+                            {current.totalItemsInOrder && !(current.totalItemsInOrder === 1 && current.totalOrderCups === 1) && <span>{current.itemIndex}/{current.totalItemsInOrder}・計{current.totalOrderCups}杯</span>}
                           </div>
                         </div>
                         <span className="font-mono text-[21px] leading-none font-black shrink-0">{current.id}</span>
@@ -244,7 +229,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                       className="w-full mt-1 text-left flex items-center justify-between gap-1 hover:text-blue-700 touch-manipulation"
                     >
                       <div className="min-w-0">
-                        <div className="text-[12px] font-black truncate">{next.beanName} ×{next.cupCount}</div>
+                        <div className="flex items-center gap-1"><span className="text-[12px] font-black truncate">{next.beanName}</span><span className="rounded bg-slate-950 px-1.5 py-0.5 text-[14px] leading-none font-mono font-black text-white">{next.cupCount}杯</span>{next.totalItemsInOrder && !(next.totalItemsInOrder === 1 && next.totalOrderCups === 1) && <span className="text-[10px] font-mono font-black">{next.itemIndex}/{next.totalItemsInOrder}・計{next.totalOrderCups}杯</span>}</div>
                         <div className="font-mono text-[15px] font-black text-slate-700">{next.id}</div>
                       </div>
                       <ChevronRight className="w-4 h-4 shrink-0 text-slate-400" />
@@ -290,11 +275,6 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
           <div className="grid grid-cols-5 grid-rows-2 gap-1.5 h-[calc(100%-38px)]">
             {visibleGroups.map((group, index) => {
               const isSelected = selectedOrderId === group.id;
-              const isSameBean = Boolean(
-                selectedQueueBean &&
-                  !isSelected &&
-                  group.items.some((item) => item.beanCode === selectedQueueBean)
-              );
               const matchesHeaderFilter = Boolean(
                 highlightFilter && group.items.some((item) => item.beanCode === highlightFilter)
               );
@@ -314,8 +294,6 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                   className={`relative rounded-lg border p-2 min-h-0 overflow-hidden cursor-pointer active:scale-[0.99] transition-all touch-manipulation ${
                     isSelected
                       ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-400 shadow-sm'
-                      : isSameBean
-                      ? 'bg-amber-50 border-amber-400 ring-1 ring-amber-300'
                       : matchesHeaderFilter
                       ? 'bg-sky-50 border-sky-400'
                       : 'bg-white border-slate-300 hover:border-slate-500 hover:shadow-sm'
@@ -338,11 +316,6 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                         )}
                       </div>
                     </div>
-                    {isSameBean && (
-                      <span className="px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 text-[9px] font-black whitespace-nowrap">
-                        同じ豆
-                      </span>
-                    )}
                   </div>
 
                   <div className="mt-1.5 space-y-1">
@@ -355,20 +328,14 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                           onSelectQueueOrder(item);
                           onAssignOrder(item);
                         }}
-                        className={`w-full rounded-md border px-2 py-1 text-left transition-colors touch-manipulation ${
-                          selectedQueueBean === item.beanCode
-                            ? 'bg-white border-amber-400'
-                            : 'bg-slate-50 border-slate-200 hover:bg-blue-50 hover:border-blue-300'
-                        }`}
+                        className="w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-left transition-colors hover:border-blue-300 hover:bg-blue-50 touch-manipulation"
                       >
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-[13px] font-black text-slate-900 truncate">{item.beanName}</span>
-                          <span className="font-mono text-[13px] font-black text-slate-700 shrink-0">×{item.cupCount}</span>
+                          <span className="rounded bg-slate-950 px-1.5 py-0.5 font-mono text-[14px] leading-none font-black text-white shrink-0">{item.cupCount}杯</span>
+                          {item.totalItemsInOrder && !(item.totalItemsInOrder === 1 && item.totalOrderCups === 1) && <span className="text-[10px] font-mono font-black text-slate-600 shrink-0">{item.itemIndex}/{item.totalItemsInOrder}・計{item.totalOrderCups}杯</span>}
                         </div>
-                        <div className="mt-1 flex items-center justify-between gap-1 text-[9px] font-bold">
-                          <span className="px-1.5 py-0.5 rounded bg-slate-900 text-white">{getServiceLabel(item)}</span>
-                          <span className="font-mono text-slate-500">{item.predictedTimeStr}</span>
-                        </div>
+                        {item.preferredBaristaId && <div className="mt-1 text-[10px] font-black text-violet-700">指名 {item.preferredBaristaId}</div>}
                       </button>
                     ))}
                   </div>

@@ -30,8 +30,8 @@ export const AssignSlotModal: React.FC<AssignSlotModalProps> = ({
   const selectedOrder = unassignedOrders.find((order) => (order.ticketUid || order.id) === selectedOrderUid);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-xs select-none" onClick={onClose}>
-      <div className="context-sheet bg-white w-full max-w-[460px] h-full border-l border-slate-300 shadow-2xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed top-[56px] right-0 bottom-0 z-50 pointer-events-none select-none">
+      <div className="context-sheet pointer-events-auto bg-white w-[min(440px,44vw)] min-w-[360px] h-full border-l border-slate-300 shadow-2xl overflow-y-auto">
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-[#f8fafc]">
           <h3 className="text-base font-bold text-slate-900">

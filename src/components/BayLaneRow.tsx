@@ -10,6 +10,10 @@ interface BayLaneRowProps {
   onSelectOrder: (orderId: string) => void;
   onAdvanceBay: (bayId: number) => void;
   onOpenTicketDetail: (ticket: OrderTicket) => void;
+  actionTicketKey?: string | null;
+  onMoveTicket: (ticket: OrderTicket, bayId: number) => void;
+  onReturnToUnassigned: (ticket: OrderTicket) => void;
+  onCloseTicketAction: () => void;
   onOpenEmptySlot: (bayId: number) => void;
   timelineStartSec: number;
   pixelsPerSec: number;
@@ -24,6 +28,10 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
   onSelectOrder,
   onAdvanceBay,
   onOpenTicketDetail,
+  actionTicketKey,
+  onMoveTicket,
+  onReturnToUnassigned,
+  onCloseTicketAction,
   onOpenEmptySlot,
   timelineStartSec,
   pixelsPerSec,
@@ -71,35 +79,32 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
   return (
     <div data-bay-target={barista.id} className="flex items-center h-[72px] border-b border-[#e2e8f0] bg-white hover:bg-[#fcfdff] transition-colors relative touch-manipulation">
       {/* 1. Barista Info Module - Sticky left column (200px) */}
-      <div className="sticky left-0 z-50 w-[195px] shrink-0 self-stretch px-2 py-1.5 flex items-start gap-2 bg-white border-r border-[#e2e8f0] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
-        {/* Bay Number Box - iPad friendly 42px touch size */}
-        <div className="w-9 h-9 bg-[#0f172a] rounded-lg flex items-center justify-center text-white font-mono font-black text-lg shadow-xs shrink-0">
+      <div className="sticky left-0 z-50 w-[195px] shrink-0 self-stretch px-2 py-1.5 flex items-center gap-2 bg-white border-r border-[#e2e8f0] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
+        {/* Bay number is the row anchor. */}
+        <div className="w-[48px] h-[58px] bg-[#0f172a] rounded-xl flex items-center justify-center text-white font-mono font-black text-[25px] shadow-xs shrink-0">
           {barista.bayNumber}
         </div>
 
-        {/* Barista Name & Speed Coefficient */}
-        <div className="flex flex-col min-w-0 flex-1">
-          <div className="flex items-center gap-1">
-            <span className="font-bold text-[16px] text-[#0f172a] tracking-tight truncate">
+        <div className="flex flex-col justify-center min-w-0 flex-1 h-full">
+          <div className="flex items-center gap-1 min-w-0 leading-none">
+            <span className="font-black text-[15px] text-[#0f172a] tracking-tight truncate">
               {barista.name}
             </span>
             {barista.canHandleSpecial && (
-              <span className="px-1 py-0.5 rounded bg-emerald-950 text-emerald-100 text-[8px] font-black whitespace-nowrap">
+              <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-100 text-[9px] font-black whitespace-nowrap">
                 ★SP
               </span>
             )}
+            {activeTicket && <span className="ml-auto font-mono text-[16px] font-black text-slate-950 shrink-0">{activeTicket.id}</span>}
           </div>
 
-          <div className="flex items-baseline justify-between gap-1 min-w-0">
-            <span className="text-[12px] font-bold text-slate-800 truncate" title={activeTicket?.beanName}>
-              {activeTicket ? `${activeTicket.beanName} ×${activeTicket.cupCount}` : '待機中'}
-            </span>
-            {activeTicket && (
-              <span className="font-mono text-[17px] font-black text-slate-950 shrink-0">{activeTicket.id}</span>
-            )}
+          <div className="mt-1 flex items-center gap-1 min-w-0 leading-none">
+            <span className="text-[13px] font-bold text-slate-800 truncate" title={activeTicket?.beanName}>{activeTicket?.beanName || '待機中'}</span>
+            {activeTicket && <span className="rounded bg-slate-950 px-1.5 py-0.5 text-[12px] font-mono font-black text-white shrink-0">{activeTicket.cupCount}杯</span>}
           </div>
-          <div className={`font-mono text-[20px] leading-none font-black ${isImminent ? 'text-red-600' : 'text-slate-950'}`}>
-            {activeTicket ? (isOvertime ? '継続中' : formatRemaining(activeTicket.timeRemainingSec)) : '--:--'}
+          <div className={`mt-1 flex items-baseline gap-1 font-mono leading-none font-black ${isImminent ? 'text-red-600' : 'text-slate-950'}`}>
+            {activeTicket && !isOvertime && <span className="text-[9px] font-sans font-black tracking-wide">残り</span>}
+            <span className={isOvertime ? 'text-[17px]' : 'text-[21px]'}>{activeTicket ? (isOvertime ? '継続中' : formatRemaining(activeTicket.timeRemainingSec)) : '--:--'}</span>
           </div>
         </div>
       </div>
@@ -142,6 +147,11 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
                 selectedOrderId={selectedOrderId}
                 onSelectOrder={onSelectOrder}
                 onOpenDetail={onOpenTicketDetail}
+                actionTicketKey={actionTicketKey}
+                currentBayId={barista.id}
+                onMoveTicket={onMoveTicket}
+                onReturnToUnassigned={onReturnToUnassigned}
+                onCloseAction={onCloseTicketAction}
                 widthPx={widthPx}
               />
             </div>

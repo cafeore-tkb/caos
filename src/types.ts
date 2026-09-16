@@ -27,6 +27,7 @@ export interface OrderTicket {
   totalItemsInOrder?: number; // e.g. 2
   totalOrderCups?: number; // e.g. 3 (total cups in entire order #152)
   orderNotes?: string; // e.g. "チャンプ 2杯 + 俺ブレ 1杯"
+  sourceOrderIds?: string[]; // combined drip across separate register orders
   beanCode: BeanCode;
   beanName: string;
   cupCount: number;
@@ -72,6 +73,7 @@ export interface UnassignedOrder {
   totalItemsInOrder?: number;
   totalOrderCups?: number;
   orderNotes?: string;
+  sourceOrderIds?: string[]; // combined drip across separate register orders
   beanCode: BeanCode;
   beanName: string;
   cupCount: number;

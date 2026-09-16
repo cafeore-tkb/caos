@@ -101,7 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {item.label}
                 </span>
               </button>
-              {item.id === 'control' && activeTab === 'control' && (
+              {item.id === 'control' && (
                 <div className="w-full rounded-xl bg-slate-200 p-1 grid gap-1" role="group" aria-label="管制盤の表示切替">
                   {(['current', 'new'] as const).map((mode) => (
                     <button
@@ -111,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onClick={() => onSelectControlViewMode(mode)}
                       className={`min-h-[44px] rounded-lg text-[12px] font-black transition-colors touch-manipulation ${controlViewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600'}`}
                     >
-                      {mode === 'current' ? '現行' : '新案'}
+                      {mode === 'current' ? 'A' : 'B'}
                     </button>
                   ))}
                 </div>
