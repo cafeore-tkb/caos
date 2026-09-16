@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Plus, Play, Pause, RotateCcw } from 'lucide-react';
+import { Volume2, VolumeX, Plus, Play, Pause, RotateCcw, Undo2 } from 'lucide-react';
 import { BeanCode } from '../types';
 import { BEAN_LEGENDS } from '../data/initialData';
 import { soundManager } from '../utils/audio';
@@ -17,6 +17,9 @@ interface TopHeaderProps {
   simSpeed: number;
   onChangeSpeed: (speed: number) => void;
   onResetData: () => void;
+  canUndo: boolean;
+  undoLabel: string | null;
+  onUndo: () => void;
   onOpenNewOrder: () => void;
 }
 
@@ -33,6 +36,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   simSpeed,
   onChangeSpeed,
   onResetData,
+  canUndo,
+  undoLabel,
+  onUndo,
   onOpenNewOrder,
 }) => {
   return (
@@ -99,7 +105,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       {/* Right side: Bean Legend Badges & Quick Action */}
       <div className="flex items-center gap-3">
         {/* Bean Legend list */}
-        <div className="hidden lg:flex items-center gap-1.5">
+        <div className="hidden xl:flex items-center gap-1.5">
           {BEAN_LEGENDS.map((bean) => {
             const isSelected = selectedBeanFilter === bean.code;
             return (
@@ -133,6 +139,19 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             </button>
           )}
         </div>
+
+        {/* Quick Order Button */}
+        <button
+          id="btn-undo"
+          type="button"
+          disabled={!canUndo}
+          onClick={onUndo}
+          title={undoLabel ? `${undoLabel}を元に戻す` : '元に戻せる操作はありません'}
+          className="min-h-[44px] flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-black text-slate-800 shadow-xs transition-colors hover:bg-slate-100 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 touch-manipulation"
+        >
+          <Undo2 className="w-4 h-4" />
+          <span>1つ戻す</span>
+        </button>
 
         {/* Quick Order Button */}
         <button
