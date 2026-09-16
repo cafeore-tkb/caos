@@ -94,16 +94,16 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
   };
 
   return (
-    <div className="p-4 sm:p-6 space-y-5 overflow-y-auto max-w-7xl mx-auto touch-manipulation">
+    <div className="space-y-3 max-w-none touch-manipulation">
       {/* Header & Actions */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3">
         <div>
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Coffee className="w-6 h-6 text-[#006c4a]" />
-            <span>豆キュー＆ロースタリー管理メニュー</span>
+          <h2 className="text-[16px] font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <Coffee className="w-5 h-5 text-[#006c4a]" />
+            <span>豆キュー</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            豆銘柄・焙煎プロファイル・在庫量（g）・フレーバーノートを直接編集できます（iPadタッチ対応）
+            銘柄と在庫を確認・編集
           </p>
         </div>
 
@@ -118,7 +118,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
       </div>
 
       {/* Filter / Search Bar for iPad Quick Interaction */}
-      <div className="bg-white p-3 sm:p-4 rounded-xl border border-slate-200 shadow-2xs flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
+      <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-2xs flex flex-col gap-2 items-stretch">
         <div className="relative flex-1">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -130,7 +130,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <Filter className="w-3.5 h-3.5 text-slate-400 shrink-0 hidden sm:inline" />
           {roastOptions.map((opt) => (
             <button
@@ -283,7 +283,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
       )}
 
       {/* Bean Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-2">
         {filteredBeans.map((bean) => {
           const legend = BEAN_LEGENDS.find((l) => l.code === bean.code);
           const isEditing = editingCode === bean.code;
@@ -292,7 +292,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
             <div
               key={bean.code}
               id={`bean-card-${bean.code.toLowerCase()}`}
-              className={`bg-white rounded-xl border p-4 shadow-xs flex flex-col justify-between transition-all select-none ${
+              className={`bg-white rounded-xl border p-3 shadow-xs flex flex-col justify-between transition-all select-none ${
                 isEditing
                   ? 'ring-2 ring-blue-500 border-blue-500 shadow-md bg-blue-50/20'
                   : 'border-slate-300 hover:border-slate-400 hover:shadow-sm'

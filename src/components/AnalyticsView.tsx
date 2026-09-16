@@ -87,22 +87,22 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
   ];
 
   return (
-    <div className="p-5 space-y-5 overflow-y-auto">
+    <div className="space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-200 pb-3 flex-wrap gap-2">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+          <h2 className="text-[16px] font-black text-slate-900 tracking-tight flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-indigo-600" />
-            <span>シフト実績・時間帯スループット分析</span>
+            <span>シフト実績</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            時間あたり抽出杯数 (CPH)・過去1時間の抽出時間ブレ推移 (Variance)・バリスタ別効率指標
+            提供数と抽出時間の推移
           </p>
         </div>
       </div>
 
       {/* Top Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-2">
         <div className="bg-white rounded-xl border border-slate-300 p-4 shadow-xs">
           <div className="text-xs text-slate-500 font-semibold mb-1 flex items-center gap-1.5">
             <TrendingUp className="w-4 h-4 text-emerald-600" />
@@ -160,9 +160,9 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </div>
 
       {/* NEW SECTION: Past 1-Hour Barista Extraction Variance Line Chart */}
-      <div className="bg-white rounded-xl border border-slate-300 p-5 shadow-xs">
+        <div className="bg-white rounded-xl border border-slate-300 p-3 shadow-xs">
         {/* Section Header & Interactive Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
+        <div className="flex flex-col gap-2 pb-3 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-2">
               <Activity className="w-4 h-4 text-indigo-600" />
@@ -251,7 +251,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </div>
 
         {/* Recharts Responsive Line Chart */}
-        <div className="w-full h-[320px] pt-2">
+        <div className="w-full h-[260px] pt-2">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={PAST_HOUR_SERIES_DATA}
@@ -391,7 +391,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
         </div>
 
         {/* Insight Breakdown Footnotes */}
-        <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+        <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 gap-2 text-xs">
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 flex items-start gap-2">
             <Info className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
             <div>
@@ -425,7 +425,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </div>
 
       {/* Hourly Throughput Bar Visualizer */}
-      <div className="bg-white rounded-xl border border-slate-300 p-5 shadow-xs">
+      <div className="bg-white rounded-xl border border-slate-300 p-3 shadow-xs">
         <h3 className="font-bold text-sm text-slate-900 mb-4">
           時間帯別 抽出杯数推移 (Cups Per Hour)
         </h3>
@@ -448,11 +448,11 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
       </div>
 
       {/* Barista Efficiency Ranking */}
-      <div className="bg-white rounded-xl border border-slate-300 p-5 shadow-xs">
+      <div className="bg-white rounded-xl border border-slate-300 p-3 shadow-xs">
         <h3 className="font-bold text-sm text-slate-900 mb-3">
           バリスタ別 抽出ペースと担当カテゴリ
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-2">
           {baristas.map((b) => (
             <div key={b.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <div className="flex justify-between items-center mb-1">
