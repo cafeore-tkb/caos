@@ -60,12 +60,12 @@ const PAST_HOUR_SERIES_DATA: TimeSeriesPoint[] = [
 ];
 
 const BARISTA_CHART_CONFIG = [
-  { key: 'sato', deltaKey: 'sato_delta', name: '佐藤 (Bay 1)', bayId: 1, target: 120, color: '#4f46e5', specialty: '高速チャンピオン' },
-  { key: 'suzuki', deltaKey: 'suzuki_delta', name: '鈴木 (Bay 2)', bayId: 2, target: 145, color: '#d97706', specialty: 'ゲイシャ/限定' },
-  { key: 'takahashi', deltaKey: 'takahashi_delta', name: '高橋 (Bay 3)', bayId: 3, target: 130, color: '#059669', specialty: '標準ドリップ' },
-  { key: 'tanaka', deltaKey: 'tanaka_delta', name: '田中 (Bay 4)', bayId: 4, target: 150, color: '#0284c7', specialty: 'アイス急冷' },
-  { key: 'ito', deltaKey: 'ito_delta', name: '伊藤 (Bay 5)', bayId: 5, target: 128, color: '#e11d48', specialty: 'ブレンド/ミルク' },
-  { key: 'watanabe', deltaKey: 'watanabe_delta', name: '渡辺 (Bay 6)', bayId: 6, target: 112, color: '#7c3aed', specialty: 'ハイスピード' },
+  { key: 'sato', deltaKey: 'sato_delta', name: '佐藤 (ドリッパー 1)', bayId: 1, target: 120, color: '#4f46e5', specialty: '高速チャンピオン' },
+  { key: 'suzuki', deltaKey: 'suzuki_delta', name: '鈴木 (ドリッパー 2)', bayId: 2, target: 145, color: '#d97706', specialty: 'ゲイシャ/限定' },
+  { key: 'takahashi', deltaKey: 'takahashi_delta', name: '高橋 (ドリッパー 3)', bayId: 3, target: 130, color: '#059669', specialty: '標準ドリップ' },
+  { key: 'tanaka', deltaKey: 'tanaka_delta', name: '田中 (ドリッパー 4)', bayId: 4, target: 150, color: '#0284c7', specialty: 'アイス急冷' },
+  { key: 'ito', deltaKey: 'ito_delta', name: '伊藤 (ドリッパー 5)', bayId: 5, target: 128, color: '#e11d48', specialty: 'ブレンド/ミルク' },
+  { key: 'watanabe', deltaKey: 'watanabe_delta', name: '渡辺 (ドリッパー 6)', bayId: 6, target: 112, color: '#7c3aed', specialty: 'ハイスピード' },
 ];
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
@@ -151,7 +151,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             最速バリスタ
           </div>
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-slate-900">渡辺 (ベイ6)</span>
+            <span className="text-2xl font-black text-slate-900">渡辺 (ドリッパー 6)</span>
           </div>
           <div className="text-[11px] text-slate-500 font-medium mt-1">
             補正係数 ×0.91 (平均1分52秒)
@@ -397,7 +397,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             <div>
               <div className="font-bold text-slate-800">最も安定したバリスタ</div>
               <div className="text-slate-600 text-[11px] mt-0.5">
-                高橋（ベイ3）：標準偏差 <span className="font-mono font-bold text-emerald-600">σ = ±1.4秒</span> 以内。再現性の極めて高い抽出を継続中。
+                高橋（ドリッパー 3）：標準偏差 <span className="font-mono font-bold text-emerald-600">σ = ±1.4秒</span> 以内。再現性の極めて高い抽出を継続中。
               </div>
             </div>
           </div>
@@ -407,7 +407,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
             <div>
               <div className="font-bold text-slate-800">意図的ブレ要因（適正）</div>
               <div className="text-slate-600 text-[11px] mt-0.5">
-                鈴木（ベイ2）：ゲイシャ特有のガス抜け度合に応じた蒸らし時間調整のため、±7秒前後の適正ブレが発生。
+                鈴木（ドリッパー 2）：ゲイシャ特有のガス抜け度合に応じた蒸らし時間調整のため、±7秒前後の適正ブレが発生。
               </div>
             </div>
           </div>
@@ -456,7 +456,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
           {baristas.map((b) => (
             <div key={b.id} className="p-3 bg-slate-50 rounded-lg border border-slate-200">
               <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-slate-900">{b.name} (ベイ{b.id})</span>
+                <span className="font-bold text-slate-900">{b.name} (ドリッパー {b.id})</span>
                 <span className="font-mono text-xs font-bold text-emerald-700">×{b.coefficient}</span>
               </div>
               <p className="text-[11px] text-slate-600">
@@ -469,4 +469,3 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     </div>
   );
 };
-

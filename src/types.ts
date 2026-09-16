@@ -32,6 +32,7 @@ export interface OrderTicket {
   cupCount: number;
   tag?: 'HOT' | 'ICE' | 'BATCH' | '牛' | '牛オレ' | '氷' | '★SP' | '定番' | '浅煎り' | '水洗' | string;
   secondaryTag?: string;
+  preferredBaristaId?: number; // 指名。必ず1人だけ
   status: 'brewing' | 'scheduled' | 'ready' | 'unassigned' | 'completed';
   timeRemainingSec?: number; // for brewing
   totalDurationSec: number;
@@ -53,6 +54,7 @@ export interface Barista {
   id: number;
   bayNumber: number;
   name: string;
+  canHandleSpecial?: boolean;
   coefficient: number; // e.g. 0.93
   coefficientColor: 'green' | 'orange' | 'blue' | 'purple';
   status: 'brewing' | 'imminent' | 'standby' | 'ready';
@@ -77,6 +79,7 @@ export interface UnassignedOrder {
   predictedTimeStr: string;
   recommendedBaristas: string;
   recommendedBayIds: number[];
+  preferredBaristaId?: number; // 指名。必ず1人だけ
   cardColor: 'blue' | 'peach' | 'cyan' | 'emerald';
 }
 

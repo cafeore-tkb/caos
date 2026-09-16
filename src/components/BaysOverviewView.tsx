@@ -25,16 +25,16 @@ export const BaysOverviewView: React.FC<BaysOverviewViewProps> = ({
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>6ベイ ステーション設備＆リアルタイム稼働状況</span>
+            <span>6人のドリッパーと使用設備</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            全6バリスタ席のミル挽き目・ケトル水温・デジタルスケール状態テレメトリ
+            抽出担当者ごとの現在キューと使用設備
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            全ベイ設備正常稼働中 (RUN 6/6)
+            全ドリッパー稼働中 (RUN 6/6)
           </span>
         </div>
       </div>
@@ -55,12 +55,12 @@ export const BaysOverviewView: React.FC<BaysOverviewViewProps> = ({
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-900">{barista.name} バリスタ</h3>
-                      <span className="text-[10px] text-slate-500">ベイ {barista.bayNumber}</span>
+                      <span className="text-[10px] text-slate-500">ドリッパー {barista.bayNumber}</span>
                     </div>
                   </div>
-                  <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    速度係数 ×{barista.coefficient}
-                  </span>
+                  {barista.canHandleSpecial && (
+                    <span className="text-[10px] font-black px-2 py-1 rounded bg-emerald-950 text-emerald-100">★ SP</span>
+                  )}
                 </div>
 
                 <div className="space-y-2 text-xs">
@@ -107,10 +107,10 @@ export const BaysOverviewView: React.FC<BaysOverviewViewProps> = ({
 
               <button
                 onClick={() => onSelectBayForDispatch(barista.id)}
-                className="mt-4 w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                className="mt-4 w-full min-h-[44px] bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5 transition-colors touch-manipulation"
               >
                 <Coffee className="w-3.5 h-3.5" />
-                <span>管制盤でこのベイを表示</span>
+                <span>管制盤でこのドリッパーを表示</span>
               </button>
             </div>
           );

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Sparkles, X, ChevronLeft, ChevronRight, RotateCcw, Clock } from 'lucide-react';
+import { Sparkles, X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { Barista, BeanCode, OrderTicket } from '../types';
 import { BayLaneRow } from './BayLaneRow';
 
@@ -20,6 +20,8 @@ const TIMELINE_END_SEC = 8 * 3600 + 25 * 60; // 30300
 const PIXELS_PER_SEC = 1.2; // 1 min = 72px
 const TIMELINE_WIDTH_PX = (TIMELINE_END_SEC - TIMELINE_START_SEC) * PIXELS_PER_SEC; // 2520px
 const STICKY_LEFT_WIDTH = 290; // 195px barista + 95px action
+// 90 seconds of past context remains visible to the left of NOW.
+const NOW_VIEWPORT_OFFSET = 90 * PIXELS_PER_SEC;
 
 export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   baristas,
@@ -35,17 +37,36 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   const [hasInitializedScroll, setHasInitializedScroll] = useState(false);
   const [isPastView, setIsPastView] = useState(false);
 
+  const formatClock = (seconds: number) => {
+    const normalized = ((seconds % 86400) + 86400) % 86400;
+    const hours = Math.floor(normalized / 3600);
+    const minutes = Math.floor((normalized % 3600) / 60);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+  };
+
+  const nextAvailable = baristas
+    .map((barista) => ({
+      bayNumber: barista.bayNumber,
+      seconds: barista.queue[0]?.timeRemainingSec ?? 0,
+      isStandby: barista.queue.length === 0,
+    }))
+    .sort((a, b) => a.seconds - b.seconds || a.bayNumber - b.bayNumber)
+    .slice(0, 3);
+
+  const formatRemaining = (seconds: number) => {
+    const safeSeconds = Math.max(0, seconds);
+    return `${Math.floor(safeSeconds / 60)}:${(safeSeconds % 60).toString().padStart(2, '0')}`;
+  };
+
   // Position of current NOW cursor along timeline
   const nowX = (simTimeSec - TIMELINE_START_SEC) * PIXELS_PER_SEC;
 
-  // On mount, center on NOW cursor
+  // Keep NOW at one fixed screen position; the timeline moves underneath it.
   useEffect(() => {
-    if (scrollContainerRef.current && !hasInitializedScroll) {
-      const targetScroll = Math.max(0, nowX - 420);
-      scrollContainerRef.current.scrollLeft = targetScroll;
-      setHasInitializedScroll(true);
-    }
-  }, [nowX, hasInitializedScroll]);
+    if (!scrollContainerRef.current || isPastView) return;
+    scrollContainerRef.current.scrollLeft = Math.max(0, nowX - NOW_VIEWPORT_OFFSET);
+    if (!hasInitializedScroll) setHasInitializedScroll(true);
+  }, [nowX, hasInitializedScroll, isPastView]);
 
   // Track scroll position to indicate if viewing past
   const handleScroll = () => {
@@ -67,10 +88,6 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
 
   const scrollToNow = () => {
     scrollToSeconds(simTimeSec);
-  };
-
-  const scrollRewind10Min = () => {
-    scrollToSeconds(simTimeSec - 600);
   };
 
   const scrollRewind5Min = () => {
@@ -116,79 +133,77 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-[#cbd5e1] shadow-xs flex flex-col relative overflow-hidden">
+    <div className="bg-white rounded-lg border border-[#cbd5e1] shadow-xs flex flex-col relative overflow-hidden shrink-0">
       {/* 1. Interactive Ribbon / Navigation Toolbar */}
-      <div className="px-3 py-1.5 bg-[#f1f5f9] border-b border-[#e2e8f0] flex items-center justify-between gap-2 flex-wrap text-xs select-none">
+      <div className="h-[44px] px-2 bg-[#f1f5f9] border-b border-[#e2e8f0] flex items-center justify-between gap-2 text-xs select-none">
         {/* Left: Rewind & Timeline Navigation Controls */}
         <div className="flex items-center gap-1.5">
-          <span className="font-bold text-slate-700 flex items-center gap-1 mr-1">
-            <Clock className="w-3.5 h-3.5 text-slate-500" />
-            <span>タイムライン操作:</span>
-          </span>
-
-          <button
-            onClick={scrollRewind10Min}
-            className="px-2 py-1 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 rounded font-semibold text-slate-700 flex items-center gap-1 transition-all touch-manipulation cursor-pointer shadow-2xs"
-            title="10分前のオーダー履歴を表示"
-          >
-            <ChevronLeft className="w-3.5 h-3.5 text-slate-500" />
-            <span>10分前 (07:54)</span>
-          </button>
-
           <button
             onClick={scrollRewind5Min}
-            className="px-2 py-1 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 rounded font-semibold text-slate-700 flex items-center gap-1 transition-all touch-manipulation cursor-pointer shadow-2xs"
+            className="min-h-[38px] px-3 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 rounded-lg font-bold text-slate-700 flex items-center gap-1 transition-all touch-manipulation cursor-pointer shadow-2xs"
             title="5分前のオーダー履歴を表示"
           >
             <ChevronLeft className="w-3 h-3 text-slate-500" />
-            <span>5分前</span>
+            <span>−5分</span>
           </button>
 
           <button
             onClick={scrollToNow}
-            className="px-2.5 py-1 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-bold rounded flex items-center gap-1 transition-all shadow-2xs touch-manipulation cursor-pointer"
+            className="min-h-[38px] px-4 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-black rounded-lg flex items-center gap-1 transition-all shadow-2xs touch-manipulation cursor-pointer"
             title="現在時刻(NOW)へ移動"
           >
-            <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-            <span>現在 (NOW)</span>
+            <span className="w-2 h-2 rounded-full bg-white" />
+            <span>現在</span>
           </button>
 
           <button
             onClick={scrollForward5Min}
-            className="px-2 py-1 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 rounded font-semibold text-slate-700 flex items-center gap-1 transition-all touch-manipulation cursor-pointer shadow-2xs"
+            className="min-h-[38px] px-3 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 rounded-lg font-bold text-slate-700 flex items-center gap-1 transition-all touch-manipulation cursor-pointer shadow-2xs"
             title="5分先の予定を表示"
           >
-            <span>5分後</span>
+            <span>＋5分</span>
             <ChevronRight className="w-3 h-3 text-slate-500" />
           </button>
 
           {isPastView && (
-            <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[11px] font-bold flex items-center gap-1 animate-pulse">
+            <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[11px] font-bold flex items-center gap-1">
               <RotateCcw className="w-3 h-3" />
               <span>過去の抽出履歴を表示中</span>
             </span>
           )}
         </div>
 
-        {/* Right: Swipe instruction for iPad */}
-        <div className="text-slate-500 text-[11px] font-medium hidden md:flex items-center gap-1">
-          <span>👈 タイムラインは左右にスワイプして自由に巻き戻し/先読みできます 👉</span>
+        {/* Right: Compact next-available summary */}
+        <div className="hidden md:flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
+          <span className="mr-0.5">次に空くドリッパー:</span>
+          {nextAvailable.map((item, index) => (
+            <span
+              key={item.bayNumber}
+              className={`px-2 py-1 rounded border font-mono whitespace-nowrap ${
+                index === 0
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                  : 'bg-white border-slate-300 text-slate-700'
+              }`}
+            >
+              #{item.bayNumber} {item.isStandby ? '待機' : formatRemaining(item.seconds)}
+            </span>
+          ))}
         </div>
       </div>
 
       {/* 2. Linked Order Highlight Banner (when an order is selected) */}
       {selectedOrderId && (
-        <div className="bg-amber-500 text-white px-3 py-1.5 flex items-center justify-between text-xs font-bold shadow-xs select-none">
+        <div className="h-[42px] bg-amber-500 text-white px-3 flex items-center justify-between text-xs font-bold shadow-xs select-none">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="flex items-center gap-1 bg-amber-600 px-2 py-0.5 rounded font-mono font-black text-sm">
+            <span className="flex items-center gap-1 bg-amber-600 px-2 py-0.5 rounded font-mono font-black text-[20px]">
               <Sparkles className="w-3.5 h-3.5" />
               <span>{selectedOrderId}</span>
             </span>
-            <span>同一オーダー連動ハイライト中:</span>
+            <span>連動:</span>
             <span className="bg-amber-600/90 text-amber-100 px-2 py-0.5 rounded font-normal">
               {matchingTickets.length > 0
                 ? matchingTickets
-                    .map((m) => `Bay ${m.bayNumber} ${m.baristaName}: ${m.beanName} ${m.cupCount}杯`)
+                    .map((m) => `ドリッパー ${m.bayNumber} ${m.baristaName}: ${m.beanName} ${m.cupCount}杯`)
                     .join(' ＋ ')
                 : 'オーダー詳細表示'}
             </span>
@@ -196,10 +211,10 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
 
           <button
             onClick={() => onSelectOrder('')}
-            className="px-2 py-0.5 bg-amber-700 hover:bg-amber-800 rounded flex items-center gap-1 text-[11px] font-bold cursor-pointer transition-colors"
+            className="min-w-[52px] min-h-[34px] px-2 bg-amber-700 hover:bg-amber-800 rounded-lg flex items-center justify-center gap-1 text-[11px] font-bold cursor-pointer transition-colors touch-manipulation"
           >
             <X className="w-3.5 h-3.5" />
-            <span>ハイライト解除</span>
+            <span>解除</span>
           </button>
         </div>
       )}
@@ -208,15 +223,15 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="overflow-x-auto overflow-y-hidden select-none touch-pan-x"
+        className="overflow-x-auto overflow-y-hidden select-none touch-auto overscroll-x-contain"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div style={{ width: `${STICKY_LEFT_WIDTH + TIMELINE_WIDTH_PX}px` }}>
           {/* 3A. Synchronized Timeline Scale Header */}
-          <div className="h-[38px] bg-[#f8fafc] border-b border-[#e2e8f0] flex items-center text-[11px] font-mono font-medium text-slate-500 relative">
+          <div className="h-[30px] bg-[#f8fafc] border-b border-[#e2e8f0] flex items-center text-[11px] font-mono font-medium text-slate-500 relative">
             {/* Sticky Left Header Cell (290px = 195px Barista + 95px Action) */}
-            <div className="sticky left-0 z-30 w-[290px] shrink-0 h-full px-3 text-[11px] font-sans font-bold text-slate-500 flex items-center justify-between bg-[#f8fafc] border-r border-[#cbd5e1] shadow-[2px_0_6px_rgba(0,0,0,0.04)]">
-              <span>ベイ / バリスタ</span>
+            <div className="sticky left-0 z-[60] w-[290px] shrink-0 h-full px-3 text-[11px] font-sans font-bold text-slate-500 flex items-center justify-between bg-[#f8fafc] border-r border-[#cbd5e1] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
+              <span>ドリッパー / 抽出担当</span>
               <span>操作</span>
             </div>
 
@@ -253,28 +268,12 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
                 </div>
               ))}
 
-              {/* Red Header NOW Indicator Pill */}
-              <div
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-30 bg-[#ef4444] text-white px-2 py-0.5 rounded text-[10px] font-bold shadow-md flex items-center gap-1 pointer-events-none"
-                style={{ left: `${nowX}px` }}
-              >
-                <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-                <span>NOW</span>
-              </div>
             </div>
           </div>
 
           {/* 3B. Synchronized Bay Rows Container */}
           <div className="relative divide-y divide-[#e2e8f0]">
-            {/* Global Synchronized Red Vertical NOW Guideline */}
-            <div
-              className="absolute top-0 bottom-0 w-[2px] bg-[#ef4444] pointer-events-none z-10 shadow-xs"
-              style={{ left: `${STICKY_LEFT_WIDTH + nowX}px` }}
-            >
-              <div className="w-2.5 h-2.5 -ml-[4px] -mt-[1px] bg-[#ef4444] rounded-full shadow-md" />
-            </div>
-
-            {baristas.map((barista) => (
+            {[...baristas].sort((a, b) => a.bayNumber - b.bayNumber).map((barista) => (
               <BayLaneRow
                 key={barista.id}
                 barista={barista}
@@ -287,12 +286,24 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
                 timelineStartSec={TIMELINE_START_SEC}
                 pixelsPerSec={PIXELS_PER_SEC}
                 timelineWidthPx={TIMELINE_WIDTH_PX}
+                simTimeSec={simTimeSec}
               />
             ))}
+          </div>
+        </div>
+        <div
+          className="absolute bottom-0 z-40 w-[2px] bg-red-500 pointer-events-none"
+          style={{
+            left: `${STICKY_LEFT_WIDTH + NOW_VIEWPORT_OFFSET}px`,
+            top: selectedOrderId ? '86px' : '44px',
+          }}
+          aria-hidden="true"
+        >
+          <div className="absolute top-1 -translate-x-1/2 rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-black text-white shadow-sm">
+            NOW
           </div>
         </div>
       </div>
     </div>
   );
 };
-

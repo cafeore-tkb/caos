@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BeanCode,
   BeanItem,
@@ -17,7 +17,6 @@ import { TopHeader } from './components/TopHeader';
 import { Sidebar, NavTab } from './components/Sidebar';
 import { DispatchBoard } from './components/DispatchBoard';
 import { UnassignedOrdersPanel } from './components/UnassignedOrdersPanel';
-import { AiLearningEnginePanel } from './components/AiLearningEnginePanel';
 import { TicketDetailModal } from './components/TicketDetailModal';
 import { AssignSlotModal } from './components/AssignSlotModal';
 import { NewOrderModal } from './components/NewOrderModal';
@@ -25,11 +24,15 @@ import { BaysOverviewView } from './components/BaysOverviewView';
 import { BeanQueueView } from './components/BeanQueueView';
 import { AiConfigView } from './components/AiConfigView';
 import { AnalyticsView } from './components/AnalyticsView';
+import { HumanCenteredControlView } from './components/HumanCenteredControlView';
 import { soundManager } from './utils/audio';
+
+type ControlViewMode = 'current' | 'new';
 
 export default function App() {
   // Navigation
   const [activeTab, setActiveTab] = useState<NavTab>('control');
+  const [controlViewMode, setControlViewMode] = useState<ControlViewMode>('current');
 
   // Core Data
   const [baristas, setBaristas] = useState<Barista[]>(INITIAL_BARISTAS);
@@ -40,6 +43,7 @@ export default function App() {
 
   // Filters & Toggles
   const [selectedBeanFilter, setSelectedBeanFilter] = useState<BeanCode | null>(null);
+  const [selectedQueueBean, setSelectedQueueBean] = useState<BeanCode | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
   // Modals
@@ -58,9 +62,16 @@ export default function App() {
   const handleToggleOrderSelection = (orderId: string) => {
     if (!orderId) {
       setSelectedOrderId(null);
+      setSelectedQueueBean(null);
       return;
     }
-    setSelectedOrderId((prev) => (prev === orderId ? null : orderId));
+    if (selectedOrderId === orderId) {
+      setSelectedOrderId(null);
+      setSelectedQueueBean(null);
+      return;
+    }
+    setSelectedQueueBean(null);
+    setSelectedOrderId(orderId);
   };
 
   // Format digital clock time HH:mm:ss
@@ -163,6 +174,7 @@ export default function App() {
             ...nextQueue[0],
             status: 'brewing',
             timeRemainingSec: Math.round(nextQueue[0].totalDurationSec * b.coefficient),
+            startTimeSec: simTimeSec,
           };
         }
 
@@ -185,6 +197,7 @@ export default function App() {
       (o) => o.ticketUid === orderUidOrId || o.id === orderUidOrId
     );
     if (!orderToAssign) return;
+    if (orderToAssign.preferredBaristaId && orderToAssign.preferredBaristaId !== targetBayId) return;
 
     // Remove from unassigned
     setUnassignedOrders((prev) =>
@@ -207,6 +220,7 @@ export default function App() {
       totalItemsInOrder: orderToAssign.totalItemsInOrder,
       totalOrderCups: orderToAssign.totalOrderCups,
       orderNotes: orderToAssign.orderNotes,
+      preferredBaristaId: orderToAssign.preferredBaristaId,
       beanCode: orderToAssign.beanCode,
       beanName: orderToAssign.beanName,
       cupCount: orderToAssign.cupCount,
@@ -223,7 +237,9 @@ export default function App() {
         if (b.id !== targetBayId) return b;
         return {
           ...b,
-          queue: [...b.queue, newTicket],
+          queue: orderToAssign.preferredBaristaId && b.queue.length > 0
+            ? [b.queue[0], newTicket, ...b.queue.slice(1)]
+            : [...b.queue, newTicket],
         };
       })
     );
@@ -231,7 +247,7 @@ export default function App() {
 
   // Directly assign an unassigned order to its recommended bay
   const handleDirectAssign = (order: UnassignedOrder) => {
-    const recommendedBay = order.recommendedBayIds[0] || 1;
+    const recommendedBay = order.preferredBaristaId || order.recommendedBayIds[0] || 1;
     handleAssignOrderToBay(order.id, recommendedBay);
   };
 
@@ -257,6 +273,8 @@ export default function App() {
     setLearningLogs(INITIAL_LEARNING_LOGS);
     setSimTimeSec(8 * 3600 + 4 * 60 + 15);
     setCompletedCount(0);
+    setSelectedOrderId('#152');
+    setSelectedQueueBean(null);
     soundManager.playDispatch();
   };
 
@@ -269,6 +287,7 @@ export default function App() {
     predictedTimeStr: string;
     recommendedBaristas: string;
     recommendedBayIds: number[];
+    preferredBaristaId?: number;
   }) => {
     const nextIdNum = 172 + Math.floor(Math.random() * 50);
     const created: UnassignedOrder = {
@@ -280,22 +299,22 @@ export default function App() {
       predictedTimeStr: newOrd.predictedTimeStr,
       recommendedBaristas: newOrd.recommendedBaristas,
       recommendedBayIds: newOrd.recommendedBayIds,
+      preferredBaristaId: newOrd.preferredBaristaId,
       cardColor: newOrd.beanCode === 'ICE' ? 'cyan' : newOrd.beanCode === 'KEN' ? 'peach' : newOrd.beanCode === 'SP' ? 'emerald' : 'blue',
     };
     setUnassignedOrders((prev) => [created, ...prev]);
     soundManager.playDispatch();
   };
 
-  // Compute total unassigned cups: (4 unassigned cards = 5 cups, plus baseline unassigned batch = 14 total)
+  // Live cup totals shown in the header
   const unassignedCardCups = unassignedOrders.reduce((acc, cur) => acc + cur.cupCount, 0);
-  const totalUnassignedDisplay = 9 + unassignedCardCups;
+  const totalUnassignedDisplay = unassignedCardCups;
 
-  // Compute total waiting cups across all 6 bays: (total in current queues + 18 in batch hold = 38 total)
   const currentBayQueueCups = baristas.reduce(
     (acc, b) => acc + b.queue.reduce((qAcc, t) => qAcc + t.cupCount, 0),
     0
   );
-  const totalWaitingCupsDisplay = 18 + currentBayQueueCups;
+  const totalWaitingCupsDisplay = currentBayQueueCups;
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f0f4fa] text-[#0f172a] select-none font-sans">
@@ -303,10 +322,10 @@ export default function App() {
       <Sidebar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
+        controlViewMode={controlViewMode}
+        onSelectControlViewMode={setControlViewMode}
         activeBayCount={baristas.filter((b) => b.queue.length > 0).length}
         totalBays={6}
-        cph={94 + completedCount * 2}
-        avgTimeStr="03:40"
       />
 
       {/* 2. Main Workstation Area */}
@@ -329,34 +348,57 @@ export default function App() {
         />
 
         {/* Dynamic Tab Body */}
-        <main className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+        <main className={`flex-1 p-2 flex flex-col gap-2 ${activeTab === 'control' ? 'overflow-hidden' : 'overflow-y-auto'}`}>
           {activeTab === 'control' && (
             <>
-              {/* Master 6-Bay Dispatch Board (Top 2/3) */}
-              <DispatchBoard
-                baristas={baristas}
-                highlightFilter={selectedBeanFilter}
-                selectedOrderId={selectedOrderId}
-                onSelectOrder={handleToggleOrderSelection}
-                onAdvanceBay={handleAdvanceBay}
-                onOpenTicketDetail={(ticket) => setSelectedTicket(ticket)}
-                onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
-                simTimeSec={simTimeSec}
-              />
+              {controlViewMode === 'current' ? (
+                <div className="h-full min-h-0 flex flex-col gap-2">
+                  {/* Master 6-Bay Dispatch Board (Top 2/3) */}
+                  <DispatchBoard
+                    baristas={baristas}
+                    highlightFilter={selectedBeanFilter}
+                    selectedOrderId={selectedOrderId}
+                    onSelectOrder={handleToggleOrderSelection}
+                    onAdvanceBay={handleAdvanceBay}
+                    onOpenTicketDetail={(ticket) => setSelectedTicket(ticket)}
+                    onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
+                    simTimeSec={simTimeSec}
+                  />
 
-              {/* Bottom Section (Bottom 1/3): Unassigned Orders (Left) + AI Learning Engine (Right) */}
-              <div className="flex flex-col lg:flex-row gap-3 min-h-[170px]">
-                <UnassignedOrdersPanel
-                  orders={unassignedOrders}
+                  {/* Bottom Section: touch-friendly unassigned queue */}
+                  <div className="h-[132px] min-h-0 overflow-hidden">
+                    <UnassignedOrdersPanel
+                      orders={unassignedOrders}
+                      selectedOrderId={selectedOrderId}
+                      selectedBeanCode={selectedQueueBean}
+                      onSelectOrder={handleToggleOrderSelection}
+                      onSelectQueueOrder={(order) => {
+                        setSelectedOrderId(order.id);
+                        setSelectedQueueBean(order.beanCode);
+                      }}
+                      onAssignToBay={(order, bayId) => handleAssignOrderToBay(order.ticketUid || order.id, bayId)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <HumanCenteredControlView
+                  baristas={baristas}
+                  unassignedOrders={unassignedOrders}
+                  simTimeSec={simTimeSec}
                   selectedOrderId={selectedOrderId}
+                  selectedQueueBean={selectedQueueBean}
+                  highlightFilter={selectedBeanFilter}
                   onSelectOrder={handleToggleOrderSelection}
-                  onAssignOrder={(ord) => setAssignSlotData({ bayId: null, order: ord })}
+                  onSelectQueueOrder={(order) => {
+                    setSelectedOrderId(order.id);
+                    setSelectedQueueBean(order.beanCode);
+                  }}
+                  onAdvanceBay={handleAdvanceBay}
+                  onOpenTicketDetail={(ticket) => setSelectedTicket(ticket)}
+                  onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
+                  onAssignOrder={(order) => setAssignSlotData({ bayId: null, order })}
                 />
-                <AiLearningEnginePanel
-                  logs={learningLogs}
-                  onTriggerRecalibration={handleTriggerRecalibration}
-                />
-              </div>
+              )}
             </>
           )}
 
