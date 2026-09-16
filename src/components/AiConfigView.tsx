@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Sliders, RefreshCw, Zap, TrendingDown, TrendingUp } from 'lucide-react';
+import { Sparkles, RefreshCw, Zap } from 'lucide-react';
 import { Barista, LearningEngineLog } from '../types';
 
 interface AiConfigViewProps {
@@ -16,15 +16,15 @@ export const AiConfigView: React.FC<AiConfigViewProps> = ({
   onResetLearning,
 }) => {
   return (
-    <div className="p-5 space-y-5 overflow-y-auto">
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 border-b border-slate-200 pb-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+          <h2 className="text-[16px] font-black text-slate-900 tracking-tight flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-emerald-600" />
-            <span>抽出タイム自動学習エンジン (AI補正パラメータ)</span>
+            <span>抽出時間の補正</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            各バリスタの直近抽出実績・タイムスプレッド（時間分散）を自動学習し、予定所要時間の係数を適応制御
+            ドリッパーごとの所要時間係数
           </p>
         </div>
 
@@ -38,9 +38,9 @@ export const AiConfigView: React.FC<AiConfigViewProps> = ({
       </div>
 
       {/* Barista Coefficients Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-2">
         {baristas.map((b) => (
-          <div key={b.id} className="bg-white rounded-xl border border-slate-300 p-4 shadow-xs space-y-3">
+          <div key={b.id} className="bg-white rounded-xl border border-slate-300 p-3 shadow-xs space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-slate-900 text-white font-mono font-bold rounded flex items-center justify-center text-sm">
@@ -100,8 +100,8 @@ export const AiConfigView: React.FC<AiConfigViewProps> = ({
         </h3>
         <div className="divide-y divide-slate-100 text-xs">
           {logs.map((log, idx) => (
-            <div key={`${log.id}-${idx}`} className="py-2.5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
+            <div key={`${log.id}-${idx}`} className="py-2.5 flex flex-col items-start gap-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-[11px] text-slate-400">{log.timestamp}</span>
                 <span className="font-bold text-slate-900">{log.baristaKey}</span>
                 <span className="text-slate-600">直近実績: <strong className="font-mono">{log.recentActual}</strong></span>
