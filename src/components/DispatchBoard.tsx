@@ -10,15 +10,15 @@ interface DispatchBoardProps {
   onSelectOrder: (orderId: string) => void;
   onAdvanceBay: (bayId: number) => void;
   onOpenTicketDetail: (ticket: OrderTicket) => void;
+  actionTicketKey?: string | null;
+  onMoveTicket: (ticket: OrderTicket, bayId: number) => void;
+  onReturnToUnassigned: (ticket: OrderTicket) => void;
+  onCloseTicketAction: () => void;
   onOpenEmptySlot: (bayId: number) => void;
   simTimeSec: number;
 }
 
-// 07:50:00 to 08:25:00 (35 minutes = 2100 seconds)
-const TIMELINE_START_SEC = 7 * 3600 + 50 * 60; // 28200
-const TIMELINE_END_SEC = 8 * 3600 + 25 * 60; // 30300
 const PIXELS_PER_SEC = 1.2; // 1 min = 72px
-const TIMELINE_WIDTH_PX = (TIMELINE_END_SEC - TIMELINE_START_SEC) * PIXELS_PER_SEC; // 2520px
 const STICKY_LEFT_WIDTH = 290; // 195px barista + 95px action
 // 90 seconds of past context remains visible to the left of NOW.
 const NOW_VIEWPORT_OFFSET = 90 * PIXELS_PER_SEC;
@@ -30,9 +30,17 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   onSelectOrder,
   onAdvanceBay,
   onOpenTicketDetail,
+  actionTicketKey,
+  onMoveTicket,
+  onReturnToUnassigned,
+  onCloseTicketAction,
   onOpenEmptySlot,
   simTimeSec,
 }) => {
+  // Build a rolling 12-hour timeline from the current real-world hour.
+  const timelineStartSec = Math.floor(simTimeSec / 3600) * 3600;
+  const timelineEndSec = timelineStartSec + 12 * 3600;
+  const timelineWidthPx = (timelineEndSec - timelineStartSec) * PIXELS_PER_SEC;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [hasInitializedScroll, setHasInitializedScroll] = useState(false);
   const [isPastView, setIsPastView] = useState(false);
@@ -59,7 +67,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   };
 
   // Position of current NOW cursor along timeline
-  const nowX = (simTimeSec - TIMELINE_START_SEC) * PIXELS_PER_SEC;
+  const nowX = (simTimeSec - timelineStartSec) * PIXELS_PER_SEC;
 
   // Keep NOW at one fixed screen position; the timeline moves underneath it.
   useEffect(() => {
@@ -79,7 +87,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   // Quick jump navigation
   const scrollToSeconds = (sec: number) => {
     if (!scrollContainerRef.current) return;
-    const targetX = (sec - TIMELINE_START_SEC) * PIXELS_PER_SEC;
+    const targetX = (sec - timelineStartSec) * PIXELS_PER_SEC;
     scrollContainerRef.current.scrollTo({
       left: Math.max(0, targetX - 380),
       behavior: 'smooth',
@@ -100,17 +108,18 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
 
   // Generate timeline markers every 1 minute, with major labels every 5 minutes
   const timeMarkers = [];
-  for (let sec = TIMELINE_START_SEC; sec <= TIMELINE_END_SEC; sec += 60) {
+  for (let sec = timelineStartSec; sec <= timelineEndSec; sec += 60) {
     const m = Math.floor(sec / 60) % 60;
     const h = Math.floor(sec / 3600) % 24;
     const isMajor = m % 5 === 0;
-    const left = (sec - TIMELINE_START_SEC) * PIXELS_PER_SEC;
+    const left = (sec - timelineStartSec) * PIXELS_PER_SEC;
 
     timeMarkers.push({
       sec,
       timeStr: `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`,
       minuteStr: `:${m.toString().padStart(2, '0')}`,
       isMajor,
+      isHour: m === 0,
       left,
     });
   }
@@ -226,7 +235,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
         className="overflow-x-auto overflow-y-hidden select-none touch-auto overscroll-x-contain"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <div style={{ width: `${STICKY_LEFT_WIDTH + TIMELINE_WIDTH_PX}px` }}>
+        <div className="relative" style={{ width: `${STICKY_LEFT_WIDTH + timelineWidthPx}px` }}>
           {/* 3A. Synchronized Timeline Scale Header */}
           <div className="h-[30px] bg-[#f8fafc] border-b border-[#e2e8f0] flex items-center text-[11px] font-mono font-medium text-slate-500 relative">
             {/* Sticky Left Header Cell (290px = 195px Barista + 95px Action) */}
@@ -238,7 +247,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
             {/* Scrollable Ruler Track with Ticks & Labels */}
             <div
               className="relative h-full"
-              style={{ width: `${TIMELINE_WIDTH_PX}px` }}
+              style={{ width: `${timelineWidthPx}px` }}
             >
               {timeMarkers.map((marker) => (
                 <div
@@ -247,8 +256,8 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
                   style={{ left: `${marker.left}px` }}
                 >
                   <div
-                    className={`h-[7px] w-[1px] ${
-                      marker.isMajor ? 'bg-slate-400 h-[10px]' : 'bg-slate-300'
+                    className={`h-[7px] ${
+                      marker.isHour ? 'bg-slate-700 h-[12px] w-[2px]' : marker.isMajor ? 'bg-slate-400 h-[10px] w-[1px]' : 'bg-slate-300 w-[1px]'
                     }`}
                   />
                   {marker.isMajor ? (
@@ -261,8 +270,8 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
                     </span>
                   )}
                   <div
-                    className={`h-[7px] w-[1px] ${
-                      marker.isMajor ? 'bg-slate-400 h-[10px]' : 'bg-slate-300'
+                    className={`h-[7px] ${
+                      marker.isHour ? 'bg-slate-700 h-[12px] w-[2px]' : marker.isMajor ? 'bg-slate-400 h-[10px] w-[1px]' : 'bg-slate-300 w-[1px]'
                     }`}
                   />
                 </div>
@@ -282,14 +291,26 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
                 onSelectOrder={onSelectOrder}
                 onAdvanceBay={onAdvanceBay}
                 onOpenTicketDetail={onOpenTicketDetail}
+                actionTicketKey={actionTicketKey}
+                onMoveTicket={onMoveTicket}
+                onReturnToUnassigned={onReturnToUnassigned}
+                onCloseTicketAction={onCloseTicketAction}
                 onOpenEmptySlot={onOpenEmptySlot}
-                timelineStartSec={TIMELINE_START_SEC}
+                timelineStartSec={timelineStartSec}
                 pixelsPerSec={PIXELS_PER_SEC}
-                timelineWidthPx={TIMELINE_WIDTH_PX}
+                timelineWidthPx={timelineWidthPx}
                 simTimeSec={simTimeSec}
               />
             ))}
           </div>
+          {timeMarkers.filter((marker) => marker.isHour).map((marker) => (
+            <div
+              key={`hour-line-${marker.sec}`}
+              className="absolute top-[30px] bottom-0 z-20 w-[2px] bg-slate-500/70 pointer-events-none"
+              style={{ left: `${STICKY_LEFT_WIDTH + marker.left}px` }}
+              aria-hidden="true"
+            />
+          ))}
         </div>
         <div
           className="absolute bottom-0 z-40 w-[2px] bg-red-500 pointer-events-none"

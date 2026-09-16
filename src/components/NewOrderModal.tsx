@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { X, Plus, Coffee } from 'lucide-react';
 import { BeanCode } from '../types';
-import { BEAN_LEGENDS, BEAN_NAME_MAP } from '../data/initialData';
+import { BEAN_NAME_MAP } from '../data/initialData';
+import { MENU_GROUPS, MENU_PRESENTATION } from '../utils/menuPresentation';
 
 interface NewOrderModalProps {
   onClose: () => void;
@@ -25,6 +26,12 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   const [cupCount, setCupCount] = useState<number>(1);
   const [orderType, setOrderType] = useState<string>('HOT');
   const [preferredBaristaId, setPreferredBaristaId] = useState<number | null>(null);
+  const selectMenu = (code: BeanCode) => {
+    setSelectedBean(code);
+    if (code === 'ICE') setOrderType('ICE');
+    else if (code === 'MILK') setOrderType('牛');
+    else if (orderType === 'ICE' || orderType === '牛') setOrderType('HOT');
+  };
 
   const handleCreate = () => {
     const name = BEAN_NAME_MAP[selectedBean];
@@ -76,8 +83,8 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-xs select-none" onClick={onClose}>
-      <div className="context-sheet bg-white w-full max-w-[460px] h-full border-l border-slate-300 shadow-2xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
+    <div className="fixed top-[56px] right-0 bottom-0 z-50 pointer-events-none select-none">
+      <div className="context-sheet pointer-events-auto bg-white w-[min(440px,44vw)] min-w-[360px] h-full border-l border-slate-300 shadow-2xl overflow-y-auto">
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-[#f8fafc]">
           <div className="flex items-center gap-2">
             <Coffee className="w-5 h-5 text-slate-700" />
@@ -93,23 +100,46 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
 
         <div className="p-5 space-y-4 text-xs">
           {/* Bean selection */}
-          <div>
-            <label className="block font-bold text-slate-700 mb-1.5">コーヒー豆種別:</label>
-            <div className="grid grid-cols-4 gap-2">
-              {BEAN_LEGENDS.map((b) => (
-                <button
-                  key={b.code}
-                  onClick={() => setSelectedBean(b.code)}
-                  className={`min-h-[56px] p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all touch-manipulation ${
-                    selectedBean === b.code
-                      ? 'border-blue-500 bg-blue-50 font-bold ring-1 ring-blue-500'
-                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <span className="font-mono text-xs">{b.label}</span>
-                  <span className="text-[10px] text-slate-500">{b.subLabel}</span>
-                </button>
-              ))}
+          <div className="space-y-3">
+            {MENU_GROUPS.map((group) => (
+              <section key={group.family}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <h4 className="text-[12px] font-black tracking-[0.12em] text-slate-900">{group.title}</h4>
+                  <span className="text-[11px] font-medium text-slate-500">{group.description}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {group.codes.map((code) => {
+                    const menu = MENU_PRESENTATION[code];
+                    return (
+                      <button
+                        key={code}
+                        onClick={() => selectMenu(code)}
+                        className={`min-h-[64px] rounded-xl border p-2.5 text-left transition-all touch-manipulation ${menu.cardClass} ${selectedBean === code ? 'ring-2 ring-slate-950 shadow-sm' : 'hover:shadow-sm'}`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className={`text-[15px] font-black ${menu.family === 'premium' ? 'text-white' : 'text-slate-950'}`}>{menu.shortLabel}</span>
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-black ${menu.badgeClass}`}>{menu.familyLabel}</span>
+                        </div>
+                        <div className={`mt-1 text-[11px] font-bold ${menu.family === 'premium' ? 'text-emerald-100' : 'text-slate-600'}`}>{menu.processLabel}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+
+          <div className={`rounded-xl border p-3 ${MENU_PRESENTATION[selectedBean].cardClass}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black tracking-[0.12em] text-slate-500">抽出工程</div>
+                <div className="mt-1 text-[16px] font-black text-slate-950">{MENU_PRESENTATION[selectedBean].processLabel}</div>
+              </div>
+              {(selectedBean === 'ICE' || selectedBean === 'MILK') && (
+                <div className="rounded-lg bg-white/80 px-3 py-2 text-right text-[12px] font-bold text-slate-700">
+                  半量をゆっくり抽出<br />してから仕上げ
+                </div>
+              )}
             </div>
           </div>
 
@@ -135,9 +165,9 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
 
           {/* Style */}
           <div>
-            <label className="block font-bold text-slate-700 mb-1.5">抽出タイプ:</label>
+            <label className="block text-[14px] font-bold text-slate-700 mb-1.5">提供タイプ</label>
             <div className="flex items-center gap-2">
-              {['HOT', 'ICE', 'BATCH', '特別抽出'].map((t) => (
+              {['HOT', 'ICE', '牛', 'BATCH'].map((t) => (
                 <button
                   key={t}
                   onClick={() => setOrderType(t)}
