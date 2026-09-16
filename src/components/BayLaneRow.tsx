@@ -80,8 +80,8 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
     <div data-bay-target={barista.id} className="flex items-center h-[72px] border-b border-[#e2e8f0] bg-white hover:bg-[#fcfdff] transition-colors relative touch-manipulation">
       {/* 1. Barista Info Module - Sticky left column (200px) */}
       <div className="sticky left-0 z-50 w-[195px] shrink-0 self-stretch px-2 py-1.5 flex items-center gap-2 bg-white border-r border-[#e2e8f0] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
-        {/* Bay number is the row anchor. */}
-        <div className="w-[48px] h-[58px] bg-[#0f172a] rounded-xl flex items-center justify-center text-white font-mono font-black text-[25px] shadow-xs shrink-0">
+        {/* The number is a quiet locator; name and active order carry the hierarchy. */}
+        <div className="w-9 h-9 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-slate-600 font-mono font-bold text-[18px] shrink-0">
           {barista.bayNumber}
         </div>
 
