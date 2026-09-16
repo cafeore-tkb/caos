@@ -25,7 +25,7 @@ import { AiConfigView } from './components/AiConfigView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { HumanCenteredControlView } from './components/HumanCenteredControlView';
 import { soundManager } from './utils/audio';
-import { X } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 
 type ControlViewMode = 'current' | 'new';
 type UndoSnapshot = {
@@ -38,9 +38,11 @@ type UndoSnapshot = {
 type ShiftMember = { name: string; canHandleSpecial: boolean };
 
 const SHIFT_ROSTERS: ShiftMember[][] = [
-  [{ name: '山本', canHandleSpecial: true }, { name: '中村', canHandleSpecial: false }, { name: '小林', canHandleSpecial: true }, { name: '松本', canHandleSpecial: false }, { name: '井上', canHandleSpecial: false }, { name: '木村', canHandleSpecial: false }],
-  [{ name: '吉田', canHandleSpecial: true }, { name: '加藤', canHandleSpecial: true }, { name: '山田', canHandleSpecial: true }, { name: '斎藤', canHandleSpecial: false }, { name: '清水', canHandleSpecial: false }, { name: '森', canHandleSpecial: false }],
-  [{ name: '池田', canHandleSpecial: true }, { name: '橋本', canHandleSpecial: false }, { name: '阿部', canHandleSpecial: false }, { name: '石川', canHandleSpecial: false }, { name: '山下', canHandleSpecial: false }, { name: '藤田', canHandleSpecial: false }],
+  [{ name: '鈴木', canHandleSpecial: true }, { name: '山口', canHandleSpecial: true }, { name: '小林', canHandleSpecial: false }, { name: '松本', canHandleSpecial: false }, { name: '井上', canHandleSpecial: false }, { name: '木村', canHandleSpecial: false }],
+  [{ name: '林', canHandleSpecial: true }, { name: '中西', canHandleSpecial: true }, { name: '近藤', canHandleSpecial: true }, { name: '斎藤', canHandleSpecial: false }, { name: '清水', canHandleSpecial: false }, { name: '山本', canHandleSpecial: false }],
+  [{ name: '森', canHandleSpecial: true }, { name: '橋本', canHandleSpecial: false }, { name: '阿部', canHandleSpecial: false }, { name: '石川', canHandleSpecial: false }, { name: '山下', canHandleSpecial: false }, { name: '藤田', canHandleSpecial: false }],
+  [{ name: '沼田', canHandleSpecial: true }, { name: '佐藤', canHandleSpecial: true }, { name: '三田', canHandleSpecial: true }, { name: '前田', canHandleSpecial: false }, { name: '岡田', canHandleSpecial: false }, { name: '石井', canHandleSpecial: false }],
+  [{ name: '瀬邉', canHandleSpecial: true }, { name: '菅原', canHandleSpecial: true }, { name: '長谷川', canHandleSpecial: false }, { name: '村上', canHandleSpecial: false }, { name: '坂本', canHandleSpecial: false }, { name: '青木', canHandleSpecial: false }],
 ];
 
 const placeShiftMembers = (members: ShiftMember[]) => {
@@ -626,9 +628,9 @@ export default function App() {
           aria-label="メニューを開く"
           title="メニューを開く"
           onClick={() => setSidebarOpen(true)}
-          className="fixed left-0 top-1/2 z-[110] flex h-14 w-6 -translate-y-1/2 items-center justify-center rounded-r-full border border-l-0 border-slate-300 bg-white/95 shadow-md touch-manipulation"
+          className="fixed left-0 top-3 z-[110] flex h-12 w-8 items-center justify-center rounded-r-xl border border-l-0 border-slate-300 bg-white/95 text-slate-700 shadow-md touch-manipulation active:bg-slate-100"
         >
-          <span className="h-2.5 w-2.5 rounded-full bg-slate-800" />
+          <ChevronRight className="h-6 w-6" strokeWidth={2.5} />
         </button>
       )}
 

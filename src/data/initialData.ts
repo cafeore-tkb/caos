@@ -165,7 +165,7 @@ export const INITIAL_BARISTAS: Barista[] = [
   {
     id: 1,
     bayNumber: 1,
-    name: '佐藤',
+    name: '鈴木',
     canHandleSpecial: true,
     coefficient: 0.97,
     coefficientColor: 'green',
@@ -282,10 +282,9 @@ export const INITIAL_BARISTAS: Barista[] = [
   {
     id: 2,
     bayNumber: 2,
-    name: '鈴木',
-    canHandleSpecial: true,
-    coefficient: 0.97,
-    coefficientColor: 'green',
+    name: '中村',
+    coefficient: 1.05,
+    coefficientColor: 'orange',
     status: 'brewing',
     remainingStr: '00:55 残り',
     iconType: 'cup',
@@ -643,7 +642,7 @@ export const INITIAL_BARISTAS: Barista[] = [
   {
     id: 6,
     bayNumber: 6,
-    name: '渡辺',
+    name: '山口',
     canHandleSpecial: true,
     coefficient: 0.97,
     coefficientColor: 'green',
