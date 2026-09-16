@@ -50,7 +50,7 @@ export const BaysOverviewView: React.FC<BaysOverviewViewProps> = ({
               <div>
                 <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-slate-900 text-white font-mono font-bold rounded flex items-center justify-center text-sm">
+                    <div className="w-8 h-8 border border-slate-300 bg-slate-100 text-slate-600 font-mono font-bold rounded-lg flex items-center justify-center text-sm">
                       {barista.id}
                     </div>
                     <div>
