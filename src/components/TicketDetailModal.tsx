@@ -19,8 +19,8 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
   const bean = BEAN_LEGENDS.find((b) => b.code === ticket.beanCode);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 select-none animate-in fade-in duration-150">
-      <div className="bg-white w-full max-w-lg rounded-xl border border-slate-300 shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-xs select-none" onClick={onClose}>
+      <div className="context-sheet bg-white w-full max-w-[520px] h-full border-l border-slate-300 shadow-2xl overflow-hidden flex flex-col" onClick={(event) => event.stopPropagation()}>
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-[#f8fafc]">
           <div className="flex items-center gap-3">
@@ -38,7 +38,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors"
+            className="w-11 h-11 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 transition-colors touch-manipulation"
           >
             <X className="w-5 h-5" />
           </button>
@@ -183,7 +183,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
         <div className="px-5 py-3 border-t border-slate-200 bg-[#f8fafc] flex items-center justify-between">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 font-medium text-xs transition-colors"
+            className="min-h-[44px] px-4 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs transition-colors touch-manipulation"
           >
             閉じる
           </button>
@@ -192,7 +192,7 @@ export const TicketDetailModal: React.FC<TicketDetailModalProps> = ({
               onCompleteTicket(ticket.id);
               onClose();
             }}
-            className="px-4 py-2 rounded-md bg-[#006c4a] hover:bg-[#005137] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+            className="min-h-[44px] px-4 rounded-lg bg-[#006c4a] hover:bg-[#005137] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors touch-manipulation"
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>このオーダーを完了にする</span>

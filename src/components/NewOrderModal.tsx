@@ -13,6 +13,7 @@ interface NewOrderModalProps {
     predictedTimeStr: string;
     recommendedBaristas: string;
     recommendedBayIds: number[];
+    preferredBaristaId?: number;
   }) => void;
 }
 
@@ -23,6 +24,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   const [selectedBean, setSelectedBean] = useState<BeanCode>('CHAMP');
   const [cupCount, setCupCount] = useState<number>(1);
   const [orderType, setOrderType] = useState<string>('HOT');
+  const [preferredBaristaId, setPreferredBaristaId] = useState<number | null>(null);
 
   const handleCreate = () => {
     const name = BEAN_NAME_MAP[selectedBean];
@@ -68,13 +70,14 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
       predictedTimeStr: predictedTime,
       recommendedBaristas: recommended,
       recommendedBayIds: bayIds,
+      preferredBaristaId: preferredBaristaId ?? undefined,
     });
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 select-none">
-      <div className="bg-white w-full max-w-md rounded-xl border border-slate-300 shadow-xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/35 backdrop-blur-xs select-none" onClick={onClose}>
+      <div className="context-sheet bg-white w-full max-w-[460px] h-full border-l border-slate-300 shadow-2xl overflow-y-auto" onClick={(event) => event.stopPropagation()}>
         <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-[#f8fafc]">
           <div className="flex items-center gap-2">
             <Coffee className="w-5 h-5 text-slate-700" />
@@ -82,7 +85,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800"
+            className="w-11 h-11 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-800 touch-manipulation"
           >
             <X className="w-5 h-5" />
           </button>
@@ -97,7 +100,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 <button
                   key={b.code}
                   onClick={() => setSelectedBean(b.code)}
-                  className={`p-2 rounded-lg border flex flex-col items-center gap-1 transition-all ${
+                  className={`min-h-[56px] p-2 rounded-lg border flex flex-col items-center justify-center gap-1 transition-all touch-manipulation ${
                     selectedBean === b.code
                       ? 'border-blue-500 bg-blue-50 font-bold ring-1 ring-blue-500'
                       : 'border-slate-200 hover:bg-slate-50 text-slate-700'
@@ -118,7 +121,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 <button
                   key={num}
                   onClick={() => setCupCount(num)}
-                  className={`flex-1 py-2 rounded-lg border font-mono font-bold text-sm ${
+                  className={`flex-1 min-h-[44px] rounded-lg border font-mono font-bold text-sm touch-manipulation ${
                     cupCount === num
                       ? 'border-slate-900 bg-slate-900 text-white'
                       : 'border-slate-200 hover:bg-slate-50 text-slate-800'
@@ -138,7 +141,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                 <button
                   key={t}
                   onClick={() => setOrderType(t)}
-                  className={`flex-1 py-2 rounded-lg border font-bold text-xs ${
+                  className={`flex-1 min-h-[44px] rounded-lg border font-bold text-xs touch-manipulation ${
                     orderType === t
                       ? 'border-slate-900 bg-slate-900 text-white'
                       : 'border-slate-200 hover:bg-slate-50 text-slate-800'
@@ -149,18 +152,29 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
               ))}
             </div>
           </div>
+
+          <div>
+            <label className="block text-[14px] font-bold text-slate-700 mb-1.5">指名（1人のみ）</label>
+            <div className="grid grid-cols-4 gap-2">
+              <button type="button" onClick={() => setPreferredBaristaId(null)} className={`min-h-[44px] rounded-lg border text-[13px] font-bold ${preferredBaristaId === null ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-300'}`}>なし</button>
+              {[1, 2, 3, 4, 5, 6].map((id) => (
+                <button key={id} type="button" onClick={() => setPreferredBaristaId(id)} className={`min-h-[44px] rounded-lg border text-[16px] font-mono font-black ${preferredBaristaId === id ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-300'}`}>{id}</button>
+              ))}
+            </div>
+            {preferredBaristaId && <p className="mt-2 text-[13px] font-bold text-blue-700">ドリッパー {preferredBaristaId} の枠を確保します</p>}
+          </div>
         </div>
 
         <div className="px-5 py-3 border-t border-slate-200 bg-[#f8fafc] flex items-center justify-between">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-md border border-slate-300 text-slate-700 hover:bg-slate-100 font-medium text-xs"
+            className="min-h-[44px] px-4 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100 font-bold text-xs touch-manipulation"
           >
             キャンセル
           </button>
           <button
             onClick={handleCreate}
-            className="px-4 py-2 rounded-md bg-[#006c4a] hover:bg-[#005137] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+            className="min-h-[44px] px-4 rounded-lg bg-[#006c4a] hover:bg-[#005137] text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors touch-manipulation"
           >
             <Plus className="w-4 h-4" />
             <span>未割当キューに投入</span>

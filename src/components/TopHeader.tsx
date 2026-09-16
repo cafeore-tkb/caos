@@ -36,7 +36,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenNewOrder,
 }) => {
   return (
-    <header className="h-[64px] bg-white border-b border-[#e2e8f0] px-4 flex items-center justify-between shadow-xs select-none">
+    <header className="h-[56px] bg-white border-b border-[#e2e8f0] px-4 flex items-center justify-between shadow-xs select-none shrink-0">
       {/* Left side: Clock and Top Metrics */}
       <div className="flex items-center gap-4">
         {/* Large Digital Clock */}
@@ -50,7 +50,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               id="sim-play-pause-btn"
               onClick={onTogglePlay}
               title={isRunning ? '一時停止' : 'タイマー再開'}
-              className="p-1 hover:bg-white text-slate-700 rounded transition-colors text-xs"
+              className="w-10 h-10 hover:bg-white text-slate-700 rounded-lg transition-colors text-xs flex items-center justify-center touch-manipulation"
             >
               {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
             </button>
@@ -58,7 +58,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               id="sim-speed-btn"
               onClick={() => onChangeSpeed(simSpeed === 1 ? 2 : simSpeed === 2 ? 5 : 1)}
               title="シミュレーション速度切替"
-              className="px-1.5 py-0.5 hover:bg-white text-[11px] font-mono font-bold text-slate-700 rounded transition-colors"
+              className="min-w-10 h-10 px-1.5 hover:bg-white text-[11px] font-mono font-bold text-slate-700 rounded-lg transition-colors touch-manipulation"
             >
               {simSpeed}x
             </button>
@@ -66,7 +66,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               id="sim-reset-btn"
               onClick={onResetData}
               title="初期状態にリセット"
-              className="p-1 hover:bg-white text-slate-600 rounded transition-colors"
+              className="w-10 h-10 hover:bg-white text-slate-600 rounded-lg transition-colors flex items-center justify-center touch-manipulation"
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
@@ -86,7 +86,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
         {/* Metric 2: 全ベイ待機杯数 (Total Queued Cups in Bays) */}
         <div className="bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 flex items-baseline gap-1.5">
-          <span className="text-[12px] font-semibold text-[#475569]">全ベイ待機杯数</span>
+          <span className="text-[12px] font-semibold text-[#475569]">全ドリッパー待機杯数</span>
           <div className="flex items-baseline font-mono">
             <span className="text-[19px] font-extrabold text-[#0f172a] leading-none">
               {totalWaitingCups}
@@ -138,7 +138,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         <button
           id="btn-add-order"
           onClick={onOpenNewOrder}
-          className="flex items-center gap-1 bg-[#0f172a] hover:bg-[#1e293b] text-white text-xs font-medium px-2.5 py-1.5 rounded-md shadow-xs transition-colors"
+          className="min-h-[44px] flex items-center gap-1.5 bg-[#0f172a] hover:bg-[#1e293b] text-white text-xs font-bold px-3 rounded-lg shadow-xs transition-colors touch-manipulation"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>オーダー追加</span>
@@ -152,7 +152,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             onToggleSound();
           }}
           title={soundEnabled ? '通知音 ON' : '通知音 消音'}
-          className={`p-1.5 rounded-md border text-xs transition-colors ${
+          className={`w-11 h-11 rounded-lg border text-xs transition-colors flex items-center justify-center touch-manipulation ${
             soundEnabled
               ? 'bg-[#f1f5f9] text-slate-700 border-[#cbd5e1]'
               : 'bg-red-50 text-red-500 border-red-200'

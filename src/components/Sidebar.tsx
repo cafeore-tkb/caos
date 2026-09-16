@@ -5,7 +5,6 @@ import {
   Coffee,
   Sparkles,
   BarChart3,
-  RotateCw,
 } from 'lucide-react';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'ai' | 'analytics';
@@ -13,19 +12,19 @@ export type NavTab = 'control' | 'bays' | 'beans' | 'ai' | 'analytics';
 interface SidebarProps {
   activeTab: NavTab;
   onSelectTab: (tab: NavTab) => void;
+  controlViewMode: 'current' | 'new';
+  onSelectControlViewMode: (mode: 'current' | 'new') => void;
   activeBayCount: number;
   totalBays: number;
-  cph: number;
-  avgTimeStr: string;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
+  controlViewMode,
+  onSelectControlViewMode,
   activeBayCount,
   totalBays,
-  cph,
-  avgTimeStr,
 }) => {
   const navItems: { id: NavTab; label: string; icon: React.ReactNode }[] = [
     {
@@ -35,7 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'bays',
-      label: '6ベイ',
+      label: 'ドリッパー',
       icon: <LayoutGrid className="w-5 h-5" />,
     },
     {
@@ -56,7 +55,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   return (
-    <aside className="w-[72px] bg-white border-r border-[#e2e8f0] flex flex-col items-center justify-between py-3 select-none shrink-0 z-10">
+    <aside className="w-[82px] bg-white border-r border-[#e2e8f0] flex flex-col items-center py-2 select-none shrink-0 z-10">
       {/* Top Section */}
       <div className="flex flex-col items-center w-full gap-3">
         {/* KDS Logo */}
@@ -73,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="w-full px-2 flex flex-col items-center">
           <div className="w-full py-1 bg-[#f0fdf4] border border-[#bbf7d0] rounded-md flex flex-col items-center justify-center">
             <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a] animate-pulse"></span>
+              <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]"></span>
               <span className="text-[9px] font-mono font-bold text-[#166534]">RUN</span>
             </div>
             <span className="text-[10px] font-mono font-bold text-[#15803d]">
@@ -86,12 +85,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <nav className="w-full flex flex-col items-center gap-1 mt-1 px-1.5">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
-            return (
+            return (<React.Fragment key={item.id}>
               <button
-                key={item.id}
                 id={`nav-tab-${item.id}`}
                 onClick={() => onSelectTab(item.id)}
-                className={`w-full py-2.5 px-1 rounded-lg flex flex-col items-center justify-center gap-1 transition-all ${
+                className={`w-full min-h-[48px] py-1.5 px-1 rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all touch-manipulation ${
                   isActive
                     ? 'bg-[#0f172a] text-white shadow-xs'
                     : 'text-slate-500 hover:text-slate-800 hover:bg-[#f8fafc]'
@@ -103,23 +101,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {item.label}
                 </span>
               </button>
-            );
+              {item.id === 'control' && activeTab === 'control' && (
+                <div className="w-full rounded-xl bg-slate-200 p-1 grid gap-1" role="group" aria-label="管制盤の表示切替">
+                  {(['current', 'new'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      aria-pressed={controlViewMode === mode}
+                      onClick={() => onSelectControlViewMode(mode)}
+                      className={`min-h-[44px] rounded-lg text-[12px] font-black transition-colors touch-manipulation ${controlViewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600'}`}
+                    >
+                      {mode === 'current' ? '現行' : '新案'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </React.Fragment>);
           })}
         </nav>
       </div>
 
-      {/* Bottom Telemetry Status */}
-      <div className="flex flex-col items-center gap-1 px-1 w-full text-center">
-        <div className="w-full py-1.5 bg-[#f8fafc] border border-[#e2e8f0] rounded-md flex flex-col items-center">
-          <RotateCw className="w-3.5 h-3.5 text-red-500 animate-spin-slow mb-0.5" />
-          <span className="font-mono text-[10px] font-bold text-slate-700 leading-none">
-            {avgTimeStr}
-          </span>
-          <span className="font-mono text-[9px] text-slate-500 font-semibold mt-0.5">
-            {cph}cph
-          </span>
-        </div>
-      </div>
     </aside>
   );
 };

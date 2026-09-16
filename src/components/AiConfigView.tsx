@@ -48,7 +48,7 @@ export const AiConfigView: React.FC<AiConfigViewProps> = ({
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-900">{b.name} バリスタ</h3>
-                  <span className="text-[10px] text-slate-500">ベイ {b.bayNumber}</span>
+                  <span className="text-[10px] text-slate-500">ドリッパー {b.bayNumber}</span>
                 </div>
               </div>
               <span className="font-mono text-base font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
