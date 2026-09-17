@@ -197,6 +197,7 @@ export default function App() {
   const [simTimeSec, setSimTimeSec] = useState<number>(8 * 3600 + 4 * 60 + 15);
   const [isRunning, setIsRunning] = useState<boolean>(true);
   const [simSpeed, setSimSpeed] = useState<number>(1);
+  const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(null);
 
   // Linked multi-item order selection (e.g. #152 has items in Bay 1 and Bay 2)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -717,6 +718,8 @@ export default function App() {
           simSpeed={simSpeed}
           onChangeSpeed={setSimSpeed}
           onResetData={handleResetData}
+          showTimelineControls={controlViewMode === 'current'}
+          onTimelineNavigate={(direction) => setTimelineCommand({ direction, id: Date.now() })}
           canUndo={Boolean(undoLabel)}
           undoLabel={undoLabel}
           onUndo={handleUndo}
@@ -740,6 +743,7 @@ export default function App() {
                     onCloseTicketAction={() => setSelectedTicket(null)}
                     onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
                     simTimeSec={realTimeSec}
+                    timelineCommand={timelineCommand}
                   />
 
                   {/* Bottom Section: touch-friendly unassigned queue */}
