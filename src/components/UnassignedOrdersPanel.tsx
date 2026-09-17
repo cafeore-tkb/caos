@@ -1,7 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ClipboardList, Combine, Sparkles } from 'lucide-react';
+import { ClipboardList, Sparkles } from 'lucide-react';
 import { UnassignedOrder } from '../types';
 import { MENU_PRESENTATION } from '../utils/menuPresentation';
+
+const MergeCupsIcon = ({ className = '' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 25.04 19.03" aria-hidden="true">
+    <path fill="currentColor" d="M3.04,12.26c-.63-.55-1.04-1.35-1.04-2.26V2h12v1h0,0v.03h2v-1.03c0-1.1-.9-2-2-2H2C.9,0,0,.9,0,2v8c0,2.07,1.27,3.86,3.07,4.61-.02-.19-.03-.39-.03-.58v-1.77Z" />
+    <path fill="currentColor" d="M20.04,4.03H6.04c-1.1,0-2,.9-2,2v8c0,.3.04.6.09.88.07.37.16.72.3,1.06.76,1.79,2.54,3.06,4.61,3.06h6c2.76,0,5-2.24,5-5,2.76,0,5-2.24,5-5s-2.24-5-5-5ZM18.04,14.03c0,1.65-1.35,3-3,3h-6c-.9,0-1.69-.4-2.24-1.03-.26-.29-.45-.63-.58-1-.11-.31-.18-.63-.18-.97V6.03h12v8ZM20.04,12.03v-6c1.65,0,3,1.35,3,3s-1.35,3-3,3Z" />
+    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.15,11.51h5.76" />
+    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12.03,8.51v5.76" />
+  </svg>
+);
 
 interface UnassignedOrdersPanelProps {
   orders: UnassignedOrder[];
@@ -187,7 +196,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 {isMergeCandidate && (
                   <div className="absolute inset-0 z-20 rounded-lg border-2 border-blue-500 bg-blue-50/90 pointer-events-none flex items-center justify-center p-1">
                     <span className="inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-[16px] font-black text-white shadow-md">
-                      <Combine className="h-5 w-5 shrink-0" strokeWidth={2.5} />
+                      <MergeCupsIcon className="h-5 w-7 shrink-0" />
                       統合する
                     </span>
                   </div>
