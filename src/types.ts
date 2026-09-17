@@ -95,3 +95,33 @@ export interface LearningEngineLog {
   coefficientStatus: string; // "係数 0.93 維持" or "最速補正 0.91"
   timestamp: string;
 }
+
+export interface HistoricalItem {
+  name: string;
+  price: number;
+  type: 'hot' | 'iceOre' | 'ice' | 'milk' | 'others' | string;
+}
+
+export interface HistoricalOrder {
+  orderId: number;
+  createdAt: string;
+  readyAt: string | null;
+  servedAt: string | null;
+  total: number;
+  billingAmount: number;
+  items: HistoricalItem[];
+}
+
+export interface HistoricalDataset {
+  source: string;
+  orders: HistoricalOrder[];
+}
+
+export interface TestPlaySession {
+  status: 'active' | 'finished';
+  startMs: number;
+  endMs: number;
+  currentMs: number;
+  durationMinutes: 30 | 60;
+  orders: HistoricalOrder[];
+}

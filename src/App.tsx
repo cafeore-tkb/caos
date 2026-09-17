@@ -6,6 +6,9 @@ import {
   UnassignedOrder,
   OrderTicket,
   LearningEngineLog,
+  HistoricalDataset,
+  HistoricalOrder,
+  TestPlaySession,
 } from './types';
 import {
   INITIAL_BARISTAS,
@@ -24,6 +27,7 @@ import { BeanQueueView } from './components/BeanQueueView';
 import { AiConfigView } from './components/AiConfigView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { HumanCenteredControlView } from './components/HumanCenteredControlView';
+import { TestPlaySetup } from './components/TestPlaySetup';
 import { soundManager } from './utils/audio';
 import { ChevronRight, ExternalLink, X } from 'lucide-react';
 
@@ -160,6 +164,43 @@ const MOCK_ORDER_GROUPS: UnassignedOrder[][] = Array.from({ length: 120 }, (_, i
   }]);
 });
 
+const historicalBeanCode = (name: string, type: string): BeanCode => {
+  if (type === 'ice') return 'ICE';
+  if (type === 'iceOre' || type === 'milk') return 'MILK';
+  if (name.includes('俺')) return 'ORE';
+  if (name.includes('縁')) return 'CHAMP';
+  if (name.includes('キリマンジャロ')) return 'TNZ';
+  if (name.includes('トラジャ')) return 'BRA';
+  if (name.includes('ピンク')) return 'KEN';
+  return 'SP';
+};
+
+const historicalOrderToDripUnits = (order: HistoricalOrder): UnassignedOrder[] => {
+  const drinks = order.items.filter((item) => item.type !== 'others');
+  const grouped = new Map<BeanCode, { names: string[]; count: number }>();
+  drinks.forEach((item) => {
+    const code = historicalBeanCode(item.name, item.type);
+    const current = grouped.get(code) || { names: [], count: 0 };
+    current.count += 1;
+    if (!current.names.includes(item.name)) current.names.push(item.name);
+    grouped.set(code, current);
+  });
+  const id = `#${order.orderId.toString().padStart(3, '0')}`;
+  const source = Array.from(grouped, ([beanCode, group], index): UnassignedOrder => ({
+    id,
+    ticketUid: `history-${order.orderId}-${beanCode}-${index}`,
+    beanCode,
+    beanName: group.names.join('・'),
+    cupCount: group.count,
+    badgeTag: `${group.count}杯`,
+    predictedTimeStr: group.count > 1 ? '3分15秒' : '2分15秒',
+    recommendedBaristas: '全ドリッパー',
+    recommendedBayIds: [1, 2, 3, 4, 5, 6],
+    cardColor: beanCode === 'ICE' ? 'cyan' : beanCode === 'SP' ? 'emerald' : beanCode === 'KEN' ? 'peach' : 'blue',
+  }));
+  return splitIntoDripUnits(source);
+};
+
 export default function App() {
   const standaloneTab = (() => {
     const panel = new URLSearchParams(window.location.search).get('panel');
@@ -197,11 +238,17 @@ export default function App() {
   const [isRunning, setIsRunning] = useState<boolean>(true);
   const [simSpeed, setSimSpeed] = useState<number>(1);
   const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(null);
+  const [historicalOrders, setHistoricalOrders] = useState<HistoricalOrder[]>([]);
+  const [testDataLoading, setTestDataLoading] = useState(true);
+  const [testSetupOpen, setTestSetupOpen] = useState(false);
+  const [testPlaySession, setTestPlaySession] = useState<TestPlaySession | null>(null);
+  const historicalOrderCursor = useRef(0);
 
   // Linked multi-item order selection (e.g. #152 has items in Bay 1 and Bay 2)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [realTime, setRealTime] = useState(() => new Date());
-  const realTimeSec = realTime.getHours() * 3600 + realTime.getMinutes() * 60 + realTime.getSeconds();
+  const operationalTime = testPlaySession ? new Date(testPlaySession.currentMs) : realTime;
+  const realTimeSec = operationalTime.getHours() * 3600 + operationalTime.getMinutes() * 60 + operationalTime.getSeconds();
 
   const sortedUnassignedOrders = [...unassignedOrders].sort((a, b) =>
     orderNumber(a.id) - orderNumber(b.id) || (a.itemIndex || 0) - (b.itemIndex || 0)
@@ -210,6 +257,26 @@ export default function App() {
   useEffect(() => {
     const clock = window.setInterval(() => setRealTime(new Date()), 1000);
     return () => window.clearInterval(clock);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTestDataLoading(true);
+    fetch(new URL('data/sohosai-2025-day12.json', document.baseURI))
+      .then((response) => {
+        if (!response.ok) throw new Error(`Historical data: ${response.status}`);
+        return response.json() as Promise<HistoricalDataset>;
+      })
+      .then((dataset) => {
+        if (!cancelled) setHistoricalOrders(dataset.orders);
+      })
+      .catch(() => {
+        if (!cancelled) setHistoricalOrders([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTestDataLoading(false);
+      });
+    return () => { cancelled = true; };
   }, []);
 
   const restartSidebarTimer = () => {
@@ -227,6 +294,7 @@ export default function App() {
 
   // Mock the register sending one complete order at a time.
   useEffect(() => {
+    if (testPlaySession) return;
     const incoming = window.setInterval(() => {
       const group = MOCK_ORDER_GROUPS[mockOrderCursor.current];
       if (!group) return;
@@ -238,7 +306,37 @@ export default function App() {
       mockOrderCursor.current += 1;
     }, 4000);
     return () => window.clearInterval(incoming);
-  }, []);
+  }, [testPlaySession]);
+
+  useEffect(() => {
+    if (!testPlaySession || testPlaySession.status !== 'active' || !isRunning) return;
+    const timer = window.setInterval(() => {
+      setTestPlaySession((session) => session ? {
+        ...session,
+        currentMs: Math.min(session.endMs, session.currentMs + 10_000),
+      } : session);
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [testPlaySession?.status, isRunning]);
+
+  useEffect(() => {
+    if (testPlaySession?.status === 'active' && testPlaySession.currentMs >= testPlaySession.endMs) {
+      setIsRunning(false);
+    }
+  }, [testPlaySession?.currentMs, testPlaySession?.endMs, testPlaySession?.status]);
+
+  useEffect(() => {
+    if (!testPlaySession || testPlaySession.status !== 'active') return;
+    const sorted = testPlaySession.orders;
+    const incoming: UnassignedOrder[] = [];
+    while (historicalOrderCursor.current < sorted.length) {
+      const order = sorted[historicalOrderCursor.current];
+      if (new Date(order.createdAt).getTime() > testPlaySession.currentMs) break;
+      incoming.push(...historicalOrderToDripUnits(order));
+      historicalOrderCursor.current += 1;
+    }
+    if (incoming.length > 0) setUnassignedOrders((prev) => [...prev, ...incoming]);
+  }, [testPlaySession?.currentMs, testPlaySession?.status]);
 
   const captureUndo = (label: string) => {
     undoSnapshotRef.current = { baristas, beans, unassignedOrders, shiftRosterIndex, label };
@@ -292,9 +390,10 @@ export default function App() {
   // Simulation timer loop
   useEffect(() => {
     if (!isRunning) return;
+    const elapsedStep = testPlaySession?.status === 'active' ? 10 : 1;
 
     const interval = setInterval(() => {
-      setSimTimeSec((prev) => prev + 1);
+      setSimTimeSec((prev) => prev + elapsedStep);
 
       // Decrement remaining seconds on active tickets
       setBaristas((prevBaristas) =>
@@ -305,7 +404,7 @@ export default function App() {
           const activeTicket = { ...updatedQueue[0] };
 
           if (activeTicket.status === 'brewing' && activeTicket.timeRemainingSec !== undefined) {
-            const nextSec = Math.max(0, activeTicket.timeRemainingSec - 1);
+            const nextSec = Math.max(0, activeTicket.timeRemainingSec - elapsedStep);
             activeTicket.timeRemainingSec = nextSec;
             updatedQueue[0] = activeTicket;
 
@@ -326,7 +425,7 @@ export default function App() {
     }, 1000 / simSpeed);
 
     return () => clearInterval(interval);
-  }, [isRunning, simSpeed]);
+  }, [isRunning, simSpeed, testPlaySession?.status]);
 
   // Advance / complete a bay's active order
   const handleAdvanceBay = (bayId: number) => {
@@ -604,7 +703,41 @@ export default function App() {
     setSelectedOrderId(null);
     setSelectedQueueBean(null);
     setShiftRosterIndex(0);
+    setTestPlaySession(null);
+    historicalOrderCursor.current = 0;
+    setIsRunning(true);
     soundManager.playDispatch();
+  };
+
+  const handleStartTestPlay = (startMs: number, durationMinutes: 30 | 60) => {
+    const endMs = startMs + durationMinutes * 60_000;
+    const orders = historicalOrders
+      .filter((order) => {
+        const createdAt = new Date(order.createdAt).getTime();
+        return createdAt >= startMs && createdAt < endMs;
+      })
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    setBaristas(makeCleanBaristas());
+    setBeans(INITIAL_BEANS);
+    setUnassignedOrders([]);
+    setLearningLogs(INITIAL_LEARNING_LOGS);
+    setSelectedOrderId(null);
+    setSelectedQueueBean(null);
+    undoSnapshotRef.current = null;
+    setUndoLabel(null);
+    historicalOrderCursor.current = 0;
+    setTestPlaySession({ status: 'active', startMs, endMs, currentMs: startMs, durationMinutes, orders });
+    setIsRunning(true);
+    setActiveTab('control');
+    setTestSetupOpen(false);
+    setSidebarOpen(false);
+  };
+
+  const handleEndTestPlay = () => {
+    setTestPlaySession((session) => session ? { ...session, status: 'finished' } : session);
+    setIsRunning(false);
+    setActiveTab('analytics');
+    setSidebarOpen(true);
   };
 
   // Live cup totals shown in the header
@@ -657,7 +790,14 @@ export default function App() {
           onDeleteBean={(code) => setBeans((prev) => prev.filter((b) => b.code !== code))}
         />
       )}
-      {tab === 'analytics' && <AnalyticsView baristas={baristas} />}
+      {tab === 'analytics' && (
+        <AnalyticsView
+          baristas={baristas}
+          salesOrders={testPlaySession?.orders.filter((order) => new Date(order.createdAt).getTime() <= testPlaySession.currentMs) || []}
+          periodStartMs={testPlaySession?.startMs}
+          periodEndMs={testPlaySession ? Math.min(testPlaySession.currentMs, testPlaySession.endMs) : undefined}
+        />
+      )}
     </>
   );
 
@@ -705,7 +845,7 @@ export default function App() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Top Header */}
         <TopHeader
-          timeStr={`${realTime.getHours().toString().padStart(2, '0')}:${realTime.getMinutes().toString().padStart(2, '0')}:${realTime.getSeconds().toString().padStart(2, '0')}`}
+          timeStr={`${operationalTime.getHours().toString().padStart(2, '0')}:${operationalTime.getMinutes().toString().padStart(2, '0')}:${operationalTime.getSeconds().toString().padStart(2, '0')}`}
           unassignedCups={totalUnassignedDisplay}
           totalWaitingCups={totalWaitingCupsDisplay}
           soundEnabled={soundEnabled}
@@ -720,6 +860,10 @@ export default function App() {
           canUndo={Boolean(undoLabel)}
           undoLabel={undoLabel}
           onUndo={handleUndo}
+          testPlaying={testPlaySession?.status === 'active'}
+          testProgressLabel={testPlaySession ? `${Math.max(0, Math.ceil((testPlaySession.endMs - testPlaySession.currentMs) / 60_000))}分` : null}
+          onOpenTestPlay={() => setTestSetupOpen(true)}
+          onEndTestPlay={handleEndTestPlay}
         />
 
         {/* Dynamic Tab Body */}
@@ -829,6 +973,15 @@ export default function App() {
           unassignedOrders={sortedUnassignedOrders}
           onClose={() => setAssignSlotData(null)}
           onAssign={handleAssignOrderToBay}
+        />
+      )}
+
+      {testSetupOpen && (
+        <TestPlaySetup
+          orders={historicalOrders}
+          loading={testDataLoading}
+          onClose={() => setTestSetupOpen(false)}
+          onStart={handleStartTestPlay}
         />
       )}
 

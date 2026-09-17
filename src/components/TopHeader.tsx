@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2, ChevronLeft, ChevronRight, CalendarClock, BarChart3 } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface TopHeaderProps {
@@ -18,6 +18,10 @@ interface TopHeaderProps {
   canUndo: boolean;
   undoLabel: string | null;
   onUndo: () => void;
+  testPlaying: boolean;
+  testProgressLabel: string | null;
+  onOpenTestPlay: () => void;
+  onEndTestPlay: () => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -36,6 +40,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   canUndo,
   undoLabel,
   onUndo,
+  testPlaying,
+  testProgressLabel,
+  onOpenTestPlay,
+  onEndTestPlay,
 }) => {
   return (
     <header className="h-[56px] bg-white border-b border-[#e2e8f0] px-4 flex items-center justify-between shadow-xs select-none shrink-0">
@@ -113,6 +121,15 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Right side: only persistent operational controls */}
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={testPlaying ? onEndTestPlay : onOpenTestPlay}
+          className={`min-h-[44px] flex items-center gap-1.5 rounded-lg border px-3 text-xs font-black shadow-xs touch-manipulation ${testPlaying ? 'border-blue-700 bg-blue-700 text-white' : 'border-blue-300 bg-blue-50 text-blue-900 hover:bg-blue-100'}`}
+          title={testPlaying ? 'テストプレイを終了して実績を表示' : '2025年の実データでテストプレイ'}
+        >
+          {testPlaying ? <BarChart3 className="h-4 w-4" /> : <CalendarClock className="h-4 w-4" />}
+          <span>{testPlaying ? `終了・実績 ${testProgressLabel || ''}` : '実データテスト'}</span>
+        </button>
         <button
           id="btn-undo"
           type="button"
