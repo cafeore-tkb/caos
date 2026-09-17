@@ -747,7 +747,7 @@ export default function App() {
                   />
 
                   {/* Bottom Section: touch-friendly unassigned queue */}
-                  <div className="h-[132px] min-h-0 overflow-visible relative z-[70]">
+                  <div className="h-[196px] min-h-0 overflow-visible relative z-[70]">
                     <UnassignedOrdersPanel
                       orders={sortedUnassignedOrders}
                       nextAvailable={nextAvailable}
