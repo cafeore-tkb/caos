@@ -352,7 +352,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                         {index + 1}
                       </span>
                       <div>
-                        <div className="font-mono text-[24px] leading-none font-black text-slate-950">{group.id}</div>
+                        <div className={`font-mono text-[24px] leading-none font-black ${isSelected ? 'text-blue-800' : group.items[0].preferredBaristaId ? 'text-violet-700' : group.items.some((item) => item.totalItemsInOrder && item.totalItemsInOrder > 1) ? 'text-slate-950' : 'text-slate-600'}`}>{group.id}</div>
                         {group.items[0].preferredBaristaId && (
                           <div className="mt-1 inline-flex rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">指名 {group.items[0].preferredBaristaId}</div>
                         )}
