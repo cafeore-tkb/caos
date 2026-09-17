@@ -31,6 +31,7 @@ type ControlViewMode = 'current' | 'new';
 type AuxiliaryTab = Exclude<NavTab, 'control'>;
 type UndoSnapshot = {
   baristas: Barista[];
+  beans: BeanItem[];
   unassignedOrders: UnassignedOrder[];
   shiftRosterIndex: number;
   label: string;
@@ -162,7 +163,7 @@ const MOCK_ORDER_GROUPS: UnassignedOrder[][] = Array.from({ length: 120 }, (_, i
 export default function App() {
   const standaloneTab = (() => {
     const panel = new URLSearchParams(window.location.search).get('panel');
-    return panel === 'bays' || panel === 'beans' || panel === 'ai' || panel === 'analytics' ? panel : null;
+    return panel === 'bays' || panel === 'beans' || panel === 'analytics' ? panel : null;
   })() as AuxiliaryTab | null;
 
   // Navigation
@@ -240,7 +241,7 @@ export default function App() {
   }, []);
 
   const captureUndo = (label: string) => {
-    undoSnapshotRef.current = { baristas, unassignedOrders, shiftRosterIndex, label };
+    undoSnapshotRef.current = { baristas, beans, unassignedOrders, shiftRosterIndex, label };
     arrivalsAfterUndoSnapshotRef.current = [];
     setUndoLabel(label);
   };
@@ -253,6 +254,7 @@ export default function App() {
       (order) => !restoredKeys.has(order.ticketUid || order.id)
     );
     setBaristas(snapshot.baristas);
+    setBeans(snapshot.beans);
     setUnassignedOrders([...snapshot.unassignedOrders, ...arrivals]);
     setShiftRosterIndex(snapshot.shiftRosterIndex);
     setSelectedOrderId(null);
@@ -360,6 +362,11 @@ export default function App() {
 
     setLearningLogs((prevLogs) => [newLog, ...prevLogs.filter((l) => l.id !== newLog.id).slice(0, 4)]);
     setCompletedCount((c) => c + 1);
+    setBeans((prev) => prev.map((bean) =>
+      bean.code === completedTicket.beanCode
+        ? { ...bean, stockGrams: Math.max(0, bean.stockGrams - completedTicket.cupCount * 14) }
+        : bean
+    ));
 
     setBaristas((prev) =>
       prev.map((b) => {
@@ -590,6 +597,7 @@ export default function App() {
   // Reset to initial screenshot state
   const handleResetData = () => {
     setBaristas(makeCleanBaristas());
+    setBeans(INITIAL_BEANS);
     setUnassignedOrders([]);
     mockOrderCursor.current = 0;
     setLearningLogs(INITIAL_LEARNING_LOGS);
@@ -610,9 +618,17 @@ export default function App() {
     0
   );
   const totalWaitingCupsDisplay = currentBayQueueCups;
+  const nextAvailable = [...baristas]
+    .map((barista) => ({
+      bayNumber: barista.bayNumber,
+      seconds: barista.queue[0]?.timeRemainingSec ?? 0,
+      isStandby: barista.queue.length === 0,
+    }))
+    .sort((a, b) => a.seconds - b.seconds || a.bayNumber - b.bayNumber)
+    .slice(0, 3);
 
   const auxiliaryTitle = (tab: AuxiliaryTab) =>
-    tab === 'bays' ? 'ドリッパー' : tab === 'beans' ? '豆キュー' : tab === 'ai' ? '補正設定' : '実績';
+    tab === 'bays' ? 'ドリッパー / 補正設定' : tab === 'beans' ? '豆キュー' : '実績';
 
   const openAuxiliaryTab = (tab: AuxiliaryTab) => {
     const url = new URL(window.location.href);
@@ -622,21 +638,25 @@ export default function App() {
 
   const renderAuxiliaryView = (tab: AuxiliaryTab) => (
     <>
-      {tab === 'bays' && <BaysOverviewView baristas={baristas} nextShiftLabel={nextShiftLabel} onChangeShift={() => changeShift(true)} />}
+      {tab === 'bays' && (
+        <div className="space-y-5">
+          <BaysOverviewView baristas={baristas} nextShiftLabel={nextShiftLabel} onChangeShift={() => changeShift(true)} />
+          <div className="border-t border-slate-300 pt-4">
+            <AiConfigView
+              baristas={baristas}
+              logs={learningLogs}
+              onUpdateCoefficient={(bayId, newCoef) => setBaristas((prev) => prev.map((b) => (b.id === bayId ? { ...b, coefficient: newCoef } : b)))}
+              onResetLearning={handleResetData}
+            />
+          </div>
+        </div>
+      )}
       {tab === 'beans' && (
         <BeanQueueView
           beans={beans}
           onUpdateBean={(updated) => setBeans((prev) => prev.map((b) => (b.code === updated.code ? updated : b)))}
           onAddBean={(newBean) => setBeans((prev) => [newBean, ...prev])}
           onDeleteBean={(code) => setBeans((prev) => prev.filter((b) => b.code !== code))}
-        />
-      )}
-      {tab === 'ai' && (
-        <AiConfigView
-          baristas={baristas}
-          logs={learningLogs}
-          onUpdateCoefficient={(bayId, newCoef) => setBaristas((prev) => prev.map((b) => (b.id === bayId ? { ...b, coefficient: newCoef } : b)))}
-          onResetLearning={handleResetData}
         />
       )}
       {tab === 'analytics' && <AnalyticsView baristas={baristas} completedCount={completedCount} cph={94 + completedCount * 2} />}
@@ -726,6 +746,7 @@ export default function App() {
                   <div className="h-[132px] min-h-0 overflow-visible relative z-[70]">
                     <UnassignedOrdersPanel
                       orders={sortedUnassignedOrders}
+                      nextAvailable={nextAvailable}
                       selectedOrderId={selectedOrderId}
                       onSelectOrder={handleToggleOrderSelection}
                       onSelectQueueOrder={(order) => {

@@ -52,20 +52,6 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
   };
 
-  const nextAvailable = baristas
-    .map((barista) => ({
-      bayNumber: barista.bayNumber,
-      seconds: barista.queue[0]?.timeRemainingSec ?? 0,
-      isStandby: barista.queue.length === 0,
-    }))
-    .sort((a, b) => a.seconds - b.seconds || a.bayNumber - b.bayNumber)
-    .slice(0, 3);
-
-  const formatRemaining = (seconds: number) => {
-    const safeSeconds = Math.max(0, seconds);
-    return `${Math.floor(safeSeconds / 60)}:${(safeSeconds % 60).toString().padStart(2, '0')}`;
-  };
-
   // Position of current NOW cursor along timeline
   const nowX = (simTimeSec - timelineStartSec) * PIXELS_PER_SEC;
 
@@ -182,22 +168,6 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
           )}
         </div>
 
-        {/* Right: Compact next-available summary */}
-        <div className="hidden md:flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-          <span className="mr-0.5">次に空くドリッパー:</span>
-          {nextAvailable.map((item, index) => (
-            <span
-              key={item.bayNumber}
-              className={`px-2 py-1 rounded border font-mono whitespace-nowrap ${
-                index === 0
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
-                  : 'bg-white border-slate-300 text-slate-700'
-              }`}
-            >
-              #{item.bayNumber} {item.isStandby ? '待機' : formatRemaining(item.seconds)}
-            </span>
-          ))}
-        </div>
       </div>
 
       {/* 2. Linked Order Highlight Banner (when an order is selected) */}

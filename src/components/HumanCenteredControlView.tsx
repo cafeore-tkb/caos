@@ -111,23 +111,6 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
             </div>
           </div>
 
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[12px] font-bold text-slate-500 shrink-0">次に空く:</span>
-            <div className="flex items-center gap-1.5 overflow-x-auto">
-              {nextAvailable.map((item, index) => (
-                <div
-                  key={item.bayNumber}
-                  className={`px-2 py-1 rounded border font-mono text-[12px] font-black whitespace-nowrap ${
-                    index === 0
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                      : 'bg-white text-slate-700 border-slate-200'
-                  }`}
-                >
-                  #{item.bayNumber} {item.isStandby ? '待機' : formatRemaining(item.seconds)}
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {selectedOrderId && (
@@ -268,6 +251,21 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
             <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[12px] font-bold text-slate-600 whitespace-nowrap">
               {orderGroups.length} 件 / {totalUnassignedCups} 杯
             </span>
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              <span className="ml-1 text-[11px] font-bold text-slate-500 shrink-0">次に空く:</span>
+              {nextAvailable.map((item, index) => (
+                <span
+                  key={item.bayNumber}
+                  className={`px-2 py-0.5 rounded border font-mono text-[11px] font-black whitespace-nowrap ${
+                    index === 0
+                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                      : 'bg-white text-slate-700 border-slate-200'
+                  }`}
+                >
+                  #{item.bayNumber} {item.isStandby ? '待機' : formatRemaining(item.seconds)}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
