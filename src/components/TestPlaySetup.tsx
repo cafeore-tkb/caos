@@ -55,7 +55,7 @@ export const TestPlaySetup: React.FC<TestPlaySetupProps> = ({ orders, loading, o
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-[20px] font-black text-slate-950"><CalendarClock className="h-5 w-5 text-blue-700" />2025実績でテストプレイ</h2>
-            <p className="mt-1 text-[12px] font-medium text-slate-500">実際の注文を10倍速で再生します（実時間6秒＝データ上1分）</p>
+            <p className="mt-1 text-[12px] font-medium text-slate-500">実際の注文を選択した速度で再生します（1xは実時間と同じ）</p>
           </div>
           <button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-slate-100" aria-label="閉じる"><X className="h-5 w-5" /></button>
         </div>
