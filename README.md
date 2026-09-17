@@ -40,7 +40,7 @@
 
 ## 公開構成
 
-- ソースと実績データはPrivateの `cafeore-tkb/digital-master-sheet` で管理します。
+- ソースと実績データはPrivateの `cafeore-tkb/CaOS` で管理します。
 - Private側のActionsはPages用ビルドを検証し、成果物を保存します。
 - `npm run publish:pages` を実行すると、ビルド済みの `site/` だけをPublicの `cafeore-tkb/digital-master-sheet-pages` へ送り、公開側のPagesワークフローが更新します。
 - 公開成果物には生JSONを置かず、実績データはハッシュ付きの遅延読込JavaScriptに内包します。
