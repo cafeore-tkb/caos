@@ -1,0 +1,119 @@
+import React, { useMemo, useState } from 'react';
+import { AlertTriangle, Clock3, X } from 'lucide-react';
+import { Barista, OrderTicket } from '../types';
+
+export interface RebrewDecision {
+  cupCount: number;
+  interruptCurrent: boolean;
+  targetBayId: number | null;
+  insertIndex: number | null;
+}
+
+interface RebrewPanelProps {
+  ticket: OrderTicket;
+  sourceBayId: number;
+  baristas: Barista[];
+  onClose: () => void;
+  onConfirm: (decision: RebrewDecision) => void;
+}
+
+const formatSeconds = (seconds: number) => {
+  const safe = Math.max(0, Math.round(seconds));
+  return `${Math.floor(safe / 60)}:${(safe % 60).toString().padStart(2, '0')}`;
+};
+
+const waitSeconds = (barista: Barista) => barista.queue.reduce((sum, item, index) => (
+  sum + (index === 0 ? (item.timeRemainingSec ?? item.totalDurationSec) : item.totalDurationSec + 15)
+), 0);
+
+export const RebrewPanel: React.FC<RebrewPanelProps> = ({ ticket, sourceBayId, baristas, onClose, onConfirm }) => {
+  const isBrewing = ticket.status === 'brewing';
+  const [cupCount, setCupCount] = useState(ticket.cupCount === 1 ? 1 : 1);
+  const [interruptCurrent, setInterruptCurrent] = useState(isBrewing);
+  const [targetBayId, setTargetBayId] = useState<number | null>(null);
+  const [insertIndex, setInsertIndex] = useState<number | null>(null);
+
+  const candidates = useMemo(() => [...baristas].map((barista) => ({
+    barista,
+    wait: waitSeconds(barista),
+    eligible: (!ticket.preferredBaristaId || ticket.preferredBaristaId === barista.id) && (ticket.beanCode !== 'SP' || Boolean(barista.canHandleSpecial)),
+  })).sort((a, b) => a.wait - b.wait || a.barista.bayNumber - b.barista.bayNumber), [baristas, ticket.beanCode]);
+  const fastestId = candidates.find((candidate) => candidate.eligible)?.barista.id;
+  const selectedBay = baristas.find((barista) => barista.id === targetBayId) || null;
+  const selectedQueue = selectedBay
+    ? (interruptCurrent && isBrewing && selectedBay.id === sourceBayId ? selectedBay.queue.slice(1) : selectedBay.queue)
+    : [];
+  const canConfirm = targetBayId === null || insertIndex !== null;
+
+  return (
+    <aside className="context-sheet absolute top-[56px] right-0 bottom-0 z-[150] w-[min(460px,46vw)] min-w-[390px] border-l border-red-200 bg-white shadow-2xl flex flex-col" aria-label="緊急入れ直し設定">
+      <div className="h-[60px] px-4 border-b border-red-200 bg-red-50 flex items-center gap-3 shrink-0">
+        <div className="w-10 h-10 rounded-full bg-red-600 text-white flex items-center justify-center"><AlertTriangle className="w-5 h-5" /></div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[12px] font-black text-red-700">緊急の入れ直し</div>
+          <div className="flex items-baseline gap-2"><span className="font-mono text-[23px] font-black text-red-700">{ticket.id}</span><span className="text-[15px] font-black truncate">{ticket.beanName}</span></div>
+        </div>
+        <button type="button" onClick={onClose} className="w-11 h-11 rounded-full hover:bg-red-100 flex items-center justify-center touch-manipulation" aria-label="閉じる"><X className="w-5 h-5" /></button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {isBrewing && (
+          <section>
+            <h3 className="text-[13px] font-black text-slate-600 mb-2">現在の抽出</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setInterruptCurrent(true)} className={`min-h-[52px] rounded-xl border-2 text-[14px] font-black touch-manipulation ${interruptCurrent ? 'border-red-600 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-700'}`}>今すぐ中断</button>
+              <button type="button" onClick={() => setInterruptCurrent(false)} className={`min-h-[52px] rounded-xl border-2 text-[14px] font-black touch-manipulation ${!interruptCurrent ? 'border-blue-600 bg-blue-50 text-blue-800' : 'border-slate-200 bg-white text-slate-700'}`}>抽出は続ける</button>
+            </div>
+          </section>
+        )}
+
+        {ticket.cupCount > 1 && (
+          <section>
+            <h3 className="text-[13px] font-black text-slate-600 mb-2">入れ直す杯数</h3>
+            <div className="grid grid-cols-2 gap-2">
+              {[1, 2].map((cups) => <button key={cups} type="button" onClick={() => setCupCount(cups)} className={`min-h-[50px] rounded-xl border-2 font-mono text-[18px] font-black touch-manipulation ${cupCount === cups ? 'border-red-600 bg-red-50 text-red-700' : 'border-slate-200 bg-white'}`}>{cups}杯</button>)}
+            </div>
+          </section>
+        )}
+
+        <section>
+          <h3 className="text-[13px] font-black text-slate-600 mb-2">担当ドリッパーを選択</h3>
+          <div className="grid grid-cols-2 gap-2">
+            {candidates.map(({ barista, wait, eligible }) => (
+              <button key={barista.id} type="button" disabled={!eligible} onClick={() => { setTargetBayId(barista.id); setInsertIndex(interruptCurrent && isBrewing && barista.id === sourceBayId ? 0 : barista.queue.length === 0 ? 0 : 1); }} className={`min-h-[66px] rounded-xl border-2 p-2 text-left touch-manipulation disabled:opacity-45 ${targetBayId === barista.id ? 'border-red-600 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-400'}`}>
+                <div className="flex items-center justify-between gap-2"><span className="font-black text-[16px]">{barista.bayNumber} {barista.name}</span>{fastestId === barista.id && <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-black text-emerald-800">最速</span>}</div>
+                <div className="mt-1 flex items-center gap-1 text-[12px] font-bold text-slate-500"><Clock3 className="w-3.5 h-3.5" />{barista.queue.length === 0 ? '今すぐ' : `全件後 ${formatSeconds(wait)}`}{!eligible && <span className="ml-auto text-red-700">{ticket.preferredBaristaId ? '指名外' : 'SP非対応'}</span>}</div>
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => { setTargetBayId(null); setInsertIndex(null); }} className={`mt-2 w-full min-h-[48px] rounded-xl border-2 text-[14px] font-black touch-manipulation ${targetBayId === null ? 'border-red-600 bg-red-50 text-red-700' : 'border-slate-200 bg-white text-slate-700'}`}>未割当に置く</button>
+        </section>
+
+        {selectedBay && (
+          <section>
+            <h3 className="text-[13px] font-black text-slate-600 mb-2">差し込み位置</h3>
+            <div className="space-y-1.5">
+              {selectedQueue.length === 0 ? (
+                <button type="button" onClick={() => setInsertIndex(0)} className="w-full min-h-[48px] rounded-xl border-2 border-red-600 bg-red-50 text-red-700 font-black">今すぐ開始</button>
+              ) : (
+                <>
+                  {interruptCurrent && isBrewing && selectedBay.id === sourceBayId && <button type="button" onClick={() => setInsertIndex(0)} className={`w-full min-h-[46px] rounded-xl border-2 px-3 text-left text-[13px] font-black touch-manipulation ${insertIndex === 0 ? 'border-red-600 bg-red-50 text-red-700' : 'border-slate-200 bg-white'}`}>中断後、今すぐ開始</button>}
+                  {selectedQueue.map((previous, offset) => {
+                    const index = offset + 1;
+                    const label = index === 1 && !(interruptCurrent && isBrewing && selectedBay.id === sourceBayId) ? '現在の抽出の次' : `${previous.id} ${previous.beanName} の次`;
+                    return <button key={index} type="button" onClick={() => setInsertIndex(index)} className={`w-full min-h-[46px] rounded-xl border-2 px-3 text-left text-[13px] font-black touch-manipulation ${insertIndex === index ? 'border-red-600 bg-red-50 text-red-700' : 'border-slate-200 bg-white'}`}>{label}{index === selectedQueue.length && <span className="ml-2 text-[11px] text-slate-500">最後</span>}</button>;
+                  })}
+                </>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
+
+      <div className="p-3 border-t border-slate-200 bg-slate-50 flex gap-2 shrink-0">
+        <button type="button" onClick={onClose} className="min-h-[50px] px-5 rounded-xl border border-slate-300 bg-white font-black touch-manipulation">キャンセル</button>
+        <button type="button" disabled={!canConfirm} onClick={() => onConfirm({ cupCount, interruptCurrent, targetBayId, insertIndex })} className="min-h-[50px] flex-1 rounded-xl bg-red-600 text-white text-[15px] font-black disabled:bg-slate-300 touch-manipulation">この内容で入れ直す</button>
+      </div>
+    </aside>
+  );
+};

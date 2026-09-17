@@ -20,6 +20,7 @@ interface HumanCenteredControlViewProps {
   onOpenTicketDetail: (ticket: OrderTicket) => void;
   onOpenEmptySlot: (bayId: number) => void;
   onAssignToBay: (order: UnassignedOrder, bayId: number) => void;
+  onRequestRebrew: (ticket: OrderTicket, bayId: number) => void;
 }
 
 interface OrderGroup {
@@ -55,6 +56,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
   onOpenTicketDetail,
   onOpenEmptySlot,
   onAssignToBay,
+  onRequestRebrew,
 }) => {
   const [openPadUid, setOpenPadUid] = useState<string | null>(null);
   const orderUid = (order: UnassignedOrder) => order.ticketUid || order.id;
@@ -192,31 +194,34 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                 <button
                   type="button"
                   disabled={!current}
-                  onClick={() => undefined}
+                  onClick={() => current && onRequestRebrew(current, barista.id)}
                   className={`w-full text-left rounded-md border p-2 min-h-[104px] transition-colors touch-manipulation ${
-                    current
+                    current?.isRebrew
+                      ? 'bg-red-50 border-red-400 text-slate-950 hover:bg-red-100'
+                      : current
                       ? isImminent
                         ? 'bg-red-50 border-red-300 hover:bg-red-100'
                         : 'bg-slate-950 border-slate-950 text-white hover:bg-slate-800'
                       : 'bg-slate-50 border-dashed border-slate-300 text-slate-400'
                   }`}
                 >
-                  <div className={`text-[9px] font-black tracking-[0.16em] ${isImminent ? 'text-red-600' : current ? 'text-slate-400' : 'text-slate-400'}`}>
+                  <div className={`text-[9px] font-black tracking-[0.16em] ${current?.isRebrew || isImminent ? 'text-red-600' : 'text-slate-400'}`}>
                     NOW
                   </div>
                   {current ? (
                     <>
-                      <div className={`mt-1 flex items-start justify-between gap-1 ${isImminent ? 'text-slate-950' : 'text-white'}`}>
+                      <div className={`mt-1 flex items-start justify-between gap-1 ${current.isRebrew || isImminent ? 'text-slate-950' : 'text-white'}`}>
                         <div className="min-w-0">
                           <div className="text-[15px] leading-tight font-black truncate">{current.beanName}</div>
+                          {current.isRebrew && <div className="mt-1 inline-flex rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">入れ直し中</div>}
                           <div className="mt-0.5 flex items-center gap-1 text-[10px] font-bold opacity-85">
                             <span className="rounded bg-white px-1.5 py-0.5 text-[14px] leading-none font-mono text-slate-950 opacity-100">{current.cupCount}杯</span>
                             {current.totalItemsInOrder && current.totalItemsInOrder > 1 && <span>{current.itemIndex}/{current.totalItemsInOrder}・計{current.totalOrderCups}杯</span>}
                           </div>
                         </div>
-                        <span className="font-mono text-[21px] leading-none font-black shrink-0">{current.id}</span>
+                        <span className={`font-mono text-[21px] leading-none font-black shrink-0 ${current.isRebrew ? 'text-red-700' : ''}`}>{current.id}</span>
                       </div>
-                      <div className={`mt-1.5 font-mono text-[30px] leading-none font-black tracking-tight ${isImminent ? 'text-red-600' : 'text-white'}`}>
+                      <div className={`mt-1.5 font-mono text-[30px] leading-none font-black tracking-tight ${current.isRebrew || isImminent ? 'text-red-600' : 'text-white'}`}>
                         {remainingSeconds === 0 ? '継続中' : formatRemaining(remainingSeconds)}
                       </div>
                     </>
@@ -372,10 +377,11 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                           event.stopPropagation();
                           openAssignmentPad(item);
                         }}
-                        className="w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-left transition-colors hover:border-blue-300 hover:bg-blue-50 touch-manipulation"
+                        className={`w-full rounded-md border px-2 py-1 text-left transition-colors touch-manipulation ${item.isRebrew ? 'border-red-300 bg-red-50 hover:bg-red-100' : 'border-slate-200 bg-slate-50 hover:border-blue-300 hover:bg-blue-50'}`}
                       >
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-[13px] font-black text-slate-900 truncate">{item.beanName}</span>
+                          {item.isRebrew && <span className="rounded bg-red-600 px-1 py-0.5 text-[9px] font-black text-white">入れ直し</span>}
                           <span className="rounded bg-slate-950 px-1.5 py-0.5 font-mono text-[14px] leading-none font-black text-white shrink-0">{item.cupCount}杯</span>
                           {item.totalItemsInOrder && item.totalItemsInOrder > 1 && <span className="text-[10px] font-mono font-black text-slate-600 shrink-0">{item.itemIndex}/{item.totalItemsInOrder}・計{item.totalOrderCups}杯</span>}
                         </div>

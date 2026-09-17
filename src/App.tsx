@@ -27,6 +27,7 @@ import { AiConfigView } from './components/AiConfigView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { HumanCenteredControlView } from './components/HumanCenteredControlView';
 import { TestPlaySetup } from './components/TestPlaySetup';
+import { RebrewDecision, RebrewPanel } from './components/RebrewPanel';
 import { soundManager } from './utils/audio';
 import { ExternalLink, X } from 'lucide-react';
 
@@ -132,6 +133,22 @@ const arrangeQueue = (
   }
   return result;
 };
+
+const reanchorQueueInOrder = (queue: OrderTicket[], coefficient: number, nowSec: number) => {
+  if (queue.length === 0) return queue;
+  const firstWasBrewing = queue[0].status === 'brewing';
+  const first: OrderTicket = firstWasBrewing
+    ? { ...queue[0] }
+    : { ...queue[0], status: 'brewing', startTimeSec: nowSec, timeRemainingSec: Math.round(queue[0].totalDurationSec * coefficient) };
+  const result = [first];
+  let cursor = Math.max(nowSec, (first.startTimeSec ?? nowSec) + first.totalDurationSec);
+  queue.slice(1).forEach((ticket) => {
+    const startTimeSec = cursor + 15;
+    result.push({ ...ticket, status: 'scheduled', startTimeSec, timeRemainingSec: undefined });
+    cursor = startTimeSec + ticket.totalDurationSec;
+  });
+  return result;
+};
 const splitIntoDripUnits = (orders: UnassignedOrder[]) => {
   const totalOrderCups = orders.reduce((sum, order) => sum + order.cupCount, 0);
   const units = orders.flatMap((order) => {
@@ -193,7 +210,8 @@ const historicalBeanCode = (name: string, type: string): BeanCode => {
 };
 
 const historicalOrderToDripUnits = (order: HistoricalOrder): UnassignedOrder[] => {
-  const drinks = order.items.filter((item) => item.type !== 'others');
+  // Plain iced milk is served without dripping, so it never enters CaOS's drip queue.
+  const drinks = order.items.filter((item) => item.type !== 'others' && item.type !== 'milk' && !item.name.includes('アイスミルク'));
   const grouped = new Map<BeanCode, { names: string[]; count: number }>();
   drinks.forEach((item) => {
     const code = historicalBeanCode(item.name, item.type);
@@ -248,6 +266,7 @@ export default function App() {
   // Modals
   const [selectedTicket, setSelectedTicket] = useState<OrderTicket | null>(null);
   const [assignSlotData, setAssignSlotData] = useState<{ bayId: number | null; order: UnassignedOrder | null } | null>(null);
+  const [rebrewSource, setRebrewSource] = useState<{ ticket: OrderTicket; bayId: number } | null>(null);
 
   // Simulation Clock (starts at 08:04:15 -> 29055 seconds)
   const [simTimeSec, setSimTimeSec] = useState<number>(8 * 3600 + 4 * 60 + 15);
@@ -267,6 +286,7 @@ export default function App() {
   const realTimeSec = operationalTime.getHours() * 3600 + operationalTime.getMinutes() * 60 + operationalTime.getSeconds();
 
   const sortedUnassignedOrders = [...unassignedOrders].sort((a, b) =>
+    Number(Boolean(b.isRebrew)) - Number(Boolean(a.isRebrew)) ||
     orderNumber(a.id) - orderNumber(b.id) || (a.itemIndex || 0) - (b.itemIndex || 0)
   );
 
@@ -360,6 +380,7 @@ export default function App() {
     setShiftRosterIndex(snapshot.shiftRosterIndex);
     setSelectedOrderId(null);
     setSelectedQueueBean(null);
+    setRebrewSource(null);
     setSelectedTicket(null);
     undoSnapshotRef.current = null;
     arrivalsAfterUndoSnapshotRef.current = [];
@@ -529,6 +550,8 @@ export default function App() {
       orderNotes: orderToAssign.orderNotes,
       sourceOrderIds: orderToAssign.sourceOrderIds,
       preferredBaristaId: orderToAssign.preferredBaristaId,
+      isRebrew: orderToAssign.isRebrew,
+      rebrewOfTicketUid: orderToAssign.rebrewOfTicketUid,
       beanCode: orderToAssign.beanCode,
       beanName: orderToAssign.beanName,
       cupCount: orderToAssign.cupCount,
@@ -641,10 +664,113 @@ export default function App() {
       recommendedBaristas: ticket.preferredBaristaId ? `ドリッパー ${ticket.preferredBaristaId}` : '全ドリッパー',
       recommendedBayIds: ticket.preferredBaristaId ? [ticket.preferredBaristaId] : [1, 2, 3, 4, 5, 6],
       preferredBaristaId: ticket.preferredBaristaId,
+      isRebrew: ticket.isRebrew,
+      rebrewOfTicketUid: ticket.rebrewOfTicketUid,
       cardColor: ticket.beanCode === 'ICE' ? 'cyan' : ticket.beanCode === 'SP' ? 'emerald' : 'blue',
     }, ...prev]);
     setSelectedOrderId(null);
     setSelectedQueueBean(null);
+    soundManager.playDispatch();
+  };
+
+  const handleConfirmRebrew = (decision: RebrewDecision) => {
+    if (!rebrewSource) return;
+    const { ticket, bayId: sourceBayId } = rebrewSource;
+    captureUndo(`${ticket.id}の入れ直し`);
+    const originalKey = ticketKey(ticket);
+    const duration = decision.cupCount > 1 ? 195 : 135;
+    const rebrewUid = `rebrew-${originalKey}-${Date.now()}`;
+    const newTicket: OrderTicket = {
+      ...ticket,
+      ticketUid: rebrewUid,
+      cupCount: decision.cupCount,
+      status: 'scheduled',
+      totalDurationSec: duration,
+      scheduledTimeStr: `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`,
+      startTimeSec: undefined,
+      endTimeSec: undefined,
+      completedAtSec: undefined,
+      timeRemainingSec: undefined,
+      isRebrew: true,
+      rebrewOfTicketUid: originalKey,
+      isInterrupted: false,
+    };
+
+    if (decision.interruptCurrent && ticket.status === 'brewing') {
+      setBeans((prev) => prev.map((bean) => bean.code === ticket.beanCode
+        ? { ...bean, stockGrams: Math.max(0, bean.stockGrams - ticket.cupCount * 14) }
+        : bean));
+    }
+
+    if (decision.targetBayId === null) {
+      setUnassignedOrders((prev) => [{
+        id: newTicket.id,
+        ticketUid: newTicket.ticketUid,
+        itemIndex: newTicket.itemIndex,
+        totalItemsInOrder: newTicket.totalItemsInOrder,
+        totalOrderCups: newTicket.totalOrderCups,
+        orderNotes: newTicket.orderNotes,
+        sourceOrderIds: newTicket.sourceOrderIds,
+        beanCode: newTicket.beanCode,
+        beanName: newTicket.beanName,
+        cupCount: newTicket.cupCount,
+        badgeTag: `${newTicket.cupCount}杯 入れ直し`,
+        predictedTimeStr: newTicket.scheduledTimeStr || '2:15',
+        recommendedBaristas: newTicket.beanCode === 'SP' ? 'SP対応ドリッパー' : '全ドリッパー',
+        recommendedBayIds: baristas.filter((barista) => newTicket.beanCode !== 'SP' || barista.canHandleSpecial).map((barista) => barista.id),
+        preferredBaristaId: newTicket.preferredBaristaId,
+        cardColor: newTicket.beanCode === 'SP' ? 'emerald' : 'blue',
+        isRebrew: true,
+        rebrewOfTicketUid: originalKey,
+      }, ...prev]);
+    }
+
+    setBaristas((prev) => {
+      let updated = prev.map((barista) => {
+        if (barista.id !== sourceBayId || !decision.interruptCurrent || ticket.status !== 'brewing') return barista;
+        const sourceIndex = barista.queue.findIndex((item) => ticketKey(item) === originalKey);
+        if (sourceIndex < 0) return barista;
+        const interrupted: OrderTicket = {
+          ...barista.queue[sourceIndex],
+          status: 'completed',
+          endTimeSec: realTimeSec,
+          completedAtSec: realTimeSec,
+          isInterrupted: true,
+        };
+        const remaining = barista.queue.filter((_, index) => index !== sourceIndex);
+        const queue = reanchorQueueInOrder(remaining, barista.coefficient, realTimeSec);
+        return {
+          ...barista,
+          queue,
+          pastTickets: [...(barista.pastTickets || []), interrupted],
+          status: queue.length > 0 ? 'brewing' : 'standby',
+          remainingStr: queue.length > 0 ? '再計算中' : '00:00 待機中',
+        };
+      });
+
+      if (decision.targetBayId !== null) {
+        updated = updated.map((barista) => {
+          if (barista.id !== decision.targetBayId) return barista;
+          const queue = [...barista.queue];
+          const canReplaceInterruptedNow = decision.interruptCurrent && ticket.status === 'brewing' && barista.id === sourceBayId;
+          const minimumIndex = queue.length > 0 && !canReplaceInterruptedNow ? 1 : 0;
+          const insertion = Math.max(minimumIndex, Math.min(decision.insertIndex ?? queue.length, queue.length));
+          queue.splice(insertion, 0, newTicket);
+          const arranged = reanchorQueueInOrder(queue, barista.coefficient, realTimeSec);
+          return {
+            ...barista,
+            queue: arranged,
+            status: arranged.length > 0 ? 'brewing' : 'standby',
+            remainingStr: arranged.length > 0 ? barista.remainingStr : '00:00 待機中',
+          };
+        });
+      }
+      return updated;
+    });
+
+    setRebrewSource(null);
+    setSelectedTicket(null);
+    setSelectedOrderId(ticket.id);
     soundManager.playDispatch();
   };
 
@@ -657,7 +783,7 @@ export default function App() {
   const handleMergeUnassignedOrders = (firstUid: string, secondUid: string) => {
     const first = unassignedOrders.find((order) => (order.ticketUid || order.id) === firstUid);
     const second = unassignedOrders.find((order) => (order.ticketUid || order.id) === secondUid);
-    if (!first || !second || first.cupCount !== 1 || second.cupCount !== 1 || first.beanCode !== second.beanCode) return;
+    if (!first || !second || first.isRebrew || second.isRebrew || first.cupCount !== 1 || second.cupCount !== 1 || first.beanCode !== second.beanCode) return;
     if (first.preferredBaristaId !== second.preferredBaristaId) return;
     captureUndo(`${first.id}と${second.id}の統合`);
     setUnassignedOrders((prev) => {
@@ -705,6 +831,7 @@ export default function App() {
     setSimTimeSec(8 * 3600 + 4 * 60 + 15);
     setSelectedOrderId(null);
     setSelectedQueueBean(null);
+    setRebrewSource(null);
     setShiftRosterIndex(0);
     setTestPlaySession(null);
     historicalOrderCursor.current = 0;
@@ -867,6 +994,10 @@ export default function App() {
                     onMoveTicket={handleMoveScheduledTicket}
                     onReturnToUnassigned={handleReturnScheduledTicket}
                     onCloseTicketAction={() => setSelectedTicket(null)}
+                    onRequestRebrew={(ticket, bayId) => {
+                      setSelectedTicket(null);
+                      setRebrewSource({ ticket, bayId });
+                    }}
                     onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
                     simTimeSec={realTimeSec}
                     timelineCommand={timelineCommand}
@@ -908,6 +1039,7 @@ export default function App() {
                   onOpenTicketDetail={(ticket) => setSelectedTicket(ticket)}
                   onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
                   onAssignToBay={(order, bayId) => handleAssignOrderToBay(order.ticketUid || order.id, bayId)}
+                  onRequestRebrew={(ticket, bayId) => setRebrewSource({ ticket, bayId })}
                 />
               )}
         </main>
@@ -958,6 +1090,16 @@ export default function App() {
           unassignedOrders={sortedUnassignedOrders}
           onClose={() => setAssignSlotData(null)}
           onAssign={handleAssignOrderToBay}
+        />
+      )}
+
+      {rebrewSource && (
+        <RebrewPanel
+          ticket={rebrewSource.ticket}
+          sourceBayId={rebrewSource.bayId}
+          baristas={baristas}
+          onClose={() => setRebrewSource(null)}
+          onConfirm={handleConfirmRebrew}
         />
       )}
 

@@ -13,6 +13,7 @@ interface TicketCardProps {
   onMoveTicket: (ticket: OrderTicket, bayId: number) => void;
   onReturnToUnassigned: (ticket: OrderTicket) => void;
   onCloseAction: () => void;
+  onRequestRebrew: (ticket: OrderTicket) => void;
   widthPx?: number;
 }
 
@@ -27,6 +28,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   onMoveTicket,
   onReturnToUnassigned,
   onCloseAction,
+  onRequestRebrew,
   widthPx,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -44,6 +46,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   if (ticket.beanCode === 'MILK') leftBorderColor = 'border-l-[#8b5cf6]';
 
   const isCompleted = ticket.status === 'completed';
+  const isRebrew = Boolean(ticket.isRebrew);
   const isNamed = Boolean(ticket.preferredBaristaId);
   const ticketKey = ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`;
   const isActionOpen = ticket.status === 'scheduled' && actionTicketKey === ticketKey;
@@ -81,7 +84,10 @@ export const TicketCard: React.FC<TicketCardProps> = ({
           suppressNextClick.current = false;
           return;
         }
-        if (ticket.status !== 'scheduled') return;
+        if (ticket.status !== 'scheduled') {
+          onRequestRebrew(ticket);
+          return;
+        }
         if (isActionOpen) {
           onReturnToUnassigned(ticket);
           onCloseAction();
@@ -127,7 +133,9 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         ...(dragOffset ? { transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)` } : {}),
       }}
       className={`relative group h-full ${dragOffset ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : isActionOpen ? 'overflow-visible z-[80]' : 'overflow-hidden'} shrink-0 min-w-[135px] rounded-lg border-2 border-l-[5px] ${leftBorderColor} px-2 py-1.5 transition-[box-shadow,border-color] select-none flex flex-col justify-center ${ticket.status === 'scheduled' ? 'cursor-grab active:cursor-grabbing touch-none' : 'cursor-default touch-manipulation'} ${
-        isCompleted
+        isRebrew
+          ? `bg-red-50 border-red-300 text-slate-900 shadow-xs ${isCompleted ? 'opacity-55 hover:opacity-75' : 'hover:border-red-500 hover:shadow-md'}`
+          : isCompleted
           ? 'bg-slate-100 border-slate-200 text-slate-500 opacity-50 hover:opacity-70'
           : isNamed
           ? 'bg-violet-50 border-violet-300 hover:border-violet-400 shadow-xs hover:shadow-md'
@@ -165,7 +173,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             {/* Large Order Number Label */}
             <span
               className={`font-mono text-[22px] font-black tracking-tight leading-none ${
-                isOrderSelected ? 'text-amber-900 font-black' : isNamed ? 'text-violet-700' : isCompleted ? 'text-slate-500' : ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1 ? 'text-slate-950' : 'text-slate-600'
+                isRebrew ? 'text-red-700' : isOrderSelected ? 'text-amber-900 font-black' : isNamed ? 'text-violet-700' : isCompleted ? 'text-slate-500' : ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1 ? 'text-slate-950' : 'text-slate-600'
               }`}
             >
               {ticket.id}
@@ -177,15 +185,17 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             </span>
 
             {ticket.preferredBaristaId && <span className="rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">指名</span>}
+            {isRebrew && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">{ticket.status === 'brewing' ? '入れ直し中' : '入れ直し'}</span>}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
-            {isCompleted && (
+            {isCompleted && !ticket.isInterrupted && (
               <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded leading-none flex items-center gap-0.5">
                 <Check className="w-3 h-3" />
                 <span className="sr-only">完了</span>
               </span>
             )}
+            {ticket.isInterrupted && <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-black text-red-700">中断</span>}
 
           </div>
         </div>

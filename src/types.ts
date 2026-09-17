@@ -41,6 +41,9 @@ export interface OrderTicket {
   startTimeSec?: number; // sim time in seconds when this drip starts
   endTimeSec?: number; // sim time in seconds when this drip ends
   completedAtSec?: number; // for historical completed drip
+  isRebrew?: boolean; // emergency remake linked to an original cup
+  rebrewOfTicketUid?: string;
+  isInterrupted?: boolean; // original drip stopped because a remake was required
   imminent?: boolean; // e.g. "残 0:07" or "まもなく完了"
   recipe?: {
     grindSize: string;
@@ -82,6 +85,8 @@ export interface UnassignedOrder {
   recommendedBaristas: string;
   recommendedBayIds: number[];
   preferredBaristaId?: number; // 指名。必ず1人だけ
+  isRebrew?: boolean;
+  rebrewOfTicketUid?: string;
   cardColor: 'blue' | 'peach' | 'cyan' | 'emerald';
 }
 

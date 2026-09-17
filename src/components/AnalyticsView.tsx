@@ -51,11 +51,21 @@ const deltaStatus = (deltaSec: number) => {
 };
 
 export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ baristas, salesOrders = [], periodStartMs, periodEndMs }) => {
+  const rebrewSummary = useMemo(() => {
+    const history = baristas.flatMap((barista) => barista.pastTickets || []);
+    const rebrews = history.filter((ticket) => ticket.isRebrew && !ticket.isInterrupted);
+    const interrupted = history.filter((ticket) => ticket.isInterrupted);
+    const interruptedKeys = new Set(interrupted.map((ticket) => ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`));
+    const rebrewCups = rebrews.reduce((sum, ticket) => sum + ticket.cupCount, 0);
+    const interruptedCups = interrupted.reduce((sum, ticket) => sum + ticket.cupCount, 0);
+    const completedRedoAfterFinished = rebrews.filter((ticket) => !ticket.rebrewOfTicketUid || !interruptedKeys.has(ticket.rebrewOfTicketUid)).reduce((sum, ticket) => sum + ticket.cupCount, 0);
+    return { rebrewCount: rebrews.length, rebrewCups, interruptedCount: interrupted.length, extraBeans: (interruptedCups + completedRedoAfterFinished) * 14 };
+  }, [baristas]);
   const completedParts = useMemo<CompletedPart[]>(() =>
     baristas.flatMap((barista) =>
       (barista.pastTickets || []).flatMap((ticket) => {
         const finishedAt = ticket.completedAtSec ?? ticket.endTimeSec;
-        return ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1 && finishedAt !== undefined
+        return !ticket.isInterrupted && !ticket.isRebrew && ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1 && finishedAt !== undefined
           ? [{ ticket, bayNumber: barista.bayNumber, finishedAt }]
           : [];
       })
@@ -224,6 +234,17 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ baristas, salesOrd
             </div>
           </section>
         </>
+      )}
+
+      {(rebrewSummary.rebrewCount > 0 || rebrewSummary.interruptedCount > 0) && (
+        <section className="rounded-xl border border-red-200 bg-red-50 p-3 shadow-xs">
+          <h3 className="flex items-center gap-2 text-[15px] font-black text-red-900"><AlertTriangle className="h-4 w-4" />緊急入れ直し</h3>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            <div className="rounded-lg border border-red-100 bg-white p-2"><div className="text-[10px] font-bold text-slate-500">完了した入れ直し</div><div className="font-mono text-[22px] font-black text-red-700">{rebrewSummary.rebrewCount}<span className="text-[11px]">件 / {rebrewSummary.rebrewCups}杯</span></div></div>
+            <div className="rounded-lg border border-red-100 bg-white p-2"><div className="text-[10px] font-bold text-slate-500">中断</div><div className="font-mono text-[22px] font-black text-red-700">{rebrewSummary.interruptedCount}<span className="text-[11px]">件</span></div></div>
+            <div className="rounded-lg border border-red-100 bg-white p-2"><div className="text-[10px] font-bold text-slate-500">追加消費豆</div><div className="font-mono text-[22px] font-black text-red-700">{rebrewSummary.extraBeans}<span className="text-[11px]">g</span></div></div>
+          </div>
+        </section>
       )}
 
       <div className="grid grid-cols-2 gap-2">
