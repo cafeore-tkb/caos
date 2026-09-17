@@ -1,8 +1,14 @@
 import React from 'react';
-import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2, ChevronLeft, ChevronRight, CalendarClock, BarChart3 } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2, ChevronLeft, ChevronRight, CalendarClock, BarChart3, SlidersHorizontal, LayoutGrid, Coffee } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
+export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
+
 interface TopHeaderProps {
+  activeTab: NavTab;
+  controlViewMode: 'current' | 'new';
+  onSelectTab: (tab: NavTab) => void;
+  onSelectControlViewMode: (mode: 'current' | 'new') => void;
   timeStr: string;
   unassignedCups: number;
   totalWaitingCups: number;
@@ -25,6 +31,10 @@ interface TopHeaderProps {
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
+  activeTab,
+  controlViewMode,
+  onSelectTab,
+  onSelectControlViewMode,
   timeStr,
   unassignedCups,
   totalWaitingCups,
@@ -45,10 +55,53 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onOpenTestPlay,
   onEndTestPlay,
 }) => {
+  const navItems = [
+    { id: 'control' as const, label: '管制盤', icon: SlidersHorizontal },
+    { id: 'bays' as const, label: 'ドリッパー', icon: LayoutGrid },
+    { id: 'beans' as const, label: '豆キュー', icon: Coffee },
+    { id: 'analytics' as const, label: '実績', icon: BarChart3 },
+  ];
+
   return (
-    <header className="h-[56px] bg-white border-b border-[#e2e8f0] px-4 flex items-center justify-between shadow-xs select-none shrink-0">
+    <header className="h-[56px] bg-white border-b border-[#e2e8f0] px-2 flex items-center justify-between gap-2 shadow-xs select-none shrink-0">
       {/* Left side: Clock and Top Metrics */}
-      <div className="flex items-center gap-4">
+      <div className="flex min-w-0 items-center gap-2">
+        <nav className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1" aria-label="画面切替">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                id={`nav-tab-${item.id}`}
+                type="button"
+                onClick={() => onSelectTab(item.id)}
+                aria-pressed={active}
+                title={item.label}
+                className={`flex h-10 min-w-10 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-black touch-manipulation ${active ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden 2xl:inline">{item.label}</span>
+              </button>
+            );
+          })}
+          {activeTab === 'control' && (
+            <div className="ml-0.5 flex items-center gap-0.5 border-l border-slate-300 pl-1" role="group" aria-label="管制盤の表示切替">
+              {(['current', 'new'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  aria-pressed={controlViewMode === mode}
+                  onClick={() => onSelectControlViewMode(mode)}
+                  className={`h-10 min-w-9 rounded-md text-[12px] font-black touch-manipulation ${controlViewMode === mode ? 'bg-blue-700 text-white' : 'bg-white text-slate-600'}`}
+                >
+                  {mode === 'current' ? 'A' : 'B'}
+                </button>
+              ))}
+            </div>
+          )}
+        </nav>
+
         {/* Large Digital Clock */}
         <div className="flex items-center gap-2">
           <div className="font-mono text-[28px] font-bold tracking-tight text-[#0f172a] leading-none">
@@ -97,7 +150,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </div>
 
         {/* Metric 1: 未割当オーダー (Unassigned Orders) */}
-        <div className="bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 flex items-baseline gap-1.5">
+        <div className="hidden xl:flex bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 items-baseline gap-1.5">
           <span className="text-[12px] font-semibold text-[#475569]">未割当オーダー</span>
           <div className="flex items-baseline font-mono">
             <span className="text-[19px] font-extrabold text-[#ef4444] leading-none">
@@ -108,7 +161,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </div>
 
         {/* Metric 2: 全ベイ待機杯数 (Total Queued Cups in Bays) */}
-        <div className="bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 flex items-baseline gap-1.5">
+        <div className="hidden xl:flex bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 items-baseline gap-1.5">
           <span className="text-[12px] font-semibold text-[#475569]">全ドリッパー待機杯数</span>
           <div className="flex items-baseline font-mono">
             <span className="text-[19px] font-extrabold text-[#0f172a] leading-none">

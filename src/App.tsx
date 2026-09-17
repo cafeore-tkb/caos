@@ -16,8 +16,7 @@ import {
   INITIAL_BEANS,
   BEAN_NAME_MAP,
 } from './data/initialData';
-import { TopHeader } from './components/TopHeader';
-import { Sidebar, NavTab } from './components/Sidebar';
+import { TopHeader, NavTab } from './components/TopHeader';
 import { DispatchBoard } from './components/DispatchBoard';
 import { UnassignedOrdersPanel } from './components/UnassignedOrdersPanel';
 import { TicketDetailModal } from './components/TicketDetailModal';
@@ -29,7 +28,7 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { HumanCenteredControlView } from './components/HumanCenteredControlView';
 import { TestPlaySetup } from './components/TestPlaySetup';
 import { soundManager } from './utils/audio';
-import { ChevronRight, ExternalLink, X } from 'lucide-react';
+import { ExternalLink, X } from 'lucide-react';
 
 type ControlViewMode = 'current' | 'new';
 type AuxiliaryTab = Exclude<NavTab, 'control'>;
@@ -39,6 +38,24 @@ type UndoSnapshot = {
   unassignedOrders: UnassignedOrder[];
   shiftRosterIndex: number;
   label: string;
+};
+
+type PanelSnapshot = {
+  baristas: Barista[];
+  beans: BeanItem[];
+  learningLogs: LearningEngineLog[];
+  testPlaySession: TestPlaySession | null;
+};
+
+const PANEL_SNAPSHOT_KEY = 'caos-panel-snapshot-v1';
+
+const readPanelSnapshot = (): PanelSnapshot | null => {
+  try {
+    const value = window.localStorage.getItem(PANEL_SNAPSHOT_KEY);
+    return value ? JSON.parse(value) as PanelSnapshot : null;
+  } catch {
+    return null;
+  }
 };
 
 type ShiftMember = { name: string; canHandleSpecial: boolean };
@@ -206,14 +223,15 @@ export default function App() {
     const panel = new URLSearchParams(window.location.search).get('panel');
     return panel === 'bays' || panel === 'beans' || panel === 'analytics' ? panel : null;
   })() as AuxiliaryTab | null;
+  const standaloneSnapshot = standaloneTab ? readPanelSnapshot() : null;
 
   // Navigation
   const [activeTab, setActiveTab] = useState<NavTab>(standaloneTab || 'control');
   const [controlViewMode, setControlViewMode] = useState<ControlViewMode>('current');
 
   // Core Data
-  const [baristas, setBaristas] = useState<Barista[]>(makeCleanBaristas);
-  const [beans, setBeans] = useState<BeanItem[]>(INITIAL_BEANS);
+  const [baristas, setBaristas] = useState<Barista[]>(() => standaloneSnapshot?.baristas || makeCleanBaristas());
+  const [beans, setBeans] = useState<BeanItem[]>(() => standaloneSnapshot?.beans || INITIAL_BEANS);
   const [unassignedOrders, setUnassignedOrders] = useState<UnassignedOrder[]>([]);
   const mockOrderCursor = useRef(0);
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
@@ -221,7 +239,7 @@ export default function App() {
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
   const [shiftRosterIndex, setShiftRosterIndex] = useState(0);
   const lastAutomaticShiftHour = useRef(new Date().getHours());
-  const [learningLogs, setLearningLogs] = useState<LearningEngineLog[]>(INITIAL_LEARNING_LOGS);
+  const [learningLogs, setLearningLogs] = useState<LearningEngineLog[]>(() => standaloneSnapshot?.learningLogs || INITIAL_LEARNING_LOGS);
 
   // Filters & Toggles
   const [selectedQueueBean, setSelectedQueueBean] = useState<BeanCode | null>(null);
@@ -230,8 +248,6 @@ export default function App() {
   // Modals
   const [selectedTicket, setSelectedTicket] = useState<OrderTicket | null>(null);
   const [assignSlotData, setAssignSlotData] = useState<{ bayId: number | null; order: UnassignedOrder | null } | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const sidebarTimerRef = useRef<number | null>(null);
 
   // Simulation Clock (starts at 08:04:15 -> 29055 seconds)
   const [simTimeSec, setSimTimeSec] = useState<number>(8 * 3600 + 4 * 60 + 15);
@@ -241,7 +257,7 @@ export default function App() {
   const [historicalOrders, setHistoricalOrders] = useState<HistoricalOrder[]>([]);
   const [testDataLoading, setTestDataLoading] = useState(true);
   const [testSetupOpen, setTestSetupOpen] = useState(false);
-  const [testPlaySession, setTestPlaySession] = useState<TestPlaySession | null>(null);
+  const [testPlaySession, setTestPlaySession] = useState<TestPlaySession | null>(() => standaloneSnapshot?.testPlaySession || null);
   const historicalOrderCursor = useRef(0);
 
   // Linked multi-item order selection (e.g. #152 has items in Bay 1 and Bay 2)
@@ -275,19 +291,6 @@ export default function App() {
       });
     return () => { cancelled = true; };
   }, []);
-
-  const restartSidebarTimer = () => {
-    if (sidebarTimerRef.current !== null) window.clearTimeout(sidebarTimerRef.current);
-    sidebarTimerRef.current = window.setTimeout(() => setSidebarOpen(false), 6000);
-  };
-
-  useEffect(() => {
-    if (!sidebarOpen) return;
-    restartSidebarTimer();
-    return () => {
-      if (sidebarTimerRef.current !== null) window.clearTimeout(sidebarTimerRef.current);
-    };
-  }, [sidebarOpen]);
 
   // Mock the register sending one complete order at a time.
   useEffect(() => {
@@ -730,14 +733,12 @@ export default function App() {
     setIsRunning(true);
     setActiveTab('control');
     setTestSetupOpen(false);
-    setSidebarOpen(false);
   };
 
   const handleEndTestPlay = () => {
     setTestPlaySession((session) => session ? { ...session, status: 'finished' } : session);
     setIsRunning(false);
     setActiveTab('analytics');
-    setSidebarOpen(true);
   };
 
   // Live cup totals shown in the header
@@ -762,6 +763,11 @@ export default function App() {
     tab === 'bays' ? 'ドリッパー / 補正設定' : tab === 'beans' ? '豆キュー' : '実績';
 
   const openAuxiliaryTab = (tab: AuxiliaryTab) => {
+    try {
+      window.localStorage.setItem(PANEL_SNAPSHOT_KEY, JSON.stringify({ baristas, beans, learningLogs, testPlaySession } satisfies PanelSnapshot));
+    } catch {
+      // Opening the panel still works with its default state if storage is unavailable.
+    }
     const url = new URL(window.location.href);
     url.searchParams.set('panel', tab);
     window.open(url.toString(), '_blank', 'noopener,noreferrer');
@@ -816,35 +822,14 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f0f4fa] text-[#0f172a] select-none font-sans">
-      {/* 1. Left Navigation Rail */}
-      <div
-        className={`h-full shrink-0 overflow-hidden transition-[width] duration-300 ease-out ${sidebarOpen ? 'w-[82px]' : 'w-0'}`}
-        onPointerDown={restartSidebarTimer}
-      >
-        <Sidebar
-          activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          controlViewMode={controlViewMode}
-          onSelectControlViewMode={setControlViewMode}
-        />
-      </div>
-
-      {!sidebarOpen && (
-        <button
-          type="button"
-          aria-label="メニューを開く"
-          title="メニューを開く"
-          onClick={() => setSidebarOpen(true)}
-          className="fixed left-0 top-3 z-[110] flex h-12 w-8 items-center justify-center rounded-r-xl border border-l-0 border-slate-300 bg-white/95 text-slate-700 shadow-md touch-manipulation active:bg-slate-100"
-        >
-          <ChevronRight className="h-6 w-6" strokeWidth={2.5} />
-        </button>
-      )}
-
-      {/* 2. Main Workstation Area */}
+      {/* Main Workstation Area */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Top Header */}
         <TopHeader
+          activeTab={activeTab}
+          controlViewMode={controlViewMode}
+          onSelectTab={setActiveTab}
+          onSelectControlViewMode={setControlViewMode}
           timeStr={`${operationalTime.getHours().toString().padStart(2, '0')}:${operationalTime.getMinutes().toString().padStart(2, '0')}:${operationalTime.getSeconds().toString().padStart(2, '0')}`}
           unassignedCups={totalUnassignedDisplay}
           totalWaitingCups={totalWaitingCupsDisplay}
