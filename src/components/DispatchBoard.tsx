@@ -183,10 +183,10 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
         <div className="relative" style={{ width: `${STICKY_LEFT_WIDTH + timelineWidthPx}px` }}>
           {/* 3A. Synchronized Timeline Scale Header */}
           <div className="h-[30px] bg-[#f8fafc] border-b border-[#e2e8f0] flex items-center text-[11px] font-mono font-medium text-slate-500 relative">
-            {/* Sticky Left Header Cell (290px = 195px Barista + 95px Action) */}
-            <div className="sticky left-0 z-[60] w-[290px] shrink-0 h-full px-3 text-[11px] font-sans font-bold text-slate-500 flex items-center justify-between bg-[#f8fafc] border-r border-[#cbd5e1] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
-              <span>ドリッパー / 抽出担当</span>
-              <span>操作</span>
+            {/* Sticky Left Header Cell (290px = 95px Action + 195px Barista) */}
+            <div className="sticky left-0 z-[60] w-[290px] shrink-0 h-full text-[11px] font-sans font-bold text-slate-500 flex items-center bg-[#f8fafc] border-r border-[#cbd5e1] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
+              <span className="w-[95px] px-3 text-center">操作</span>
+              <span className="w-[195px] px-3 border-l border-slate-200">ドリッパー / 抽出担当</span>
             </div>
 
             {/* Scrollable Ruler Track with Ticks & Labels */}

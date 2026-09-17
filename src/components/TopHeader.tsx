@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2, ChevronLeft, ChevronRight, CalendarClock, BarChart3, SlidersHorizontal, LayoutGrid, Coffee } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2, ChevronLeft, ChevronRight, CalendarClock, BarChart3, LayoutGrid, Coffee } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
@@ -56,7 +56,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onEndTestPlay,
 }) => {
   const navItems = [
-    { id: 'control' as const, label: '管制盤', icon: SlidersHorizontal },
+    { id: 'control' as const, label: '管制盤', icon: null },
     { id: 'bays' as const, label: 'ドリッパー', icon: LayoutGrid },
     { id: 'beans' as const, label: '豆キュー', icon: Coffee },
     { id: 'analytics' as const, label: '実績', icon: BarChart3 },
@@ -80,8 +80,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 title={item.label}
                 className={`flex h-10 min-w-10 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-black touch-manipulation ${active ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
               >
-                <Icon className="h-4 w-4" />
-                <span className="hidden 2xl:inline">{item.label}</span>
+                {Icon && <Icon className="h-4 w-4" />}
+                <span className={item.id === 'control' ? '' : 'hidden 2xl:inline'}>{item.label}</span>
               </button>
             );
           })}

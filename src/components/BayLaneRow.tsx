@@ -78,8 +78,22 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
 
   return (
     <div data-bay-target={barista.id} className="flex items-center h-[72px] border-b border-[#e2e8f0] bg-white hover:bg-[#fcfdff] transition-colors relative touch-manipulation">
-      {/* 1. Barista Info Module - Sticky left column (200px) */}
-      <div className="sticky left-0 z-50 w-[195px] shrink-0 self-stretch px-2 py-1.5 flex items-center gap-2 bg-white border-r border-[#e2e8f0] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
+      {/* 1. Action Button - left edge for immediate thumb access */}
+      <div className="sticky left-0 z-[51] w-[95px] shrink-0 self-stretch px-2 flex items-center justify-center bg-white border-r border-[#cbd5e1] isolate">
+        <button
+          id={`bay-action-btn-${barista.id}`}
+          disabled={barista.queue.length === 0}
+          onClick={() => onAdvanceBay(barista.id)}
+          className={`w-full min-h-[48px] rounded-lg font-black text-[15px] flex items-center justify-center gap-1.5 shadow-xs active:scale-95 touch-manipulation ${barista.queue.length === 0 ? 'bg-slate-200 text-slate-500' : isImminent ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-200' : 'bg-[#006c4a] text-white'}`}
+          title={`${barista.name}の現在の抽出を確定して次へ`}
+        >
+          <span>{barista.queue.length === 0 ? '待機' : '次へ'}</span>
+          <ArrowRightCircle className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* 2. Barista Info Module - immediately after the action */}
+      <div className="sticky left-[95px] z-50 w-[195px] shrink-0 self-stretch px-2 py-1.5 flex items-center gap-2 bg-white border-r border-[#e2e8f0] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
         {/* The number is a quiet locator; name and active order carry the hierarchy. */}
         <div className="w-9 h-9 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-slate-600 font-mono font-bold text-[18px] shrink-0">
           {barista.bayNumber}
@@ -107,20 +121,6 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
             <span className={isOvertime ? 'text-[17px]' : 'text-[21px]'}>{activeTicket ? (isOvertime ? '継続中' : formatRemaining(activeTicket.timeRemainingSec)) : '--:--'}</span>
           </div>
         </div>
-      </div>
-
-      {/* 2. Action Button - Sticky left column after barista info (95px) */}
-      <div className="sticky left-[195px] z-50 w-[95px] shrink-0 self-stretch px-2 flex items-center justify-center bg-white border-r border-[#cbd5e1] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
-        <button
-          id={`bay-action-btn-${barista.id}`}
-          disabled={barista.queue.length === 0}
-          onClick={() => onAdvanceBay(barista.id)}
-          className={`w-full min-h-[48px] rounded-lg font-black text-[15px] flex items-center justify-center gap-1.5 shadow-xs active:scale-95 touch-manipulation ${barista.queue.length === 0 ? 'bg-slate-200 text-slate-500' : isImminent ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-200' : 'bg-[#006c4a] text-white'}`}
-          title={`${barista.name}の現在の抽出を確定して次へ`}
-        >
-          <span>{barista.queue.length === 0 ? '待機' : '次へ'}</span>
-          <ArrowRightCircle className="w-5 h-5" />
-        </button>
       </div>
 
       {/* 3. Timeline Track with Ticket Queue scaled by duration */}
