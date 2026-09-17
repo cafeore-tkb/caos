@@ -307,14 +307,17 @@ export default function App() {
 
   useEffect(() => {
     if (!testPlaySession || testPlaySession.status !== 'active' || !isRunning) return;
+    // One test-play tick advances ten seconds of historical time. The shared
+    // speed control changes the tick frequency so the clock, timeline, order
+    // arrivals, and brewing countdown all stay on the same multiplier.
     const timer = window.setInterval(() => {
       setTestPlaySession((session) => session ? {
         ...session,
         currentMs: Math.min(session.endMs, session.currentMs + 10_000),
       } : session);
-    }, 1000);
+    }, 1000 / simSpeed);
     return () => window.clearInterval(timer);
-  }, [testPlaySession?.status, isRunning]);
+  }, [testPlaySession?.status, isRunning, simSpeed]);
 
   useEffect(() => {
     if (testPlaySession?.status === 'active' && testPlaySession.currentMs >= testPlaySession.endMs) {
