@@ -200,7 +200,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
           >
             {ticket.beanName}
           </span>
-          {ticket.totalItemsInOrder && !(ticket.totalItemsInOrder === 1 && ticket.totalOrderCups === 1) && (
+          {ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1 && (
             <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-mono font-black text-slate-700 whitespace-nowrap shrink-0">
               {ticket.itemIndex}/{ticket.totalItemsInOrder}・計{ticket.totalOrderCups}杯
             </span>
