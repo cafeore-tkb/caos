@@ -5,6 +5,7 @@ import { MENU_PRESENTATION } from '../utils/menuPresentation';
 
 interface UnassignedOrdersPanelProps {
   orders: UnassignedOrder[];
+  nextAvailable: { bayNumber: number; seconds: number; isStandby: boolean }[];
   selectedOrderId?: string | null;
   onSelectOrder?: (orderId: string) => void;
   onSelectQueueOrder?: (order: UnassignedOrder) => void;
@@ -15,6 +16,7 @@ interface UnassignedOrdersPanelProps {
 
 export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
   orders,
+  nextAvailable,
   selectedOrderId,
   onSelectOrder,
   onSelectQueueOrder,
@@ -62,6 +64,8 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
     setHoveredBay(null);
   };
   const totalCups = orders.reduce((sum, o) => sum + o.cupCount, 0);
+  const formatRemaining = (seconds: number) =>
+    `${Math.floor(Math.max(0, seconds) / 60)}:${(Math.max(0, seconds) % 60).toString().padStart(2, '0')}`;
 
   return (
     <div className="h-full bg-white rounded-lg border border-[#cbd5e1] p-2 shadow-xs flex flex-col overflow-visible">
@@ -75,6 +79,14 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
           <span className="bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold px-2 py-0.5 rounded-full font-mono">
             {orders.length} 件 / {totalCups} 杯
           </span>
+          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+            <span className="ml-1">次に空く:</span>
+            {nextAvailable.map((item, index) => (
+              <span key={item.bayNumber} className={`rounded border px-1.5 py-0.5 font-mono whitespace-nowrap ${index === 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-white text-slate-700'}`}>
+                #{item.bayNumber} {item.isStandby ? '待機' : formatRemaining(item.seconds)}
+              </span>
+            ))}
+          </div>
         </div>
       </div>
 

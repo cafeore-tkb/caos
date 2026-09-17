@@ -3,11 +3,10 @@ import {
   SlidersHorizontal,
   LayoutGrid,
   Coffee,
-  Sparkles,
   BarChart3,
 } from 'lucide-react';
 
-export type NavTab = 'control' | 'bays' | 'beans' | 'ai' | 'analytics';
+export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
 
 interface SidebarProps {
   activeTab: NavTab;
@@ -37,11 +36,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'beans',
       label: '豆キュー',
       icon: <Coffee className="w-5 h-5" />,
-    },
-    {
-      id: 'ai',
-      label: '補正AI',
-      icon: <Sparkles className="w-5 h-5" />,
     },
     {
       id: 'analytics',
