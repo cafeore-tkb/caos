@@ -56,7 +56,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onEndTestPlay,
 }) => {
   const navItems = [
-    { id: 'control' as const, label: '管制盤', icon: null },
+    { id: 'control' as const, label: 'CaOS', icon: null },
     { id: 'bays' as const, label: 'ドリッパー', icon: LayoutGrid },
     { id: 'beans' as const, label: '豆キュー', icon: Coffee },
     { id: 'analytics' as const, label: '実績', icon: BarChart3 },

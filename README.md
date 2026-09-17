@@ -1,4 +1,4 @@
-# Digital Master Sheet
+# CaOS — Cafeore Operating System
 
 コーヒー提供現場で、6人のドリッパー（抽出担当者）へ注文を割り当て、進行状況を一画面で把握するためのタッチ操作向けUIモックです。iPadの横画面を想定し、管制盤を常に表示したまま操作できます。
 
@@ -6,15 +6,15 @@
 
 ## プレビュー
 
-[GitHub Pages](https://210on.github.io/digital-master-sheet/)
+[CaOSをGitHub Pagesで開く](https://cafeore-tkb.github.io/digital-master-sheet-pages/)
 
-`main` ブランチへのpushを契機に、GitHub ActionsからGitHub Pagesへ自動デプロイします。
+Privateのソースをビルドし、`npm run publish:pages` でPublicの配信用リポジトリへ公開します。
 
 ## 画面
 
 - **A**: NOW線を基準に、6人のレーンと時間軸で進行・待機カードを確認する管制盤
 - **B**: 現在・次の抽出と未割当注文を、よりコンパクトに確認する比較案
-- 左の縦バーからA/Bを切り替えます。
+- 最上段のヘッダーからA/Bを切り替えます。
 - 補助情報は右側パネルに表示し、管制盤全体を隠しません。
 
 ## 主な挙動
@@ -68,4 +68,4 @@ npm run lint
 npm run build
 ```
 
-本番ビルドは `dist/` に生成され、公開時のベースパスは `/digital-master-sheet/` です。
+本番ビルドは `dist/` に生成され、公開時のベースパスは `/digital-master-sheet-pages/` です。

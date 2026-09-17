@@ -1,6 +1,6 @@
 {
-  "name": "Precision Kitchen Dispatch",
-  "description": "6ベイ対応の高性能バリスタ管制盤・KDS（Kitchen Display System）。抽出タイム予測、リアルタイムタイムライン、未割当オーダー配分エンジンを搭載。",
+  "name": "CaOS — Cafeore Operating System",
+  "description": "コーヒー提供現場の注文割り当てと抽出進行を一画面で管理する、タッチ操作向けオペレーティングシステム。",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
