@@ -262,12 +262,9 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     setTestDataLoading(true);
-    fetch(new URL('data/sohosai-2025-day12.json', document.baseURI))
-      .then((response) => {
-        if (!response.ok) throw new Error(`Historical data: ${response.status}`);
-        return response.json() as Promise<HistoricalDataset>;
-      })
-      .then((dataset) => {
+    import('./data/sohosai-2025-day12.json')
+      .then((module) => {
+        const dataset = module.default as HistoricalDataset;
         if (!cancelled) setHistoricalOrders(dataset.orders);
       })
       .catch(() => {
