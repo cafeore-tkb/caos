@@ -781,7 +781,7 @@ export default function App() {
                   onAdvanceBay={handleAdvanceBay}
                   onOpenTicketDetail={(ticket) => setSelectedTicket(ticket)}
                   onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
-                  onAssignOrder={(order) => setAssignSlotData({ bayId: null, order })}
+                  onAssignToBay={(order, bayId) => handleAssignOrderToBay(order.ticketUid || order.id, bayId)}
                 />
               )}
         </main>

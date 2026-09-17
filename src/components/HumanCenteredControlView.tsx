@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   CheckCircle2,
   ChevronRight,
@@ -19,7 +19,7 @@ interface HumanCenteredControlViewProps {
   onAdvanceBay: (bayId: number) => void;
   onOpenTicketDetail: (ticket: OrderTicket) => void;
   onOpenEmptySlot: (bayId: number) => void;
-  onAssignOrder: (order: UnassignedOrder) => void;
+  onAssignToBay: (order: UnassignedOrder, bayId: number) => void;
 }
 
 interface OrderGroup {
@@ -54,8 +54,33 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
   onAdvanceBay,
   onOpenTicketDetail,
   onOpenEmptySlot,
-  onAssignOrder,
+  onAssignToBay,
 }) => {
+  const [openPadUid, setOpenPadUid] = useState<string | null>(null);
+  const orderUid = (order: UnassignedOrder) => order.ticketUid || order.id;
+
+  useEffect(() => {
+    if (!openPadUid) return;
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      const target = event.target as HTMLElement;
+      if (target.closest(`[data-b-order-uid="${openPadUid}"]`)) return;
+      setOpenPadUid(null);
+      onSelectOrder('');
+    };
+    document.addEventListener('pointerdown', closeOnOutsidePress);
+    return () => document.removeEventListener('pointerdown', closeOnOutsidePress);
+  }, [openPadUid, onSelectOrder]);
+
+  const openAssignmentPad = (order: UnassignedOrder) => {
+    onSelectQueueOrder(order);
+    setOpenPadUid(orderUid(order));
+  };
+
+  const assignToBay = (order: UnassignedOrder, bayId: number) => {
+    if (order.preferredBaristaId && order.preferredBaristaId !== bayId) return;
+    onAssignToBay(order, bayId);
+    setOpenPadUid(null);
+  };
   const sortedBaristas = useMemo(
     () => [...baristas].sort((a, b) => a.bayNumber - b.bayNumber),
     [baristas]
@@ -285,11 +310,11 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
               return (
                 <article
                   key={group.id}
+                  data-b-order-uid={orderUid(group.items.find((item) => orderUid(item) === openPadUid) || group.items[0])}
                   onClick={() => {
-                    onSelectQueueOrder(group.items[0]);
-                    onAssignOrder(group.items[0]);
+                    openAssignmentPad(group.items[0]);
                   }}
-                  className={`relative rounded-lg border p-2 min-h-0 overflow-hidden cursor-pointer active:scale-[0.99] transition-all touch-manipulation ${
+                  className={`relative rounded-lg border p-2 min-h-0 cursor-pointer active:scale-[0.99] transition-all touch-manipulation ${openPadUid && group.items.some((item) => orderUid(item) === openPadUid) ? 'overflow-visible z-40' : 'overflow-hidden'} ${
                     isSelected
                       ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-400 shadow-sm'
                       : matchesHeaderFilter
@@ -297,6 +322,28 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                       : 'bg-white border-slate-300 hover:border-slate-500 hover:shadow-sm'
                   }`}
                 >
+                  {(() => {
+                    const openOrder = group.items.find((item) => orderUid(item) === openPadUid);
+                    if (!openOrder) return null;
+                    return (
+                      <>
+                        <div className="absolute -top-[38px] left-0 right-0 z-50 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl" aria-label={`${openOrder.id}の割当先 1から3`}>
+                          {[1, 2, 3].map((bayId) => (
+                            <button key={bayId} type="button" onClick={(event) => { event.stopPropagation(); assignToBay(openOrder, bayId); }} disabled={Boolean(openOrder.preferredBaristaId && openOrder.preferredBaristaId !== bayId)} className={`rounded-md border text-[17px] font-mono font-black touch-manipulation disabled:border-slate-700 disabled:bg-slate-700 disabled:text-slate-500 ${openOrder.preferredBaristaId === bayId ? 'border-violet-300 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-950'}`}>
+                              {bayId}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="absolute -bottom-[38px] left-0 right-0 z-50 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl" aria-label={`${openOrder.id}の割当先 4から6`}>
+                          {[4, 5, 6].map((bayId) => (
+                            <button key={bayId} type="button" onClick={(event) => { event.stopPropagation(); assignToBay(openOrder, bayId); }} disabled={Boolean(openOrder.preferredBaristaId && openOrder.preferredBaristaId !== bayId)} className={`rounded-md border text-[17px] font-mono font-black touch-manipulation disabled:border-slate-700 disabled:bg-slate-700 disabled:text-slate-500 ${openOrder.preferredBaristaId === bayId ? 'border-violet-300 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-950'}`}>
+                              {bayId}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    );
+                  })()}
                   <div className="flex items-start justify-between gap-2 pb-1.5 border-b border-slate-200">
                     <div className="flex items-center gap-2">
                       <span className={`w-7 h-7 rounded-md flex items-center justify-center font-mono text-[14px] font-black ${
@@ -323,8 +370,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                         key={item.ticketUid || `${item.id}-${item.beanCode}`}
                         onClick={(event) => {
                           event.stopPropagation();
-                          onSelectQueueOrder(item);
-                          onAssignOrder(item);
+                          openAssignmentPad(item);
                         }}
                         className="w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-left transition-colors hover:border-blue-300 hover:bg-blue-50 touch-manipulation"
                       >
