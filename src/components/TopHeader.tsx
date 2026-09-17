@@ -1,5 +1,5 @@
 import React from 'react';
-import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2 } from 'lucide-react';
+import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { soundManager } from '../utils/audio';
 
 interface TopHeaderProps {
@@ -13,6 +13,8 @@ interface TopHeaderProps {
   simSpeed: number;
   onChangeSpeed: (speed: number) => void;
   onResetData: () => void;
+  showTimelineControls: boolean;
+  onTimelineNavigate: (direction: 'back' | 'now' | 'forward') => void;
   canUndo: boolean;
   undoLabel: string | null;
   onUndo: () => void;
@@ -29,6 +31,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   simSpeed,
   onChangeSpeed,
   onResetData,
+  showTimelineControls,
+  onTimelineNavigate,
   canUndo,
   undoLabel,
   onUndo,
@@ -68,6 +72,19 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             >
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
+            {showTimelineControls && (
+              <div className="ml-1 flex items-center gap-1 border-l border-slate-300 pl-1">
+                <button type="button" onClick={() => onTimelineNavigate('back')} title="5分前を表示" className="h-10 px-2 rounded-lg border border-slate-300 bg-white text-[12px] font-black text-slate-700 flex items-center gap-0.5 touch-manipulation">
+                  <ChevronLeft className="h-3.5 w-3.5" />−5分
+                </button>
+                <button type="button" onClick={() => onTimelineNavigate('now')} title="現在時刻へ戻る" className="h-10 px-3 rounded-lg bg-red-500 text-[12px] font-black text-white flex items-center gap-1 touch-manipulation">
+                  <span className="h-2 w-2 rounded-full bg-white" />現在
+                </button>
+                <button type="button" onClick={() => onTimelineNavigate('forward')} title="5分先を表示" className="h-10 px-2 rounded-lg border border-slate-300 bg-white text-[12px] font-black text-slate-700 flex items-center gap-0.5 touch-manipulation">
+                  ＋5分<ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

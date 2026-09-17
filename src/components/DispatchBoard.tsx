@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Sparkles, X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { Sparkles, X, RotateCcw } from 'lucide-react';
 import { Barista, BeanCode, OrderTicket } from '../types';
 import { BayLaneRow } from './BayLaneRow';
 
@@ -16,6 +16,7 @@ interface DispatchBoardProps {
   onCloseTicketAction: () => void;
   onOpenEmptySlot: (bayId: number) => void;
   simTimeSec: number;
+  timelineCommand: { direction: 'back' | 'now' | 'forward'; id: number } | null;
 }
 
 const PIXELS_PER_SEC = 1.2; // 1 min = 72px
@@ -36,6 +37,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   onCloseTicketAction,
   onOpenEmptySlot,
   simTimeSec,
+  timelineCommand,
 }) => {
   // Build a rolling 12-hour timeline from the current real-world hour.
   const timelineStartSec = Math.floor(simTimeSec / 3600) * 3600;
@@ -92,6 +94,13 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
     scrollToSeconds(simTimeSec + 300);
   };
 
+  useEffect(() => {
+    if (!timelineCommand) return;
+    if (timelineCommand.direction === 'back') scrollRewind5Min();
+    else if (timelineCommand.direction === 'forward') scrollForward5Min();
+    else scrollToNow();
+  }, [timelineCommand]);
+
   // Generate timeline markers every 1 minute, with major labels every 5 minutes
   const timeMarkers = [];
   for (let sec = timelineStartSec; sec <= timelineEndSec; sec += 60) {
@@ -129,46 +138,12 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
 
   return (
     <div className="bg-white rounded-lg border border-[#cbd5e1] shadow-xs flex flex-col relative overflow-hidden shrink-0">
-      {/* 1. Interactive Ribbon / Navigation Toolbar */}
-      <div className="h-[44px] px-2 bg-[#f1f5f9] border-b border-[#e2e8f0] flex items-center justify-between gap-2 text-xs select-none">
-        {/* Left: Rewind & Timeline Navigation Controls */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={scrollRewind5Min}
-            className="min-h-[38px] px-3 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 rounded-lg font-bold text-slate-700 flex items-center gap-1 transition-all touch-manipulation cursor-pointer shadow-2xs"
-            title="5分前のオーダー履歴を表示"
-          >
-            <ChevronLeft className="w-3 h-3 text-slate-500" />
-            <span>−5分</span>
-          </button>
-
-          <button
-            onClick={scrollToNow}
-            className="min-h-[38px] px-4 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-black rounded-lg flex items-center gap-1 transition-all shadow-2xs touch-manipulation cursor-pointer"
-            title="現在時刻(NOW)へ移動"
-          >
-            <span className="w-2 h-2 rounded-full bg-white" />
-            <span>現在</span>
-          </button>
-
-          <button
-            onClick={scrollForward5Min}
-            className="min-h-[38px] px-3 bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-300 rounded-lg font-bold text-slate-700 flex items-center gap-1 transition-all touch-manipulation cursor-pointer shadow-2xs"
-            title="5分先の予定を表示"
-          >
-            <span>＋5分</span>
-            <ChevronRight className="w-3 h-3 text-slate-500" />
-          </button>
-
-          {isPastView && (
-            <span className="ml-2 px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[11px] font-bold flex items-center gap-1">
-              <RotateCcw className="w-3 h-3" />
-              <span>過去の抽出履歴を表示中</span>
-            </span>
-          )}
+      {isPastView && (
+        <div className="h-[28px] px-3 bg-amber-50 border-b border-amber-200 text-amber-900 text-[11px] font-bold flex items-center gap-1">
+          <RotateCcw className="w-3 h-3" />
+          <span>過去の抽出履歴を表示中</span>
         </div>
-
-      </div>
+      )}
 
       {/* 2. Linked Order Highlight Banner (when an order is selected) */}
       {selectedOrderId && (
