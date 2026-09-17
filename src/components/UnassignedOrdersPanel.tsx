@@ -109,6 +109,8 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
             const openOrder = orders.find((candidate) => orderUid(candidate) === openPadUid);
             const isMergeCandidate = Boolean(
               openOrder &&
+              !openOrder.isRebrew &&
+              !order.isRebrew &&
               orderUid(openOrder) !== orderUid(order) &&
               openOrder.cupCount === 1 &&
               order.cupCount === 1 &&
@@ -116,10 +118,14 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
               openOrder.preferredBaristaId === order.preferredBaristaId
             );
             const isSelected = selectedOrderId === order.id;
-            const cardStyle = order.preferredBaristaId
+            const cardStyle = order.isRebrew
+              ? 'bg-red-50 border-red-300 text-slate-900'
+              : order.preferredBaristaId
               ? 'bg-violet-50 border-violet-300 text-slate-900'
               : `${menu.cardClass} ${menu.family === 'premium' ? 'text-white' : 'text-slate-900'}`;
-            const idColor = order.preferredBaristaId
+            const idColor = order.isRebrew
+              ? 'text-red-700'
+              : order.preferredBaristaId
               ? 'text-violet-700'
               : menu.family === 'premium'
               ? 'text-white'
@@ -260,6 +266,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                       <span className={`font-mono text-[25px] font-black ${idColor} tracking-tight leading-none`}>
                         {order.id}
                       </span>
+                      {order.isRebrew && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">入れ直し</span>}
                       {order.totalItemsInOrder && order.totalItemsInOrder > 1 && (
                         <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-mono font-black text-slate-700 whitespace-nowrap">
                           {order.itemIndex}/{order.totalItemsInOrder}・計{order.totalOrderCups}杯
