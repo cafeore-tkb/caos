@@ -118,8 +118,8 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
           className={`w-full min-h-[48px] rounded-lg font-black text-[15px] flex items-center justify-center gap-1.5 shadow-xs active:scale-95 touch-manipulation ${barista.queue.length === 0 ? 'bg-slate-200 text-slate-500' : isImminent ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-200' : 'bg-[#006c4a] text-white'}`}
           title={`${barista.name}の現在の抽出を確定して次へ`}
         >
-          <ArrowRightCircle className="w-5 h-5" />
           <span>{barista.queue.length === 0 ? '待機' : '次へ'}</span>
+          <ArrowRightCircle className="w-5 h-5" />
         </button>
       </div>
 

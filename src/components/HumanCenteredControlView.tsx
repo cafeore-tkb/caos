@@ -234,8 +234,8 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                   onClick={() => onAdvanceBay(barista.id)}
                   className="min-h-[42px] rounded-lg bg-emerald-700 hover:bg-emerald-800 disabled:bg-slate-200 disabled:text-slate-400 text-white text-[13px] font-black flex items-center justify-center gap-1.5 transition-colors touch-manipulation"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
                   <span>次へ</span>
+                  <CheckCircle2 className="w-4 h-4" />
                 </button>
               </article>
             );
