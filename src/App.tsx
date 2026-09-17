@@ -181,7 +181,6 @@ export default function App() {
   const [shiftRosterIndex, setShiftRosterIndex] = useState(0);
   const lastAutomaticShiftHour = useRef(new Date().getHours());
   const [learningLogs, setLearningLogs] = useState<LearningEngineLog[]>(INITIAL_LEARNING_LOGS);
-  const [completedCount, setCompletedCount] = useState<number>(0);
 
   // Filters & Toggles
   const [selectedQueueBean, setSelectedQueueBean] = useState<BeanCode | null>(null);
@@ -362,7 +361,6 @@ export default function App() {
     };
 
     setLearningLogs((prevLogs) => [newLog, ...prevLogs.filter((l) => l.id !== newLog.id).slice(0, 4)]);
-    setCompletedCount((c) => c + 1);
     setBeans((prev) => prev.map((bean) =>
       bean.code === completedTicket.beanCode
         ? { ...bean, stockGrams: Math.max(0, bean.stockGrams - completedTicket.cupCount * 14) }
@@ -603,7 +601,6 @@ export default function App() {
     mockOrderCursor.current = 0;
     setLearningLogs(INITIAL_LEARNING_LOGS);
     setSimTimeSec(8 * 3600 + 4 * 60 + 15);
-    setCompletedCount(0);
     setSelectedOrderId(null);
     setSelectedQueueBean(null);
     setShiftRosterIndex(0);
@@ -660,7 +657,7 @@ export default function App() {
           onDeleteBean={(code) => setBeans((prev) => prev.filter((b) => b.code !== code))}
         />
       )}
-      {tab === 'analytics' && <AnalyticsView baristas={baristas} completedCount={completedCount} cph={94 + completedCount * 2} />}
+      {tab === 'analytics' && <AnalyticsView baristas={baristas} />}
     </>
   );
 
