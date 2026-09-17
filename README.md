@@ -38,6 +38,13 @@
 - 実績データはビルド時に遅延読込用JavaScriptへ内包し、公開サイトに生JSONのURLを作りません。
 - データ出典: [cafeore-tkb/sohosai-analysis](https://github.com/cafeore-tkb/sohosai-analysis/tree/main/2025/data)
 
+## 公開構成
+
+- ソースと実績データはPrivateの `cafeore-tkb/digital-master-sheet` で管理します。
+- Private側のActionsはPages用ビルドを検証し、成果物を保存します。
+- `npm run publish:pages` を実行すると、ビルド済みの `site/` だけをPublicの `cafeore-tkb/digital-master-sheet-pages` へ送り、公開側のPagesワークフローが更新します。
+- 公開成果物には生JSONを置かず、実績データはハッシュ付きの遅延読込JavaScriptに内包します。
+
 ## タッチ操作
 
 - 未割当カードをタップすると、カードを隠さず上下に1〜6の割当ボタンが開きます。

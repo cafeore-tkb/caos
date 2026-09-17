@@ -5,7 +5,7 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/digital-master-sheet/',
+    base: process.env.VITE_BASE_PATH || '/digital-master-sheet/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
