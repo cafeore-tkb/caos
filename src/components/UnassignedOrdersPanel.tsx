@@ -92,10 +92,10 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
 
       {/* Responsive Grid for up to 12 Orders with Touch-friendly Horizontal/Vertical Scroll */}
       <div className="flex-1 min-h-0 overflow-visible">
-        <div className="h-full grid grid-cols-6 grid-rows-1 gap-1.5">
-          {orders.slice(0, 6).map((order, orderIndex) => {
+        <div className="h-full grid grid-cols-6 grid-rows-2 gap-1.5">
+          {orders.slice(0, 12).map((order, orderIndex) => {
             const menu = MENU_PRESENTATION[order.beanCode];
-            const visibleOrders = orders.slice(0, 6);
+            const visibleOrders = orders.slice(0, 12);
             const isOrderBoundary = orderIndex > 0 && visibleOrders[orderIndex - 1]?.id !== order.id;
             const openOrder = orders.find((candidate) => orderUid(candidate) === openPadUid);
             const isMergeCandidate = Boolean(
