@@ -35,6 +35,7 @@
 - 開始前に時間帯と30分／1時間を選択します。注文は10倍速で到着します。
 - 「終了・実績」を押すと、売上、商品構成、ピーク、提供時間、担当量、分割注文の仕上がりΔを表示します。
 - 指定された `2025/data/day1.json` は空ファイルだったため、同じリポジトリにあるダミー除去済み `2025/data/day12.json` を軽量化して同梱しています。
+- 実績データはビルド時に遅延読込用JavaScriptへ内包し、公開サイトに生JSONのURLを作りません。
 - データ出典: [cafeore-tkb/sohosai-analysis](https://github.com/cafeore-tkb/sohosai-analysis/tree/main/2025/data)
 
 ## タッチ操作
