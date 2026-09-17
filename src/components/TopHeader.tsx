@@ -66,7 +66,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             </button>
             <button
               id="sim-speed-btn"
-              onClick={() => onChangeSpeed(simSpeed === 1 ? 2 : simSpeed === 2 ? 5 : 1)}
+              onClick={() => onChangeSpeed(simSpeed === 1 ? 2 : simSpeed === 2 ? 5 : simSpeed === 5 ? 10 : 1)}
               title="シミュレーション速度切替"
               className="min-w-10 h-10 px-1.5 hover:bg-white text-[11px] font-mono font-bold text-slate-700 rounded-lg transition-colors touch-manipulation"
             >
