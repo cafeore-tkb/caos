@@ -733,7 +733,7 @@ export default function App() {
                   <DispatchBoard
                     baristas={baristas}
                     highlightFilter={null}
-                    selectedOrderId={selectedQueueBean ? null : selectedOrderId}
+                    selectedOrderId={selectedOrderId}
                     onSelectOrder={handleToggleOrderSelection}
                     onAdvanceBay={handleAdvanceBay}
                     onOpenTicketDetail={(ticket) => setSelectedTicket(ticket)}
