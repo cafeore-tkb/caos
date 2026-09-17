@@ -119,7 +119,13 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
             const cardStyle = order.preferredBaristaId
               ? 'bg-violet-50 border-violet-300 text-slate-900'
               : `${menu.cardClass} ${menu.family === 'premium' ? 'text-white' : 'text-slate-900'}`;
-            const idColor = order.preferredBaristaId ? 'text-violet-700' : menu.family === 'premium' ? 'text-white' : 'text-slate-950';
+            const idColor = order.preferredBaristaId
+              ? 'text-violet-700'
+              : menu.family === 'premium'
+              ? 'text-white'
+              : order.totalItemsInOrder && order.totalItemsInOrder > 1
+              ? 'text-slate-950'
+              : 'text-slate-600';
 
             return (
               <div

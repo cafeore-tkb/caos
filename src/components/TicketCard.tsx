@@ -165,7 +165,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             {/* Large Order Number Label */}
             <span
               className={`font-mono text-[22px] font-black tracking-tight leading-none ${
-                isOrderSelected ? 'text-amber-900 font-black' : isNamed ? 'text-violet-700' : isCompleted ? 'text-slate-500' : 'text-[#0f172a]'
+                isOrderSelected ? 'text-amber-900 font-black' : isNamed ? 'text-violet-700' : isCompleted ? 'text-slate-500' : ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1 ? 'text-slate-950' : 'text-slate-600'
               }`}
             >
               {ticket.id}
