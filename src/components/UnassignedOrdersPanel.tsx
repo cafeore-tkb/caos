@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ClipboardList, Sparkles } from 'lucide-react';
+import { ClipboardList, Combine, Sparkles } from 'lucide-react';
 import { UnassignedOrder } from '../types';
 import { MENU_PRESENTATION } from '../utils/menuPresentation';
 
@@ -185,8 +185,11 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-slate-500" aria-hidden="true" />
                 )}
                 {isMergeCandidate && (
-                  <div className="absolute inset-0 z-20 rounded-lg border-2 border-blue-500 bg-blue-50/90 pointer-events-none flex items-end justify-center p-1">
-                    <span className="rounded bg-blue-600 px-2 py-1 text-[11px] font-black text-white shadow-sm">＋ 2杯にまとめる</span>
+                  <div className="absolute inset-0 z-20 rounded-lg border-2 border-blue-500 bg-blue-50/90 pointer-events-none flex items-center justify-center p-1">
+                    <span className="inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-[16px] font-black text-white shadow-md">
+                      <Combine className="h-5 w-5 shrink-0" strokeWidth={2.5} />
+                      統合する
+                    </span>
                   </div>
                 )}
                 {openPadUid === orderUid(order) && (
