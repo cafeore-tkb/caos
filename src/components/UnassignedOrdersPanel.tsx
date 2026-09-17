@@ -254,7 +254,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                       <span className={`font-mono text-[25px] font-black ${idColor} tracking-tight leading-none`}>
                         {order.id}
                       </span>
-                      {order.totalItemsInOrder && !(order.totalItemsInOrder === 1 && order.totalOrderCups === 1) && (
+                      {order.totalItemsInOrder && order.totalItemsInOrder > 1 && (
                         <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-mono font-black text-slate-700 whitespace-nowrap">
                           {order.itemIndex}/{order.totalItemsInOrder}・計{order.totalOrderCups}杯
                         </span>

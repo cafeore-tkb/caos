@@ -186,7 +186,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                           <div className="text-[15px] leading-tight font-black truncate">{current.beanName}</div>
                           <div className="mt-0.5 flex items-center gap-1 text-[10px] font-bold opacity-85">
                             <span className="rounded bg-white px-1.5 py-0.5 text-[14px] leading-none font-mono text-slate-950 opacity-100">{current.cupCount}杯</span>
-                            {current.totalItemsInOrder && !(current.totalItemsInOrder === 1 && current.totalOrderCups === 1) && <span>{current.itemIndex}/{current.totalItemsInOrder}・計{current.totalOrderCups}杯</span>}
+                            {current.totalItemsInOrder && current.totalItemsInOrder > 1 && <span>{current.itemIndex}/{current.totalItemsInOrder}・計{current.totalOrderCups}杯</span>}
                           </div>
                         </div>
                         <span className="font-mono text-[21px] leading-none font-black shrink-0">{current.id}</span>
@@ -212,7 +212,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                       className="w-full mt-1 text-left flex items-center justify-between gap-1 hover:text-blue-700 touch-manipulation"
                     >
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1"><span className="text-[12px] font-black truncate">{next.beanName}</span><span className="rounded bg-slate-950 px-1.5 py-0.5 text-[14px] leading-none font-mono font-black text-white">{next.cupCount}杯</span>{next.totalItemsInOrder && !(next.totalItemsInOrder === 1 && next.totalOrderCups === 1) && <span className="text-[10px] font-mono font-black">{next.itemIndex}/{next.totalItemsInOrder}・計{next.totalOrderCups}杯</span>}</div>
+                        <div className="flex items-center gap-1"><span className="text-[12px] font-black truncate">{next.beanName}</span><span className="rounded bg-slate-950 px-1.5 py-0.5 text-[14px] leading-none font-mono font-black text-white">{next.cupCount}杯</span>{next.totalItemsInOrder && next.totalItemsInOrder > 1 && <span className="text-[10px] font-mono font-black">{next.itemIndex}/{next.totalItemsInOrder}・計{next.totalOrderCups}杯</span>}</div>
                         <div className="font-mono text-[15px] font-black text-slate-700">{next.id}</div>
                       </div>
                       <ChevronRight className="w-4 h-4 shrink-0 text-slate-400" />
@@ -331,7 +331,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-[13px] font-black text-slate-900 truncate">{item.beanName}</span>
                           <span className="rounded bg-slate-950 px-1.5 py-0.5 font-mono text-[14px] leading-none font-black text-white shrink-0">{item.cupCount}杯</span>
-                          {item.totalItemsInOrder && !(item.totalItemsInOrder === 1 && item.totalOrderCups === 1) && <span className="text-[10px] font-mono font-black text-slate-600 shrink-0">{item.itemIndex}/{item.totalItemsInOrder}・計{item.totalOrderCups}杯</span>}
+                          {item.totalItemsInOrder && item.totalItemsInOrder > 1 && <span className="text-[10px] font-mono font-black text-slate-600 shrink-0">{item.itemIndex}/{item.totalItemsInOrder}・計{item.totalOrderCups}杯</span>}
                         </div>
                         {item.preferredBaristaId && <div className="mt-1 text-[10px] font-black text-violet-700">指名 {item.preferredBaristaId}</div>}
                       </button>
