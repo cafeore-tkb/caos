@@ -14,8 +14,6 @@ interface SidebarProps {
   onSelectTab: (tab: NavTab) => void;
   controlViewMode: 'current' | 'new';
   onSelectControlViewMode: (mode: 'current' | 'new') => void;
-  activeBayCount: number;
-  totalBays: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -23,8 +21,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTab,
   controlViewMode,
   onSelectControlViewMode,
-  activeBayCount,
-  totalBays,
 }) => {
   const navItems: { id: NavTab; label: string; icon: React.ReactNode }[] = [
     {
@@ -56,32 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside className="w-[82px] bg-white border-r border-[#e2e8f0] flex flex-col items-center py-2 select-none shrink-0 z-10">
-      {/* Top Section */}
-      <div className="flex flex-col items-center w-full gap-3">
-        {/* KDS Logo */}
-        <div className="flex flex-col items-center group cursor-pointer" onClick={() => onSelectTab('control')}>
-          <div className="w-10 h-10 bg-[#0f172a] rounded-lg flex flex-col items-center justify-center text-white shadow-xs">
-            <span className="text-[17px] font-black leading-none tracking-tight">匠</span>
-            <span className="text-[8px] font-mono font-bold tracking-widest text-slate-300 mt-0.5">
-              KDS
-            </span>
-          </div>
-        </div>
-
-        {/* RUN Status Indicator */}
-        <div className="w-full px-2 flex flex-col items-center">
-          <div className="w-full py-1 bg-[#f0fdf4] border border-[#bbf7d0] rounded-md flex flex-col items-center justify-center">
-            <div className="flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]"></span>
-              <span className="text-[9px] font-mono font-bold text-[#166534]">RUN</span>
-            </div>
-            <span className="text-[10px] font-mono font-bold text-[#15803d]">
-              {activeBayCount}/{totalBays}
-            </span>
-          </div>
-        </div>
-
-        {/* Navigation Items */}
+      <div className="flex flex-col items-center w-full">
         <nav className="w-full flex flex-col items-center gap-1 mt-1 px-1.5">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;

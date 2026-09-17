@@ -25,9 +25,10 @@ import { AiConfigView } from './components/AiConfigView';
 import { AnalyticsView } from './components/AnalyticsView';
 import { HumanCenteredControlView } from './components/HumanCenteredControlView';
 import { soundManager } from './utils/audio';
-import { ChevronRight, X } from 'lucide-react';
+import { ChevronRight, ExternalLink, X } from 'lucide-react';
 
 type ControlViewMode = 'current' | 'new';
+type AuxiliaryTab = Exclude<NavTab, 'control'>;
 type UndoSnapshot = {
   baristas: Barista[];
   unassignedOrders: UnassignedOrder[];
@@ -159,8 +160,13 @@ const MOCK_ORDER_GROUPS: UnassignedOrder[][] = Array.from({ length: 120 }, (_, i
 });
 
 export default function App() {
+  const standaloneTab = (() => {
+    const panel = new URLSearchParams(window.location.search).get('panel');
+    return panel === 'bays' || panel === 'beans' || panel === 'ai' || panel === 'analytics' ? panel : null;
+  })() as AuxiliaryTab | null;
+
   // Navigation
-  const [activeTab, setActiveTab] = useState<NavTab>('control');
+  const [activeTab, setActiveTab] = useState<NavTab>(standaloneTab || 'control');
   const [controlViewMode, setControlViewMode] = useState<ControlViewMode>('current');
 
   // Core Data
@@ -605,6 +611,51 @@ export default function App() {
   );
   const totalWaitingCupsDisplay = currentBayQueueCups;
 
+  const auxiliaryTitle = (tab: AuxiliaryTab) =>
+    tab === 'bays' ? 'ドリッパー' : tab === 'beans' ? '豆キュー' : tab === 'ai' ? '補正設定' : '実績';
+
+  const openAuxiliaryTab = (tab: AuxiliaryTab) => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('panel', tab);
+    window.open(url.toString(), '_blank', 'noopener,noreferrer');
+  };
+
+  const renderAuxiliaryView = (tab: AuxiliaryTab) => (
+    <>
+      {tab === 'bays' && <BaysOverviewView baristas={baristas} nextShiftLabel={nextShiftLabel} onChangeShift={() => changeShift(true)} />}
+      {tab === 'beans' && (
+        <BeanQueueView
+          beans={beans}
+          onUpdateBean={(updated) => setBeans((prev) => prev.map((b) => (b.code === updated.code ? updated : b)))}
+          onAddBean={(newBean) => setBeans((prev) => [newBean, ...prev])}
+          onDeleteBean={(code) => setBeans((prev) => prev.filter((b) => b.code !== code))}
+        />
+      )}
+      {tab === 'ai' && (
+        <AiConfigView
+          baristas={baristas}
+          logs={learningLogs}
+          onUpdateCoefficient={(bayId, newCoef) => setBaristas((prev) => prev.map((b) => (b.id === bayId ? { ...b, coefficient: newCoef } : b)))}
+          onResetLearning={handleResetData}
+        />
+      )}
+      {tab === 'analytics' && <AnalyticsView baristas={baristas} completedCount={completedCount} cph={94 + completedCount * 2} />}
+    </>
+  );
+
+  if (standaloneTab) {
+    return (
+      <div className="h-screen overflow-hidden bg-slate-100 text-slate-950 font-sans">
+        <header className="h-14 border-b border-slate-300 bg-white px-5 flex items-center">
+          <h1 className="text-[18px] font-black">{auxiliaryTitle(standaloneTab)}</h1>
+        </header>
+        <main className="h-[calc(100vh-56px)] overflow-y-auto p-4">
+          <div className="mx-auto max-w-[900px]">{renderAuxiliaryView(standaloneTab)}</div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-[#f0f4fa] text-[#0f172a] select-none font-sans">
       {/* 1. Left Navigation Rail */}
@@ -617,8 +668,6 @@ export default function App() {
           onSelectTab={setActiveTab}
           controlViewMode={controlViewMode}
           onSelectControlViewMode={setControlViewMode}
-          activeBayCount={baristas.filter((b) => b.queue.length > 0).length}
-          totalBays={6}
         />
       </div>
 
@@ -716,31 +765,19 @@ export default function App() {
           <aside className="context-sheet absolute top-[56px] right-0 bottom-0 z-40 w-[min(440px,44vw)] min-w-[360px] bg-white border-l border-slate-300 shadow-2xl flex flex-col">
             <div className="h-[52px] px-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
               <h2 className="text-[16px] font-black text-slate-950">
-                {activeTab === 'bays' ? 'ドリッパー' : activeTab === 'beans' ? '豆キュー' : activeTab === 'ai' ? '補正設定' : '実績'}
+                {auxiliaryTitle(activeTab)}
               </h2>
-              <button type="button" onClick={() => setActiveTab('control')} className="w-11 h-11 rounded-full hover:bg-slate-200 flex items-center justify-center" aria-label="補助パネルを閉じる">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={() => openAuxiliaryTab(activeTab)} className="w-11 h-11 rounded-full hover:bg-slate-200 flex items-center justify-center touch-manipulation" aria-label={`${auxiliaryTitle(activeTab)}を新しいブラウザタブで開く`} title="新しいタブで開く">
+                  <ExternalLink className="w-5 h-5" />
+                </button>
+                <button type="button" onClick={() => setActiveTab('control')} className="w-11 h-11 rounded-full hover:bg-slate-200 flex items-center justify-center" aria-label="補助パネルを閉じる">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto p-3">
-              {activeTab === 'bays' && <BaysOverviewView baristas={baristas} nextShiftLabel={nextShiftLabel} onChangeShift={() => changeShift(true)} />}
-              {activeTab === 'beans' && (
-                <BeanQueueView
-                  beans={beans}
-                  onUpdateBean={(updated) => setBeans((prev) => prev.map((b) => (b.code === updated.code ? updated : b)))}
-                  onAddBean={(newBean) => setBeans((prev) => [newBean, ...prev])}
-                  onDeleteBean={(code) => setBeans((prev) => prev.filter((b) => b.code !== code))}
-                />
-              )}
-              {activeTab === 'ai' && (
-                <AiConfigView
-                  baristas={baristas}
-                  logs={learningLogs}
-                  onUpdateCoefficient={(bayId, newCoef) => setBaristas((prev) => prev.map((b) => (b.id === bayId ? { ...b, coefficient: newCoef } : b)))}
-                  onResetLearning={handleResetData}
-                />
-              )}
-              {activeTab === 'analytics' && <AnalyticsView baristas={baristas} completedCount={completedCount} cph={94 + completedCount * 2} />}
+              {renderAuxiliaryView(activeTab)}
             </div>
           </aside>
         )}
