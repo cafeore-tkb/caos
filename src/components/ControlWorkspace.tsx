@@ -1,0 +1,102 @@
+import type React from 'react';
+import type { Barista, OrderTicket, UnassignedOrder } from '../types';
+import { DispatchBoard } from './DispatchBoard';
+import { HumanCenteredControlView } from './HumanCenteredControlView';
+import { UnassignedOrdersPanel } from './UnassignedOrdersPanel';
+
+export type ControlViewMode = 'current' | 'new';
+
+interface ControlWorkspaceProps {
+  mode: ControlViewMode;
+  baristas: Barista[];
+  unassignedOrders: UnassignedOrder[];
+  nextAvailable: Array<{ bayNumber: number; seconds: number; isStandby: boolean }>;
+  selectedOrderId: string | null;
+  actionTicketKey: string | null;
+  currentTimeSec: number;
+  timelineCommand: { direction: 'back' | 'now' | 'forward'; id: number } | null;
+  onSelectOrder: (orderId: string) => void;
+  onAdvanceBay: (bayId: number) => void;
+  onOpenTicketDetail: (ticket: OrderTicket) => void;
+  onMoveTicket: (ticket: OrderTicket, targetBayId: number) => void;
+  onReturnToUnassigned: (ticket: OrderTicket) => void;
+  onCloseTicketAction: () => void;
+  onRequestRebrew: (ticket: OrderTicket, bayId: number) => void;
+  onOpenEmptySlot: (bayId: number) => void;
+  onAssignToBay: (order: UnassignedOrder, bayId: number) => void;
+  onMergeOrders: (firstUid: string, secondUid: string) => void;
+}
+
+export const ControlWorkspace: React.FC<ControlWorkspaceProps> = ({
+  mode,
+  baristas,
+  unassignedOrders,
+  nextAvailable,
+  selectedOrderId,
+  actionTicketKey,
+  currentTimeSec,
+  timelineCommand,
+  onSelectOrder,
+  onAdvanceBay,
+  onOpenTicketDetail,
+  onMoveTicket,
+  onReturnToUnassigned,
+  onCloseTicketAction,
+  onRequestRebrew,
+  onOpenEmptySlot,
+  onAssignToBay,
+  onMergeOrders,
+}) => {
+  if (mode === 'new') {
+    return (
+      <HumanCenteredControlView
+        baristas={baristas}
+        unassignedOrders={unassignedOrders}
+        simTimeSec={currentTimeSec}
+        selectedOrderId={selectedOrderId}
+        highlightFilter={null}
+        onSelectOrder={onSelectOrder}
+        onSelectQueueOrder={(order) => onSelectOrder(order.id)}
+        onAdvanceBay={onAdvanceBay}
+        onOpenTicketDetail={onOpenTicketDetail}
+        onOpenEmptySlot={onOpenEmptySlot}
+        onAssignToBay={onAssignToBay}
+        onRequestRebrew={onRequestRebrew}
+      />
+    );
+  }
+
+  return (
+    <div className="h-full min-h-0 flex flex-col gap-2">
+      <DispatchBoard
+        baristas={baristas}
+        highlightFilter={null}
+        selectedOrderId={selectedOrderId}
+        onSelectOrder={onSelectOrder}
+        onAdvanceBay={onAdvanceBay}
+        onOpenTicketDetail={onOpenTicketDetail}
+        actionTicketKey={actionTicketKey}
+        onMoveTicket={onMoveTicket}
+        onReturnToUnassigned={onReturnToUnassigned}
+        onCloseTicketAction={onCloseTicketAction}
+        onRequestRebrew={onRequestRebrew}
+        onOpenEmptySlot={onOpenEmptySlot}
+        simTimeSec={currentTimeSec}
+        timelineCommand={timelineCommand}
+      />
+
+      <div className="h-[196px] min-h-0 overflow-visible relative z-[70]">
+        <UnassignedOrdersPanel
+          orders={unassignedOrders}
+          nextAvailable={nextAvailable}
+          selectedOrderId={selectedOrderId}
+          onSelectOrder={onSelectOrder}
+          onSelectQueueOrder={(order) => onSelectOrder(order.id)}
+          onClearSelection={() => onSelectOrder('')}
+          onAssignToBay={onAssignToBay}
+          onMergeOrders={onMergeOrders}
+        />
+      </div>
+    </div>
+  );
+};

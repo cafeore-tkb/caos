@@ -1,10 +1,5 @@
+import { BarChart3, Coffee, LayoutGrid, SlidersHorizontal } from 'lucide-react';
 import React from 'react';
-import {
-  SlidersHorizontal,
-  LayoutGrid,
-  Coffee,
-  BarChart3,
-} from 'lucide-react';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
 
@@ -50,42 +45,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <nav className="w-full flex flex-col items-center gap-1 mt-1 px-1.5">
           {navItems.map((item) => {
             const isActive = activeTab === item.id;
-            return (<React.Fragment key={item.id}>
-              <button
-                id={`nav-tab-${item.id}`}
-                onClick={() => onSelectTab(item.id)}
-                className={`w-full min-h-[48px] py-1.5 px-1 rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all touch-manipulation ${
-                  isActive
-                    ? 'bg-[#0f172a] text-white shadow-xs'
-                    : 'text-slate-500 hover:text-slate-800 hover:bg-[#f8fafc]'
-                }`}
-                title={item.label}
-              >
-                <div>{item.icon}</div>
-                <span className="text-[10px] font-medium tracking-tight leading-tight">
-                  {item.label}
-                </span>
-              </button>
-              {item.id === 'control' && (
-                <div className="w-full rounded-xl bg-slate-200 p-1 grid gap-1" role="group" aria-label="管制盤の表示切替">
-                  {(['current', 'new'] as const).map((mode) => (
-                    <button
-                      key={mode}
-                      type="button"
-                      aria-pressed={controlViewMode === mode}
-                      onClick={() => onSelectControlViewMode(mode)}
-                      className={`min-h-[44px] rounded-lg text-[12px] font-black transition-colors touch-manipulation ${controlViewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600'}`}
-                    >
-                      {mode === 'current' ? 'A' : 'B'}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </React.Fragment>);
+            return (
+              <React.Fragment key={item.id}>
+                <button
+                  id={`nav-tab-${item.id}`}
+                  onClick={() => onSelectTab(item.id)}
+                  className={`w-full min-h-[48px] py-1.5 px-1 rounded-lg flex flex-col items-center justify-center gap-0.5 transition-all touch-manipulation ${
+                    isActive
+                      ? 'bg-[#0f172a] text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800 hover:bg-[#f8fafc]'
+                  }`}
+                  title={item.label}
+                >
+                  <div>{item.icon}</div>
+                  <span className="text-[10px] font-medium tracking-tight leading-tight">{item.label}</span>
+                </button>
+                {item.id === 'control' && (
+                  <div
+                    className="w-full rounded-xl bg-slate-200 p-1 grid gap-1"
+                    role="group"
+                    aria-label="管制盤の表示切替"
+                  >
+                    {(['current', 'new'] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        aria-pressed={controlViewMode === mode}
+                        onClick={() => onSelectControlViewMode(mode)}
+                        className={`min-h-[44px] rounded-lg text-[12px] font-black transition-colors touch-manipulation ${controlViewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600'}`}
+                      >
+                        {mode === 'current' ? 'A' : 'B'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </React.Fragment>
+            );
           })}
         </nav>
       </div>
-
     </aside>
   );
 };

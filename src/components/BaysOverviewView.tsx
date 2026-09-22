@@ -1,6 +1,6 @@
-import React from 'react';
 import { ArrowRightLeft, Clock3, Star } from 'lucide-react';
-import { Barista } from '../types';
+import type React from 'react';
+import type { Barista } from '../types';
 
 interface BaysOverviewViewProps {
   baristas: Barista[];
@@ -22,37 +22,66 @@ export const BaysOverviewView: React.FC<BaysOverviewViewProps> = ({ baristas, ne
             </div>
             <div className="mt-1 text-[15px] font-black text-slate-950">6人総入替・SP対応 {specialCount}人</div>
           </div>
-          <button type="button" onClick={onChangeShift} className="min-h-[44px] shrink-0 rounded-lg bg-slate-950 px-3 text-[12px] font-black text-white shadow-sm active:scale-[0.98] touch-manipulation">
-            <span className="flex items-center gap-1.5"><ArrowRightLeft className="h-4 w-4" />今すぐ交代</span>
+          <button
+            type="button"
+            onClick={onChangeShift}
+            className="min-h-[44px] shrink-0 rounded-lg bg-slate-950 px-3 text-[12px] font-black text-white shadow-sm active:scale-[0.98] touch-manipulation"
+          >
+            <span className="flex items-center gap-1.5">
+              <ArrowRightLeft className="h-4 w-4" />
+              今すぐ交代
+            </span>
           </button>
         </div>
       </section>
 
       <div className="grid grid-cols-2 gap-2">
-        {[...baristas].sort((a, b) => a.bayNumber - b.bayNumber).map((barista) => {
-          const current = barista.queue[0];
-          return (
-            <article key={barista.id} className="rounded-xl border border-slate-300 bg-white p-3 shadow-xs">
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-slate-100 font-mono text-[14px] font-bold text-slate-600">{barista.bayNumber}</div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <h3 className="truncate text-[16px] font-black text-slate-950">{barista.name}</h3>
-                    {barista.canHandleSpecial && <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-emerald-950 px-1.5 py-0.5 text-[10px] font-black text-emerald-100"><Star className="h-2.5 w-2.5 fill-current" />SP</span>}
+        {[...baristas]
+          .sort((a, b) => a.bayNumber - b.bayNumber)
+          .map((barista) => {
+            const current = barista.queue[0];
+            return (
+              <article key={barista.id} className="rounded-xl border border-slate-300 bg-white p-3 shadow-xs">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-slate-100 font-mono text-[14px] font-bold text-slate-600">
+                    {barista.bayNumber}
                   </div>
-                  <div className="font-mono text-[11px] font-bold text-slate-500">×{barista.coefficient.toFixed(2)}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="truncate text-[16px] font-black text-slate-950">{barista.name}</h3>
+                      {barista.canHandleSpecial && (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded bg-emerald-950 px-1.5 py-0.5 text-[10px] font-black text-emerald-100">
+                          <Star className="h-2.5 w-2.5 fill-current" />
+                          SP
+                        </span>
+                      )}
+                    </div>
+                    <div className="font-mono text-[11px] font-bold text-slate-500">
+                      ×{barista.coefficient.toFixed(2)}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-2 border-t border-slate-100 pt-2 text-[12px]">
-                {current ? <div className="flex items-center justify-between gap-2"><span className="truncate font-bold text-slate-700">{current.beanName}</span><span className="shrink-0 font-mono text-[15px] font-black text-slate-950">{current.id}</span></div> : <span className="font-bold text-slate-400">待機中</span>}
-                <div className="mt-1 text-[11px] font-bold text-slate-500">待ち {Math.max(0, barista.queue.length - 1)}件</div>
-              </div>
-            </article>
-          );
-        })}
+                <div className="mt-2 border-t border-slate-100 pt-2 text-[12px]">
+                  {current ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate font-bold text-slate-700">{current.beanName}</span>
+                      <span className="shrink-0 font-mono text-[15px] font-black text-slate-950">{current.id}</span>
+                    </div>
+                  ) : (
+                    <span className="font-bold text-slate-400">待機中</span>
+                  )}
+                  <div className="mt-1 text-[11px] font-bold text-slate-500">
+                    待ち {Math.max(0, barista.queue.length - 1)}件
+                  </div>
+                </div>
+              </article>
+            );
+          })}
       </div>
 
-      <p className="px-1 text-[11px] leading-relaxed text-slate-500">毎正時に自動交代します。SP対応者は1番、次に6番へ優先配置されます。</p>
+      <p className="px-1 text-[11px] leading-relaxed text-slate-500">
+        毎正時に自動交代します。SP対応者は1番、次に6番へ優先配置されます。
+      </p>
     </div>
   );
 };

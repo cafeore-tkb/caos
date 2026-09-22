@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
 import { Check, X } from 'lucide-react';
-import { OrderTicket, BeanCode } from '../types';
+import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { BeanCode, OrderTicket } from '../types';
 
 interface TicketCardProps {
   ticket: OrderTicket;
@@ -21,7 +22,6 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   ticket,
   highlightFilter,
   selectedOrderId,
-  onSelectOrder,
   onOpenDetail,
   actionTicketKey,
   currentBayId,
@@ -61,7 +61,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   }, [isActionOpen, onCloseAction]);
 
   const bayAtPoint = (clientX: number, clientY: number) => {
-    const lane = document.elementsFromPoint(clientX, clientY)
+    const lane = document
+      .elementsFromPoint(clientX, clientY)
       .map((element) => element.closest<HTMLElement>('[data-bay-target]'))
       .find((element) => {
         const bayId = Number(element?.dataset.bayTarget);
@@ -136,14 +137,12 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         isRebrew
           ? `bg-red-50 border-red-300 text-slate-900 shadow-xs ${isCompleted ? 'opacity-55 hover:opacity-75' : 'hover:border-red-500 hover:shadow-md'}`
           : isCompleted
-          ? 'bg-slate-100 border-slate-200 text-slate-500 opacity-50 hover:opacity-70'
-          : isNamed
-          ? 'bg-violet-50 border-violet-300 hover:border-violet-400 shadow-xs hover:shadow-md'
-          : 'bg-white border-[#cbd5e1] hover:border-slate-400 shadow-xs hover:shadow-md'
+            ? 'bg-slate-100 border-slate-200 text-slate-500 opacity-50 hover:opacity-70'
+            : isNamed
+              ? 'bg-violet-50 border-violet-300 hover:border-violet-400 shadow-xs hover:shadow-md'
+              : 'bg-white border-[#cbd5e1] hover:border-slate-400 shadow-xs hover:shadow-md'
       } ${
-        isOrderSelected
-          ? 'ring-4 ring-amber-400 border-amber-500 bg-amber-50/95 shadow-xl scale-[1.02] z-20'
-          : ''
+        isOrderSelected ? 'ring-4 ring-amber-400 border-amber-500 bg-amber-50/95 shadow-xl scale-[1.02] z-20' : ''
       } ${!isMatchFilter ? 'opacity-25 blur-[0.5px]' : ''}`}
     >
       {dragOffset && dragTargetBay && (
@@ -154,12 +153,44 @@ export const TicketCard: React.FC<TicketCardProps> = ({
       {isActionOpen && (
         <>
           {[1, 2, 3].map((bayId, index) => {
-            const disabled = bayId === currentBayId || Boolean(ticket.preferredBaristaId && ticket.preferredBaristaId !== bayId);
-            return <button key={bayId} type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onMoveTicket(ticket, bayId); onCloseAction(); }} className="absolute -top-[38px] z-[90] h-[34px] rounded-md border bg-white text-[17px] font-mono font-black shadow-lg disabled:bg-slate-200 disabled:text-slate-400 touch-none" style={{ left: `${index * 33.333}%`, width: '33.333%' }}>{bayId}</button>;
+            const disabled =
+              bayId === currentBayId || Boolean(ticket.preferredBaristaId && ticket.preferredBaristaId !== bayId);
+            return (
+              <button
+                key={bayId}
+                type="button"
+                disabled={disabled}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onMoveTicket(ticket, bayId);
+                  onCloseAction();
+                }}
+                className="absolute -top-[38px] z-[90] h-[34px] rounded-md border bg-white text-[17px] font-mono font-black shadow-lg disabled:bg-slate-200 disabled:text-slate-400 touch-none"
+                style={{ left: `${index * 33.333}%`, width: '33.333%' }}
+              >
+                {bayId}
+              </button>
+            );
           })}
           {[4, 5, 6].map((bayId, index) => {
-            const disabled = bayId === currentBayId || Boolean(ticket.preferredBaristaId && ticket.preferredBaristaId !== bayId);
-            return <button key={bayId} type="button" disabled={disabled} onClick={(event) => { event.stopPropagation(); onMoveTicket(ticket, bayId); onCloseAction(); }} className="absolute -bottom-[38px] z-[90] h-[34px] rounded-md border bg-white text-[17px] font-mono font-black shadow-lg disabled:bg-slate-200 disabled:text-slate-400 touch-none" style={{ left: `${index * 33.333}%`, width: '33.333%' }}>{bayId}</button>;
+            const disabled =
+              bayId === currentBayId || Boolean(ticket.preferredBaristaId && ticket.preferredBaristaId !== bayId);
+            return (
+              <button
+                key={bayId}
+                type="button"
+                disabled={disabled}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onMoveTicket(ticket, bayId);
+                  onCloseAction();
+                }}
+                className="absolute -bottom-[38px] z-[90] h-[34px] rounded-md border bg-white text-[17px] font-mono font-black shadow-lg disabled:bg-slate-200 disabled:text-slate-400 touch-none"
+                style={{ left: `${index * 33.333}%`, width: '33.333%' }}
+              >
+                {bayId}
+              </button>
+            );
           })}
           <div className="absolute inset-0 z-[70] rounded-md bg-red-500/10 pointer-events-none flex items-center justify-center">
             <X className="w-10 h-10 text-red-600/35 stroke-[3]" />
@@ -173,7 +204,17 @@ export const TicketCard: React.FC<TicketCardProps> = ({
             {/* Large Order Number Label */}
             <span
               className={`font-mono text-[22px] font-black tracking-tight leading-none ${
-                isRebrew ? 'text-red-700' : isOrderSelected ? 'text-amber-900 font-black' : isNamed ? 'text-violet-700' : isCompleted ? 'text-slate-500' : ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1 ? 'text-slate-950' : 'text-slate-600'
+                isRebrew
+                  ? 'text-red-700'
+                  : isOrderSelected
+                    ? 'text-amber-900 font-black'
+                    : isNamed
+                      ? 'text-violet-700'
+                      : isCompleted
+                        ? 'text-slate-500'
+                        : ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1
+                          ? 'text-slate-950'
+                          : 'text-slate-600'
               }`}
             >
               {ticket.id}
@@ -184,8 +225,14 @@ export const TicketCard: React.FC<TicketCardProps> = ({
               {ticket.cupCount}杯
             </span>
 
-            {ticket.preferredBaristaId && <span className="rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">指名</span>}
-            {isRebrew && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">{ticket.status === 'brewing' ? '入れ直し中' : '入れ直し'}</span>}
+            {ticket.preferredBaristaId && (
+              <span className="rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">指名</span>
+            )}
+            {isRebrew && (
+              <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                {ticket.status === 'brewing' ? '入れ直し中' : '入れ直し'}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
@@ -195,8 +242,11 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                 <span className="sr-only">完了</span>
               </span>
             )}
-            {ticket.isInterrupted && <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-black text-red-700">中断</span>}
-
+            {ticket.isInterrupted && (
+              <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-black text-red-700">
+                中断
+              </span>
+            )}
           </div>
         </div>
 
@@ -219,7 +269,6 @@ export const TicketCard: React.FC<TicketCardProps> = ({
 
         {/* Order Notes (e.g. チャンプ 2杯 + 俺ブレ 1杯) */}
       </div>
-
     </div>
   );
 };
