@@ -1,6 +1,18 @@
-import React from 'react';
-import { Volume2, VolumeX, Play, Pause, RotateCcw, Undo2, ChevronLeft, ChevronRight, CalendarClock, BarChart3, LayoutGrid, Coffee } from 'lucide-react';
-import { soundManager } from '../utils/audio';
+import {
+  BarChart3,
+  CalendarClock,
+  ChevronLeft,
+  ChevronRight,
+  Coffee,
+  LayoutGrid,
+  Pause,
+  Play,
+  RotateCcw,
+  Undo2,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import type React from 'react';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
 
@@ -66,7 +78,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
     <header className="h-[56px] bg-white border-b border-[#e2e8f0] px-2 flex items-center justify-between gap-2 shadow-xs select-none shrink-0">
       {/* Left side: Clock and Top Metrics */}
       <div className="flex min-w-0 items-center gap-2">
-        <nav className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1" aria-label="画面切替">
+        <nav
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1"
+          aria-label="画面切替"
+        >
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.id;
@@ -86,7 +101,11 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             );
           })}
           {activeTab === 'control' && (
-            <div className="ml-0.5 flex items-center gap-0.5 border-l border-slate-300 pl-1" role="group" aria-label="管制盤の表示切替">
+            <div
+              className="ml-0.5 flex items-center gap-0.5 border-l border-slate-300 pl-1"
+              role="group"
+              aria-label="管制盤の表示切替"
+            >
               {(['current', 'new'] as const).map((mode) => (
                 <button
                   key={mode}
@@ -104,9 +123,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
         {/* Large Digital Clock */}
         <div className="flex items-center gap-2">
-          <div className="font-mono text-[28px] font-bold tracking-tight text-[#0f172a] leading-none">
-            {timeStr}
-          </div>
+          <div className="font-mono text-[28px] font-bold tracking-tight text-[#0f172a] leading-none">{timeStr}</div>
           {/* Quick Sim Controls */}
           <div className="flex items-center gap-1 bg-[#f1f5f9] p-1 rounded-md border border-[#e2e8f0]">
             <button
@@ -135,14 +152,32 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             </button>
             {showTimelineControls && (
               <div className="ml-1 flex items-center gap-1 border-l border-slate-300 pl-1">
-                <button type="button" onClick={() => onTimelineNavigate('back')} title="5分前を表示" className="h-10 px-2 rounded-lg border border-slate-300 bg-white text-[12px] font-black text-slate-700 flex items-center gap-0.5 touch-manipulation">
-                  <ChevronLeft className="h-3.5 w-3.5" />−5分
+                <button
+                  type="button"
+                  onClick={() => onTimelineNavigate('back')}
+                  title="5分前を表示"
+                  className="h-10 px-2 rounded-lg border border-slate-300 bg-white text-[12px] font-black text-slate-700 flex items-center gap-0.5 touch-manipulation"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                  −5分
                 </button>
-                <button type="button" onClick={() => onTimelineNavigate('now')} title="現在時刻へ戻る" className="h-10 px-3 rounded-lg bg-red-500 text-[12px] font-black text-white flex items-center gap-1 touch-manipulation">
-                  <span className="h-2 w-2 rounded-full bg-white" />現在
+                <button
+                  type="button"
+                  onClick={() => onTimelineNavigate('now')}
+                  title="現在時刻へ戻る"
+                  className="h-10 px-3 rounded-lg bg-red-500 text-[12px] font-black text-white flex items-center gap-1 touch-manipulation"
+                >
+                  <span className="h-2 w-2 rounded-full bg-white" />
+                  現在
                 </button>
-                <button type="button" onClick={() => onTimelineNavigate('forward')} title="5分先を表示" className="h-10 px-2 rounded-lg border border-slate-300 bg-white text-[12px] font-black text-slate-700 flex items-center gap-0.5 touch-manipulation">
-                  ＋5分<ChevronRight className="h-3.5 w-3.5" />
+                <button
+                  type="button"
+                  onClick={() => onTimelineNavigate('forward')}
+                  title="5分先を表示"
+                  className="h-10 px-2 rounded-lg border border-slate-300 bg-white text-[12px] font-black text-slate-700 flex items-center gap-0.5 touch-manipulation"
+                >
+                  ＋5分
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             )}
@@ -153,9 +188,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         <div className="hidden xl:flex bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 items-baseline gap-1.5">
           <span className="text-[12px] font-semibold text-[#475569]">未割当オーダー</span>
           <div className="flex items-baseline font-mono">
-            <span className="text-[19px] font-extrabold text-[#ef4444] leading-none">
-              {unassignedCups}
-            </span>
+            <span className="text-[19px] font-extrabold text-[#ef4444] leading-none">{unassignedCups}</span>
             <span className="text-[12px] font-bold text-[#475569] ml-1">杯</span>
           </div>
         </div>
@@ -164,9 +197,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         <div className="hidden xl:flex bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 items-baseline gap-1.5">
           <span className="text-[12px] font-semibold text-[#475569]">全ドリッパー待機杯数</span>
           <div className="flex items-baseline font-mono">
-            <span className="text-[19px] font-extrabold text-[#0f172a] leading-none">
-              {totalWaitingCups}
-            </span>
+            <span className="text-[19px] font-extrabold text-[#0f172a] leading-none">{totalWaitingCups}</span>
             <span className="text-[12px] font-bold text-[#475569] ml-1">杯</span>
           </div>
         </div>
@@ -198,15 +229,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         {/* Sound toggle */}
         <button
           id="btn-toggle-sound"
-          onClick={() => {
-            soundManager.enabled = !soundEnabled;
-            onToggleSound();
-          }}
+          onClick={onToggleSound}
           title={soundEnabled ? '通知音 ON' : '通知音 消音'}
           className={`w-11 h-11 rounded-lg border text-xs transition-colors flex items-center justify-center touch-manipulation ${
-            soundEnabled
-              ? 'bg-[#f1f5f9] text-slate-700 border-[#cbd5e1]'
-              : 'bg-red-50 text-red-500 border-red-200'
+            soundEnabled ? 'bg-[#f1f5f9] text-slate-700 border-[#cbd5e1]' : 'bg-red-50 text-red-500 border-red-200'
           }`}
         >
           {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}

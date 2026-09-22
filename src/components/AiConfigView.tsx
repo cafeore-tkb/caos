@@ -1,6 +1,6 @@
-import React from 'react';
-import { Sparkles, RefreshCw, Zap } from 'lucide-react';
-import { Barista, LearningEngineLog } from '../types';
+import { RefreshCw, Sparkles, Zap } from 'lucide-react';
+import type React from 'react';
+import type { Barista, LearningEngineLog } from '../types';
 
 interface AiConfigViewProps {
   baristas: Barista[];
@@ -9,12 +9,7 @@ interface AiConfigViewProps {
   onResetLearning: () => void;
 }
 
-export const AiConfigView: React.FC<AiConfigViewProps> = ({
-  baristas,
-  logs,
-  onUpdateCoefficient,
-  onResetLearning,
-}) => {
+export const AiConfigView: React.FC<AiConfigViewProps> = ({ baristas, logs, onUpdateCoefficient, onResetLearning }) => {
   return (
     <div className="space-y-3">
       <div className="flex flex-col gap-2 border-b border-slate-200 pb-3">
@@ -23,9 +18,7 @@ export const AiConfigView: React.FC<AiConfigViewProps> = ({
             <Sparkles className="w-5 h-5 text-emerald-600" />
             <span>抽出時間の補正</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            ドリッパーごとの所要時間係数
-          </p>
+          <p className="text-xs text-slate-500 mt-0.5">ドリッパーごとの所要時間係数</p>
         </div>
 
         <button
@@ -99,13 +92,17 @@ export const AiConfigView: React.FC<AiConfigViewProps> = ({
           <span>最新の自動補正ログ (直近5件)</span>
         </h3>
         <div className="divide-y divide-slate-100 text-xs">
-          {logs.map((log, idx) => (
-            <div key={`${log.id}-${idx}`} className="py-2.5 flex flex-col items-start gap-1.5">
+          {logs.map((log) => (
+            <div key={log.id} className="py-2.5 flex flex-col items-start gap-1.5">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-[11px] text-slate-400">{log.timestamp}</span>
                 <span className="font-bold text-slate-900">{log.baristaKey}</span>
-                <span className="text-slate-600">直近実績: <strong className="font-mono">{log.recentActual}</strong></span>
-                <span className={`font-mono font-bold ${log.deltaType === 'slower' ? 'text-amber-600' : 'text-emerald-600'}`}>
+                <span className="text-slate-600">
+                  直近実績: <strong className="font-mono">{log.recentActual}</strong>
+                </span>
+                <span
+                  className={`font-mono font-bold ${log.deltaType === 'slower' ? 'text-amber-600' : 'text-emerald-600'}`}
+                >
                   {log.deltaStr}
                 </span>
               </div>

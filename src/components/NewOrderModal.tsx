@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { X, Plus, Coffee } from 'lucide-react';
-import { BeanCode } from '../types';
+import { Coffee, Plus, X } from 'lucide-react';
+import type React from 'react';
+import { useState } from 'react';
 import { BEAN_NAME_MAP } from '../data/initialData';
+import type { BeanCode } from '../types';
 import { MENU_GROUPS, MENU_PRESENTATION } from '../utils/menuPresentation';
 
 interface NewOrderModalProps {
@@ -18,10 +19,7 @@ interface NewOrderModalProps {
   }) => void;
 }
 
-export const NewOrderModal: React.FC<NewOrderModalProps> = ({
-  onClose,
-  onAddOrder,
-}) => {
+export const NewOrderModal: React.FC<NewOrderModalProps> = ({ onClose, onAddOrder }) => {
   const [selectedBean, setSelectedBean] = useState<BeanCode>('CHAMP');
   const [cupCount, setCupCount] = useState<number>(1);
   const [orderType, setOrderType] = useState<string>('HOT');
@@ -117,10 +115,20 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                         className={`min-h-[64px] rounded-xl border p-2.5 text-left transition-all touch-manipulation ${menu.cardClass} ${selectedBean === code ? 'ring-2 ring-slate-950 shadow-sm' : 'hover:shadow-sm'}`}
                       >
                         <div className="flex items-center justify-between gap-1">
-                          <span className={`text-[15px] font-black ${menu.family === 'premium' ? 'text-white' : 'text-slate-950'}`}>{menu.shortLabel}</span>
-                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-black ${menu.badgeClass}`}>{menu.familyLabel}</span>
+                          <span
+                            className={`text-[15px] font-black ${menu.family === 'premium' ? 'text-white' : 'text-slate-950'}`}
+                          >
+                            {menu.shortLabel}
+                          </span>
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-black ${menu.badgeClass}`}>
+                            {menu.familyLabel}
+                          </span>
                         </div>
-                        <div className={`mt-1 text-[11px] font-bold ${menu.family === 'premium' ? 'text-emerald-100' : 'text-slate-600'}`}>{menu.processLabel}</div>
+                        <div
+                          className={`mt-1 text-[11px] font-bold ${menu.family === 'premium' ? 'text-emerald-100' : 'text-slate-600'}`}
+                        >
+                          {menu.processLabel}
+                        </div>
                       </button>
                     );
                   })}
@@ -133,11 +141,15 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black tracking-[0.12em] text-slate-500">抽出工程</div>
-                <div className="mt-1 text-[16px] font-black text-slate-950">{MENU_PRESENTATION[selectedBean].processLabel}</div>
+                <div className="mt-1 text-[16px] font-black text-slate-950">
+                  {MENU_PRESENTATION[selectedBean].processLabel}
+                </div>
               </div>
               {(selectedBean === 'ICE' || selectedBean === 'MILK') && (
                 <div className="rounded-lg bg-white/80 px-3 py-2 text-right text-[12px] font-bold text-slate-700">
-                  半量をゆっくり抽出<br />してから仕上げ
+                  半量をゆっくり抽出
+                  <br />
+                  してから仕上げ
                 </div>
               )}
             </div>
@@ -186,12 +198,29 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
           <div>
             <label className="block text-[14px] font-bold text-slate-700 mb-1.5">指名（1人のみ）</label>
             <div className="grid grid-cols-4 gap-2">
-              <button type="button" onClick={() => setPreferredBaristaId(null)} className={`min-h-[44px] rounded-lg border text-[13px] font-bold ${preferredBaristaId === null ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-300'}`}>なし</button>
+              <button
+                type="button"
+                onClick={() => setPreferredBaristaId(null)}
+                className={`min-h-[44px] rounded-lg border text-[13px] font-bold ${preferredBaristaId === null ? 'bg-slate-900 text-white border-slate-900' : 'border-slate-300'}`}
+              >
+                なし
+              </button>
               {[1, 2, 3, 4, 5, 6].map((id) => (
-                <button key={id} type="button" onClick={() => setPreferredBaristaId(id)} className={`min-h-[44px] rounded-lg border text-[16px] font-mono font-black ${preferredBaristaId === id ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-300'}`}>{id}</button>
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPreferredBaristaId(id)}
+                  className={`min-h-[44px] rounded-lg border text-[16px] font-mono font-black ${preferredBaristaId === id ? 'bg-blue-600 text-white border-blue-600' : 'border-slate-300'}`}
+                >
+                  {id}
+                </button>
               ))}
             </div>
-            {preferredBaristaId && <p className="mt-2 text-[13px] font-bold text-blue-700">ドリッパー {preferredBaristaId} の枠を確保します</p>}
+            {preferredBaristaId && (
+              <p className="mt-2 text-[13px] font-bold text-blue-700">
+                ドリッパー {preferredBaristaId} の枠を確保します
+              </p>
+            )}
           </div>
         </div>
 

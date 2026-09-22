@@ -1,14 +1,35 @@
-import React, { useEffect, useRef, useState } from 'react';
 import { ClipboardList, Sparkles } from 'lucide-react';
-import { UnassignedOrder } from '../types';
+import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { UnassignedOrder } from '../types';
 import { MENU_PRESENTATION } from '../utils/menuPresentation';
 
 const MergeCupsIcon = ({ className = '' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 25.04 19.03" aria-hidden="true">
-    <path fill="currentColor" d="M3.04,12.26c-.63-.55-1.04-1.35-1.04-2.26V2h12v1h0,0v.03h2v-1.03c0-1.1-.9-2-2-2H2C.9,0,0,.9,0,2v8c0,2.07,1.27,3.86,3.07,4.61-.02-.19-.03-.39-.03-.58v-1.77Z" />
-    <path fill="currentColor" d="M20.04,4.03H6.04c-1.1,0-2,.9-2,2v8c0,.3.04.6.09.88.07.37.16.72.3,1.06.76,1.79,2.54,3.06,4.61,3.06h6c2.76,0,5-2.24,5-5,2.76,0,5-2.24,5-5s-2.24-5-5-5ZM18.04,14.03c0,1.65-1.35,3-3,3h-6c-.9,0-1.69-.4-2.24-1.03-.26-.29-.45-.63-.58-1-.11-.31-.18-.63-.18-.97V6.03h12v8ZM20.04,12.03v-6c1.65,0,3,1.35,3,3s-1.35,3-3,3Z" />
-    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.15,11.51h5.76" />
-    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12.03,8.51v5.76" />
+    <path
+      fill="currentColor"
+      d="M3.04,12.26c-.63-.55-1.04-1.35-1.04-2.26V2h12v1h0,0v.03h2v-1.03c0-1.1-.9-2-2-2H2C.9,0,0,.9,0,2v8c0,2.07,1.27,3.86,3.07,4.61-.02-.19-.03-.39-.03-.58v-1.77Z"
+    />
+    <path
+      fill="currentColor"
+      d="M20.04,4.03H6.04c-1.1,0-2,.9-2,2v8c0,.3.04.6.09.88.07.37.16.72.3,1.06.76,1.79,2.54,3.06,4.61,3.06h6c2.76,0,5-2.24,5-5,2.76,0,5-2.24,5-5s-2.24-5-5-5ZM18.04,14.03c0,1.65-1.35,3-3,3h-6c-.9,0-1.69-.4-2.24-1.03-.26-.29-.45-.63-.58-1-.11-.31-.18-.63-.18-.97V6.03h12v8ZM20.04,12.03v-6c1.65,0,3,1.35,3,3s-1.35,3-3,3Z"
+    />
+    <path
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M9.15,11.51h5.76"
+    />
+    <path
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      d="M12.03,8.51v5.76"
+    />
   </svg>
 );
 
@@ -56,7 +77,8 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
 
   const orderUid = (order: UnassignedOrder) => order.ticketUid || order.id;
   const bayAtPoint = (clientX: number, clientY: number) => {
-    const target = document.elementsFromPoint(clientX, clientY)
+    const target = document
+      .elementsFromPoint(clientX, clientY)
       .map((element) => element.closest<HTMLElement>('[data-bay-target]'))
       .find((element) => {
         const bayId = Number(element?.dataset.bayTarget);
@@ -82,16 +104,17 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
       <div className="h-[34px] flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <ClipboardList className="w-4 h-4 text-red-500" />
-          <h2 className="text-[16px] font-black text-[#0f172a] tracking-tight">
-            未割当
-          </h2>
+          <h2 className="text-[16px] font-black text-[#0f172a] tracking-tight">未割当</h2>
           <span className="bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold px-2 py-0.5 rounded-full font-mono">
             {orders.length} 件 / {totalCups} 杯
           </span>
           <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
             <span className="ml-1">次に空く:</span>
             {nextAvailable.map((item, index) => (
-              <span key={item.bayNumber} className={`rounded border px-1.5 py-0.5 font-mono whitespace-nowrap ${index === 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-white text-slate-700'}`}>
+              <span
+                key={item.bayNumber}
+                className={`rounded border px-1.5 py-0.5 font-mono whitespace-nowrap ${index === 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-white text-slate-700'}`}
+              >
                 #{item.bayNumber} {item.isStandby ? '待機' : formatRemaining(item.seconds)}
               </span>
             ))}
@@ -109,29 +132,29 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
             const openOrder = orders.find((candidate) => orderUid(candidate) === openPadUid);
             const isMergeCandidate = Boolean(
               openOrder &&
-              !openOrder.isRebrew &&
-              !order.isRebrew &&
-              orderUid(openOrder) !== orderUid(order) &&
-              openOrder.cupCount === 1 &&
-              order.cupCount === 1 &&
-              openOrder.beanCode === order.beanCode &&
-              openOrder.preferredBaristaId === order.preferredBaristaId
+                !openOrder.isRebrew &&
+                !order.isRebrew &&
+                orderUid(openOrder) !== orderUid(order) &&
+                openOrder.cupCount === 1 &&
+                order.cupCount === 1 &&
+                openOrder.beanCode === order.beanCode &&
+                openOrder.preferredBaristaId === order.preferredBaristaId
             );
             const isSelected = selectedOrderId === order.id;
             const cardStyle = order.isRebrew
               ? 'bg-red-50 border-red-300 text-slate-900'
               : order.preferredBaristaId
-              ? 'bg-violet-50 border-violet-300 text-slate-900'
-              : `${menu.cardClass} ${menu.family === 'premium' ? 'text-white' : 'text-slate-900'}`;
+                ? 'bg-violet-50 border-violet-300 text-slate-900'
+                : `${menu.cardClass} ${menu.family === 'premium' ? 'text-white' : 'text-slate-900'}`;
             const idColor = order.isRebrew
               ? 'text-red-700'
               : order.preferredBaristaId
-              ? 'text-violet-700'
-              : menu.family === 'premium'
-              ? 'text-white'
-              : order.totalItemsInOrder && order.totalItemsInOrder > 1
-              ? 'text-slate-950'
-              : 'text-slate-600';
+                ? 'text-violet-700'
+                : menu.family === 'premium'
+                  ? 'text-white'
+                  : order.totalItemsInOrder && order.totalItemsInOrder > 1
+                    ? 'text-slate-950'
+                    : 'text-slate-600';
 
             return (
               <div
@@ -190,11 +213,13 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   setDragVisual(null);
                   setHoveredBay(null);
                 }}
-                style={dragVisual?.uid === orderUid(order) ? { transform: `translate3d(${dragVisual.x}px, ${dragVisual.y}px, 0)` } : undefined}
+                style={
+                  dragVisual?.uid === orderUid(order)
+                    ? { transform: `translate3d(${dragVisual.x}px, ${dragVisual.y}px, 0)` }
+                    : undefined
+                }
                 className={`rounded-lg border p-2 min-h-0 flex flex-col justify-between transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing touch-none select-none relative ${dragVisual?.uid === orderUid(order) ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
-                  isSelected
-                    ? 'ring-4 ring-amber-400 border-amber-500 shadow-lg z-10'
-                    : ''
+                  isSelected ? 'ring-4 ring-amber-400 border-amber-500 shadow-lg z-10' : ''
                 }`}
               >
                 {dragVisual?.uid === orderUid(order) && hoveredBay && (
@@ -203,7 +228,10 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   </div>
                 )}
                 {isOrderBoundary && (
-                  <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-slate-500" aria-hidden="true" />
+                  <span
+                    className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r-full bg-slate-500"
+                    aria-hidden="true"
+                  />
                 )}
                 {isMergeCandidate && (
                   <div className="absolute inset-0 z-20 rounded-lg border-2 border-blue-500 bg-blue-50/90 pointer-events-none flex items-center justify-center p-1">
@@ -215,7 +243,10 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 )}
                 {openPadUid === orderUid(order) && (
                   <>
-                    <div className="absolute -top-[38px] left-0 right-0 z-30 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl" aria-label={`${order.id}の割当先 1から3`}>
+                    <div
+                      className="absolute -top-[38px] left-0 right-0 z-30 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+                      aria-label={`${order.id}の割当先 1から3`}
+                    >
                       {[1, 2, 3].map((bayId) => (
                         <button
                           key={bayId}
@@ -232,21 +263,24 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                         </button>
                       ))}
                     </div>
-                    <div className="absolute -bottom-[38px] left-0 right-0 z-30 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl" aria-label={`${order.id}の割当先 4から6`}>
+                    <div
+                      className="absolute -bottom-[38px] left-0 right-0 z-30 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+                      aria-label={`${order.id}の割当先 4から6`}
+                    >
                       {[4, 5, 6].map((bayId) => (
-                      <button
-                        key={bayId}
-                        type="button"
-                        data-bay-target={bayId}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          assignToBay(order, bayId);
-                        }}
-                        disabled={Boolean(order.preferredBaristaId && order.preferredBaristaId !== bayId)}
-                        className={`h-full rounded-md border text-[17px] font-mono font-black transition-colors touch-none disabled:bg-slate-700 disabled:text-slate-500 disabled:border-slate-700 ${hoveredBay === bayId ? 'border-white bg-blue-500 text-white' : order.preferredBaristaId === bayId ? 'border-violet-300 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-950'}`}
-                      >
-                        {bayId}
-                      </button>
+                        <button
+                          key={bayId}
+                          type="button"
+                          data-bay-target={bayId}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            assignToBay(order, bayId);
+                          }}
+                          disabled={Boolean(order.preferredBaristaId && order.preferredBaristaId !== bayId)}
+                          className={`h-full rounded-md border text-[17px] font-mono font-black transition-colors touch-none disabled:bg-slate-700 disabled:text-slate-500 disabled:border-slate-700 ${hoveredBay === bayId ? 'border-white bg-blue-500 text-white' : order.preferredBaristaId === bayId ? 'border-violet-300 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-950'}`}
+                        >
+                          {bayId}
+                        </button>
                       ))}
                     </div>
                   </>
@@ -266,22 +300,34 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                       <span className={`font-mono text-[25px] font-black ${idColor} tracking-tight leading-none`}>
                         {order.id}
                       </span>
-                      {order.isRebrew && <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">入れ直し</span>}
+                      {order.isRebrew && (
+                        <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                          入れ直し
+                        </span>
+                      )}
                       {order.totalItemsInOrder && order.totalItemsInOrder > 1 && (
                         <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-mono font-black text-slate-700 whitespace-nowrap">
                           {order.itemIndex}/{order.totalItemsInOrder}・計{order.totalOrderCups}杯
                         </span>
                       )}
                     </div>
-                    <span className={`text-[17px] font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? 'bg-violet-700 text-white' : 'bg-slate-950 text-white'}`}>
+                    <span
+                      className={`text-[17px] font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? 'bg-violet-700 text-white' : 'bg-slate-950 text-white'}`}
+                    >
                       {order.cupCount}杯
                     </span>
                   </div>
 
                   {/* Coffee Name - Clean display without cut off */}
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-bold text-[15px] leading-snug truncate" title={order.beanName}>{order.beanName} ×{order.cupCount}</h3>
-                    {order.preferredBaristaId && <span className="text-[12px] font-black text-violet-700 whitespace-nowrap">指名 {order.preferredBaristaId}</span>}
+                    <h3 className="font-bold text-[15px] leading-snug truncate" title={order.beanName}>
+                      {order.beanName} ×{order.cupCount}
+                    </h3>
+                    {order.preferredBaristaId && (
+                      <span className="text-[12px] font-black text-violet-700 whitespace-nowrap">
+                        指名 {order.preferredBaristaId}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
