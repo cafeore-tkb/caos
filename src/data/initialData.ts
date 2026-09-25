@@ -165,7 +165,7 @@ export const INITIAL_BARISTAS: Barista[] = [
   {
     id: 1,
     bayNumber: 1,
-    name: '鈴木',
+    name: 'なかにしゆうな',
     canHandleSpecial: true,
     coefficient: 0.97,
     coefficientColor: 'green',

@@ -44,9 +44,6 @@ export const AiConfigView: React.FC<AiConfigViewProps> = ({ baristas, logs, onUp
                   <span className="text-[10px] text-slate-500">ドリッパー {b.bayNumber}</span>
                 </div>
               </div>
-              <span className="font-mono text-base font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-300">
-                ×{b.coefficient.toFixed(2)}
-              </span>
             </div>
 
             {/* Slider to adjust coefficient */}

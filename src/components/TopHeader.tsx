@@ -13,14 +13,15 @@ import {
   VolumeX,
 } from 'lucide-react';
 import type React from 'react';
+import type { ControlViewMode } from './ControlWorkspace';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
 
 interface TopHeaderProps {
   activeTab: NavTab;
-  controlViewMode: 'current' | 'new';
+  controlViewMode: ControlViewMode;
   onSelectTab: (tab: NavTab) => void;
-  onSelectControlViewMode: (mode: 'current' | 'new') => void;
+  onSelectControlViewMode: (mode: ControlViewMode) => void;
   timeStr: string;
   unassignedCups: number;
   totalWaitingCups: number;
@@ -106,7 +107,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               role="group"
               aria-label="管制盤の表示切替"
             >
-              {(['current', 'new'] as const).map((mode) => (
+              {(['current', 'new', 'c'] as const).map((mode) => (
                 <button
                   key={mode}
                   type="button"
@@ -114,7 +115,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   onClick={() => onSelectControlViewMode(mode)}
                   className={`h-10 min-w-9 rounded-md text-[12px] font-black touch-manipulation ${controlViewMode === mode ? 'bg-blue-700 text-white' : 'bg-white text-slate-600'}`}
                 >
-                  {mode === 'current' ? 'A' : 'B'}
+                  {mode === 'current' ? 'A' : mode === 'new' ? 'B' : 'C'}
                 </button>
               ))}
             </div>

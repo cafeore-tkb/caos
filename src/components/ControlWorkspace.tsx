@@ -1,10 +1,10 @@
 import type React from 'react';
 import type { Barista, OrderTicket, UnassignedOrder } from '../types';
-import { DispatchBoard } from './DispatchBoard';
-import { HumanCenteredControlView } from './HumanCenteredControlView';
-import { UnassignedOrdersPanel } from './UnassignedOrdersPanel';
+import { ControlViewA } from './ControlViewA';
+import { ControlViewB } from './ControlViewB';
+import { ControlViewC } from './ControlViewC';
 
-export type ControlViewMode = 'current' | 'new';
+export type ControlViewMode = 'current' | 'new' | 'c';
 
 interface ControlWorkspaceProps {
   mode: ControlViewMode;
@@ -47,9 +47,32 @@ export const ControlWorkspace: React.FC<ControlWorkspaceProps> = ({
   onAssignToBay,
   onMergeOrders,
 }) => {
+  const originalBaristas = baristas.map((barista) =>
+    barista.id === 1 && barista.name === 'なかにしゆうな' ? { ...barista, name: '鈴木' } : barista
+  );
+
   if (mode === 'new') {
     return (
-      <HumanCenteredControlView
+      <ControlViewB
+        baristas={originalBaristas}
+        unassignedOrders={unassignedOrders}
+        simTimeSec={currentTimeSec}
+        selectedOrderId={selectedOrderId}
+        highlightFilter={null}
+        onSelectOrder={onSelectOrder}
+        onSelectQueueOrder={(order) => onSelectOrder(order.id)}
+        onAdvanceBay={onAdvanceBay}
+        onOpenTicketDetail={onOpenTicketDetail}
+        onOpenEmptySlot={onOpenEmptySlot}
+        onAssignToBay={onAssignToBay}
+        onRequestRebrew={onRequestRebrew}
+      />
+    );
+  }
+
+  if (mode === 'c') {
+    return (
+      <ControlViewC
         baristas={baristas}
         unassignedOrders={unassignedOrders}
         simTimeSec={currentTimeSec}
@@ -67,36 +90,24 @@ export const ControlWorkspace: React.FC<ControlWorkspaceProps> = ({
   }
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-2">
-      <DispatchBoard
-        baristas={baristas}
-        highlightFilter={null}
-        selectedOrderId={selectedOrderId}
-        onSelectOrder={onSelectOrder}
-        onAdvanceBay={onAdvanceBay}
-        onOpenTicketDetail={onOpenTicketDetail}
-        actionTicketKey={actionTicketKey}
-        onMoveTicket={onMoveTicket}
-        onReturnToUnassigned={onReturnToUnassigned}
-        onCloseTicketAction={onCloseTicketAction}
-        onRequestRebrew={onRequestRebrew}
-        onOpenEmptySlot={onOpenEmptySlot}
-        simTimeSec={currentTimeSec}
-        timelineCommand={timelineCommand}
-      />
-
-      <div className="h-[196px] min-h-0 overflow-visible relative z-[70]">
-        <UnassignedOrdersPanel
-          orders={unassignedOrders}
-          nextAvailable={nextAvailable}
-          selectedOrderId={selectedOrderId}
-          onSelectOrder={onSelectOrder}
-          onSelectQueueOrder={(order) => onSelectOrder(order.id)}
-          onClearSelection={() => onSelectOrder('')}
-          onAssignToBay={onAssignToBay}
-          onMergeOrders={onMergeOrders}
-        />
-      </div>
-    </div>
+    <ControlViewA
+      baristas={originalBaristas}
+      unassignedOrders={unassignedOrders}
+      nextAvailable={nextAvailable}
+      selectedOrderId={selectedOrderId}
+      actionTicketKey={actionTicketKey}
+      currentTimeSec={currentTimeSec}
+      timelineCommand={timelineCommand}
+      onSelectOrder={onSelectOrder}
+      onAdvanceBay={onAdvanceBay}
+      onOpenTicketDetail={onOpenTicketDetail}
+      onMoveTicket={onMoveTicket}
+      onReturnToUnassigned={onReturnToUnassigned}
+      onCloseTicketAction={onCloseTicketAction}
+      onRequestRebrew={onRequestRebrew}
+      onOpenEmptySlot={onOpenEmptySlot}
+      onAssignToBay={onAssignToBay}
+      onMergeOrders={onMergeOrders}
+    />
   );
 };

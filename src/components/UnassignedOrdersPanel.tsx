@@ -36,6 +36,7 @@ const MergeCupsIcon = ({ className = '' }: { className?: string }) => (
 interface UnassignedOrdersPanelProps {
   orders: UnassignedOrder[];
   nextAvailable: { bayNumber: number; seconds: number; isStandby: boolean }[];
+  layout?: 'strip' | 'sidebar';
   selectedOrderId?: string | null;
   onSelectOrder?: (orderId: string) => void;
   onSelectQueueOrder?: (order: UnassignedOrder) => void;
@@ -47,6 +48,7 @@ interface UnassignedOrdersPanelProps {
 export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
   orders,
   nextAvailable,
+  layout = 'strip',
   selectedOrderId,
   onSelectOrder,
   onSelectQueueOrder,
@@ -95,40 +97,83 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
     setHoveredBay(null);
   };
   const totalCups = orders.reduce((sum, o) => sum + o.cupCount, 0);
+  const isSidebar = layout === 'sidebar';
+  const visibleOrders = isSidebar ? orders : orders.slice(0, 12);
+  const displayedOrders = (() => {
+    if (!isSidebar) {
+      return visibleOrders.map((order) => ({ order, gridColumn: undefined, gridRow: undefined }));
+    }
+
+    const groups = new Map<string, UnassignedOrder[]>();
+    for (const order of visibleOrders) {
+      const group = groups.get(order.id) || [];
+      group.push(order);
+      groups.set(order.id, group);
+    }
+
+    let nextRow = 1;
+    const positionedOrders: Array<{ order: UnassignedOrder; gridColumn: number; gridRow: number }> = [];
+    for (const group of groups.values()) {
+      group.forEach((order, index) => {
+        positionedOrders.push({
+          order,
+          gridColumn: (index % 3) + 1,
+          gridRow: nextRow + Math.floor(index / 3),
+        });
+      });
+      nextRow += Math.max(1, Math.ceil(group.length / 3));
+    }
+
+    return positionedOrders;
+  })();
   const formatRemaining = (seconds: number) =>
     `${Math.floor(Math.max(0, seconds) / 60)}:${(Math.max(0, seconds) % 60).toString().padStart(2, '0')}`;
 
   return (
-    <div className="h-full bg-white rounded-lg border border-[#cbd5e1] p-2 shadow-xs flex flex-col overflow-visible">
+    <div
+      className={`h-full bg-white rounded-lg border border-[#cbd5e1] p-2 shadow-xs flex flex-col ${isSidebar ? 'overflow-hidden' : 'overflow-visible'}`}
+    >
       {/* Header */}
-      <div className="h-[34px] flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
+      <div className={`${isSidebar ? 'shrink-0 pb-2' : 'h-[34px] mb-1'} flex items-center justify-between`}>
+        <div className={`flex ${isSidebar ? 'w-full flex-wrap' : ''} items-center gap-2`}>
           <ClipboardList className="w-4 h-4 text-red-500" />
-          <h2 className="text-[16px] font-black text-[#0f172a] tracking-tight">未割当</h2>
-          <span className="bg-red-50 text-red-600 border border-red-200 text-[11px] font-bold px-2 py-0.5 rounded-full font-mono">
+          <h2 className={`${isSidebar ? 'text-[18px]' : 'text-[16px]'} font-black text-[#0f172a] tracking-tight`}>
+            {isSidebar ? 'カップキュー' : '未割当'}
+          </h2>
+          <span
+            className={`bg-red-50 text-red-600 border border-red-200 font-bold px-2 py-0.5 rounded-full font-mono ${isSidebar ? 'text-[13px]' : 'text-[11px]'}`}
+          >
             {orders.length} 件 / {totalCups} 杯
           </span>
-          <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
-            <span className="ml-1">次に空く:</span>
-            {nextAvailable.map((item, index) => (
-              <span
-                key={item.bayNumber}
-                className={`rounded border px-1.5 py-0.5 font-mono whitespace-nowrap ${index === 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-white text-slate-700'}`}
-              >
-                #{item.bayNumber} {item.isStandby ? '待機' : formatRemaining(item.seconds)}
-              </span>
-            ))}
-          </div>
+          {!isSidebar && (
+            <div className="flex items-center gap-1 text-[10px] font-bold text-slate-500">
+              <span className="ml-1">次に空く:</span>
+              {nextAvailable.map((item, index) => (
+                <span
+                  key={item.bayNumber}
+                  className={`whitespace-nowrap rounded border px-1.5 py-0.5 font-mono ${index === 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-slate-300 bg-white text-slate-700'}`}
+                >
+                  #{item.bayNumber} {item.isStandby ? '待機' : formatRemaining(item.seconds)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {/* Responsive Grid for up to 12 Orders with Touch-friendly Horizontal/Vertical Scroll */}
-      <div className="flex-1 min-h-0 overflow-visible">
-        <div className="h-full grid grid-cols-6 grid-rows-2 gap-1.5">
-          {orders.slice(0, 12).map((order, orderIndex) => {
+      <div className={`flex-1 min-h-0 ${isSidebar ? 'overflow-auto px-1 py-10' : 'overflow-visible'}`}>
+        <div
+          className={
+            isSidebar
+              ? 'grid grid-cols-3 auto-rows-[112px] content-start gap-2'
+              : 'h-full grid grid-cols-6 grid-rows-2 gap-1.5'
+          }
+        >
+          {displayedOrders.map(({ order, gridColumn, gridRow }, orderIndex) => {
             const menu = MENU_PRESENTATION[order.beanCode];
-            const visibleOrders = orders.slice(0, 12);
-            const isOrderBoundary = orderIndex > 0 && visibleOrders[orderIndex - 1]?.id !== order.id;
+            const isOrderBoundary =
+              !isSidebar && orderIndex > 0 && displayedOrders[orderIndex - 1]?.order.id !== order.id;
             const openOrder = orders.find((candidate) => orderUid(candidate) === openPadUid);
             const isMergeCandidate = Boolean(
               openOrder &&
@@ -213,12 +258,13 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   setDragVisual(null);
                   setHoveredBay(null);
                 }}
-                style={
-                  dragVisual?.uid === orderUid(order)
+                style={{
+                  ...(isSidebar ? { gridColumn, gridRow } : {}),
+                  ...(dragVisual?.uid === orderUid(order)
                     ? { transform: `translate3d(${dragVisual.x}px, ${dragVisual.y}px, 0)` }
-                    : undefined
-                }
-                className={`rounded-lg border p-2 min-h-0 flex flex-col justify-between transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing touch-none select-none relative ${dragVisual?.uid === orderUid(order) ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
+                    : {}),
+                }}
+                className={`rounded-lg border min-h-0 flex flex-col transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing touch-none select-none relative ${isSidebar ? 'justify-center p-4' : 'justify-between p-2'} ${dragVisual?.uid === orderUid(order) ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
                   isSelected ? 'ring-4 ring-amber-400 border-amber-500 shadow-lg z-10' : ''
                 }`}
               >
@@ -297,7 +343,9 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 <div>
                   <div className="flex items-center justify-between gap-1 mb-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className={`font-mono text-[25px] font-black ${idColor} tracking-tight leading-none`}>
+                      <span
+                        className={`font-mono font-black ${idColor} tracking-tight leading-none ${isSidebar ? 'text-[32px]' : 'text-[25px]'}`}
+                      >
                         {order.id}
                       </span>
                       {order.isRebrew && (
@@ -312,7 +360,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                       )}
                     </div>
                     <span
-                      className={`text-[17px] font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? 'bg-violet-700 text-white' : 'bg-slate-950 text-white'}`}
+                      className={`${isSidebar ? 'text-[20px]' : 'text-[17px]'} font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? 'bg-violet-700 text-white' : 'bg-slate-950 text-white'}`}
                     >
                       {order.cupCount}杯
                     </span>
@@ -320,7 +368,10 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
 
                   {/* Coffee Name - Clean display without cut off */}
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="font-bold text-[15px] leading-snug truncate" title={order.beanName}>
+                    <h3
+                      className={`${isSidebar ? 'text-[18px]' : 'text-[15px]'} font-bold leading-snug truncate`}
+                      title={order.beanName}
+                    >
                       {order.beanName} ×{order.cupCount}
                     </h3>
                     {order.preferredBaristaId && (
