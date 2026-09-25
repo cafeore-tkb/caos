@@ -3,7 +3,7 @@ import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { Barista, BeanCode, OrderTicket, UnassignedOrder } from '../types';
 
-interface HumanCenteredControlViewProps {
+export interface ControlViewBProps {
   baristas: Barista[];
   unassignedOrders: UnassignedOrder[];
   simTimeSec: number;
@@ -38,7 +38,7 @@ const getRemainingSeconds = (barista: Barista, simTimeSec: number) => {
   return Math.round(current.totalDurationSec * barista.coefficient);
 };
 
-export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> = ({
+export const ControlViewB: React.FC<ControlViewBProps> = ({
   baristas,
   unassignedOrders,
   simTimeSec,

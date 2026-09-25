@@ -726,7 +726,7 @@ export default function App() {
     }
 
     setBaristas((prev) => {
-      let updated = prev.map((barista) => {
+      let updated: Barista[] = prev.map((barista): Barista => {
         if (barista.id !== sourceBayId || !decision.interruptCurrent || ticket.status !== 'brewing') return barista;
         const sourceIndex = barista.queue.findIndex((item) => ticketKey(item) === originalKey);
         if (sourceIndex < 0) return barista;
@@ -749,7 +749,7 @@ export default function App() {
       });
 
       if (decision.targetBayId !== null) {
-        updated = updated.map((barista) => {
+        updated = updated.map((barista): Barista => {
           if (barista.id !== decision.targetBayId) return barista;
           const queue = [...barista.queue];
           const canReplaceInterruptedNow =
@@ -1014,7 +1014,7 @@ export default function App() {
       </div>
 
       {/* Ticket Detail Recipe Modal */}
-      {selectedTicket && controlViewMode === 'new' && (
+      {selectedTicket && controlViewMode !== 'current' && (
         <TicketDetailModal
           ticket={selectedTicket}
           currentBayId={

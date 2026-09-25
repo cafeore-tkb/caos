@@ -56,9 +56,6 @@ export const BaysOverviewView: React.FC<BaysOverviewViewProps> = ({ baristas, ne
                         </span>
                       )}
                     </div>
-                    <div className="font-mono text-[11px] font-bold text-slate-500">
-                      ×{barista.coefficient.toFixed(2)}
-                    </div>
                   </div>
                 </div>
                 <div className="mt-2 border-t border-slate-100 pt-2 text-[12px]">
