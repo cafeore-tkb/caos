@@ -50,7 +50,6 @@ export const DripperOrderCard: React.FC<DripperOrderCardProps> = ({
           : 'border-dashed border-slate-300 bg-white text-slate-400'
       } ${isWaiting ? 'w-full flex-1 border-l-4 border-l-blue-500' : 'w-[180px]'} ${onClick ? 'hover:ring-2 hover:ring-blue-400' : ''}`}
     >
-
       {ticket && theme ? (
         <>
           <div className="mt-0.5 flex w-full min-w-0 items-center justify-between gap-1">
