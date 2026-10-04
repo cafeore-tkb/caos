@@ -12,6 +12,7 @@ import { TestPlaySetup } from './components/TestPlaySetup';
 import { TicketDetailModal } from './components/TicketDetailModal';
 import { type NavTab, TopHeader } from './components/TopHeader';
 import { BEAN_NAME_MAP, INITIAL_BARISTAS, INITIAL_BEANS, INITIAL_LEARNING_LOGS } from './data/initialData';
+import { usePosOrders } from './hooks/usePosOrders';
 import type {
   Barista,
   BeanCode,
@@ -33,6 +34,7 @@ import {
   splitIntoDripUnits,
   ticketKey,
 } from './utils/orderQueue';
+import { isPendingPosOrder, POS_API_BASE_URL, posOrderTicketPrefix, posOrderToDripUnits } from './utils/posOrders';
 
 type UndoSnapshot = {
   baristas: Barista[];
@@ -50,6 +52,18 @@ type PanelSnapshot = {
 };
 
 const PANEL_SNAPSHOT_KEY = 'caos-panel-snapshot-v1';
+const ORDER_SOURCE_KEY = 'caos-order-source';
+
+// mock: 画面内で作るモック注文 / pos: cafeore-pos と同じ DB の実注文
+export type OrderSource = 'mock' | 'pos';
+
+const readOrderSource = (): OrderSource => {
+  try {
+    return window.localStorage.getItem(ORDER_SOURCE_KEY) === 'pos' ? 'pos' : 'mock';
+  } catch {
+    return 'mock';
+  }
+};
 
 const readPanelSnapshot = (): PanelSnapshot | null => {
   try {
@@ -216,6 +230,10 @@ export default function App() {
   const [beans, setBeans] = useState<BeanItem[]>(() => standaloneSnapshot?.beans || INITIAL_BEANS);
   const [unassignedOrders, setUnassignedOrders] = useState<UnassignedOrder[]>([]);
   const mockOrderCursor = useRef(0);
+  const [orderSource, setOrderSource] = useState<OrderSource>(readOrderSource);
+  // 取り込み済みの cafeore-pos 注文（UUID）。全件が届くたびに、新しい注文だけを未割当へ足すために使う。
+  const posIngestedOrderIds = useRef(new Set<string>());
+  const [posIngestEpoch, setPosIngestEpoch] = useState(0);
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
   const arrivalsAfterUndoSnapshotRef = useRef<UnassignedOrder[]>([]);
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
@@ -263,6 +281,11 @@ export default function App() {
   // increasing past 24:00 instead of wrapping and scrambling every queue.
   const operationalDayStartMs = testPlaySession ? startOfLocalDay(testPlaySession.startMs) : realDayStartMs;
   const realTimeSec = Math.floor((operationalTime.getTime() - operationalDayStartMs) / 1000);
+
+  const posActive = orderSource === 'pos' && !testPlaySession;
+  const { orders: posOrders, status: posStatus } = usePosOrders(posActive, POS_API_BASE_URL);
+  const baristasRef = useRef(baristas);
+  baristasRef.current = baristas;
 
   const findLiveTicket = (key: string) => {
     for (const bay of baristas) {
@@ -314,7 +337,7 @@ export default function App() {
 
   // Mock the register sending one complete order at a time.
   useEffect(() => {
-    if (testPlaySession) return;
+    if (testPlaySession || orderSource === 'pos') return;
     const incoming = window.setInterval(() => {
       const group = MOCK_ORDER_GROUPS[mockOrderCursor.current];
       if (!group) return;
@@ -326,7 +349,39 @@ export default function App() {
       mockOrderCursor.current += 1;
     }, 4000);
     return () => window.clearInterval(incoming);
-  }, [testPlaySession]);
+  }, [testPlaySession, orderSource]);
+
+  // cafeore-pos の注文を取り込む。届いた一覧のうち、当日の未提供・未準備で新しく届いた注文を未割当へ足し、
+  // POS 側で準備完了・提供済み・削除になった注文は、まだ割り当てていない分だけ未割当から外す。
+  // biome-ignore lint/correctness/useExhaustiveDependencies: posIngestEpoch はリセット後に取り込み直すための合図
+  useEffect(() => {
+    if (!posActive || !posOrders) return;
+    const dayStartMs = startOfLocalDay(Date.now());
+    const pending = posOrders.filter(
+      (order) => isPendingPosOrder(order) && new Date(order.created_at).getTime() >= dayStartMs
+    );
+    const pendingIds = new Set(pending.map((order) => order.id));
+    const ingested = posIngestedOrderIds.current;
+    const incoming = pending
+      .filter((order) => !ingested.has(order.id))
+      .sort((a, b) => a.order_id - b.order_id)
+      .flatMap((order) => {
+        ingested.add(order.id);
+        return posOrderToDripUnits(order, baristasRef.current);
+      });
+    const withdrawnPrefixes = [...ingested].filter((id) => !pendingIds.has(id)).map((id) => posOrderTicketPrefix(id));
+    const isWithdrawn = (order: UnassignedOrder) =>
+      withdrawnPrefixes.some((prefix) => (order.ticketUid || '').startsWith(prefix));
+
+    if (incoming.length > 0 && undoSnapshotRef.current) {
+      arrivalsAfterUndoSnapshotRef.current.push(...incoming);
+    }
+    setUnassignedOrders((prev) => {
+      const remaining = withdrawnPrefixes.length > 0 ? prev.filter((order) => !isWithdrawn(order)) : prev;
+      if (incoming.length === 0 && remaining.length === prev.length) return prev;
+      return [...remaining, ...incoming];
+    });
+  }, [posActive, posOrders, posIngestEpoch]);
 
   useEffect(() => {
     if (testPlayStatus !== 'active' || !isRunning) return;
@@ -863,6 +918,8 @@ export default function App() {
     setBeans(INITIAL_BEANS);
     setUnassignedOrders([]);
     mockOrderCursor.current = 0;
+    posIngestedOrderIds.current.clear();
+    setPosIngestEpoch((epoch) => epoch + 1);
     undoSnapshotRef.current = null;
     arrivalsAfterUndoSnapshotRef.current = [];
     setUndoLabel(null);
@@ -876,6 +933,16 @@ export default function App() {
     historicalOrderCursor.current = 0;
     setIsRunning(true);
     soundManager.playDispatch();
+  };
+
+  const handleSelectOrderSource = (source: OrderSource) => {
+    try {
+      window.localStorage.setItem(ORDER_SOURCE_KEY, source);
+    } catch {
+      // The choice still applies for this session if storage is unavailable.
+    }
+    setOrderSource(source);
+    handleResetData();
   };
 
   const handleStartTestPlay = (startMs: number, durationMinutes: 30 | 60) => {
@@ -1001,6 +1068,9 @@ export default function App() {
           }
           onOpenTestPlay={() => setTestSetupOpen(true)}
           onEndTestPlay={handleEndTestPlay}
+          orderSource={orderSource}
+          posStatus={posStatus}
+          onToggleOrderSource={() => handleSelectOrderSource(orderSource === 'pos' ? 'mock' : 'pos')}
         />
 
         {/* Dynamic Tab Body */}
