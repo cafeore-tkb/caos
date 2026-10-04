@@ -64,7 +64,7 @@ CaOS は cafeore-pos と同じ Postgres（Supabase）の `caos` スキーマを�
    │ supabase-js
    ▼
 [Supabase]
- ・ログイン = Supabase Auth（Google）。書き込めるのは caos.staff に登録したスタッフだけ
+ ・ログイン = Supabase Auth（Google）。書き込めるのは caos.staff に登録したスタッフだけ（ShiftMaker と同じプロジェクト）
  ・権限     = RLS。スタッフは caos.drips を読めるだけで、書き込みは RPC に限る
  ・同期     = Realtime。変わったカードの行だけが届く
  ・操作     = Postgres 関数（caos.assign / unassign / next / merge / rebrew / restore）
@@ -86,8 +86,8 @@ CaOS は cafeore-pos と同じ Postgres（Supabase）の `caos` スキーマを�
 本番の Supabase プロジェクトで、管理者が 1 度だけ行います。
 
 1. `supabase/migrations/` の SQL を順に流します（SQL Editor か `supabase db push`）。`public` スキーマの表から `anon` / `authenticated` の権限を外すので、POS の API（Go）は今までどおりオーナーのロールで接続していることを確かめてから流してください。
-2. Data API の Exposed schemas に `caos` を足し、`public` は外します（POS の表を匿名キーから見えなくするため）。
-3. Authentication の Providers で Google を有効にし、Redirect URLs に公開版（`https://cafeore-tkb.github.io/digital-master-sheet-pages/`）と開発用（`http://localhost:3000/`）を足します。
+2. Data API の Exposed schemas に `caos` を足します。ShiftMaker の `shift` は残し、`public`・`graphql_public` は外したままにします（POS の表を匿名キーから見えなくするため）。
+3. Authentication → URL Configuration の Redirect URLs に、公開版（`https://cafeore-tkb.github.io/digital-master-sheet-pages/`）と開発用（`http://localhost:3000/`）を足します。Google ログインは ShiftMaker で有効にしてあります。スタッフかどうかは Google でログインした人だけで判定するので、メール（パスワード）のログインは ShiftMaker の README どおり無効にしておきます。
 4. 使うスタッフの Google アカウントを登録します。
 
    ```sql

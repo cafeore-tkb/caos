@@ -70,10 +70,14 @@ create index drips_created_at on caos.drips (created_at);
 alter table caos.staff enable row level security;
 alter table caos.drips enable row level security;
 
+-- Google でログインしたスタッフか。メール・パスワードや匿名のログインは認めない
+-- （ShiftMaker の shift.me() と同じ判定。app_metadata は本人が書き換えられない）。
 create function caos.is_staff() returns boolean
 language sql stable security definer set search_path = ''
 as $$
-  select exists (select 1 from caos.staff where email = lower(auth.jwt() ->> 'email'))
+  select not coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)
+     and coalesce(auth.jwt() -> 'app_metadata' -> 'providers', '[]'::jsonb) ? 'google'
+     and exists (select 1 from caos.staff where email = lower(auth.jwt() ->> 'email'))
 $$;
 
 create function caos.require_staff() returns void
