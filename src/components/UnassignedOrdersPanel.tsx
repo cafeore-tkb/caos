@@ -1,6 +1,7 @@
 import { ClipboardList, Sparkles } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { UnassignedOrder } from '../types';
 import { MENU_PRESENTATION } from '../utils/menuPresentation';
 
@@ -59,6 +60,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
   const suppressNextClick = useRef(false);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const padBeforePress = useRef<string | null>(null);
+  const dragOriginRect = useRef<DOMRect | null>(null);
   const [openPadUid, setOpenPadUid] = useState<string | null>(null);
   const [hoveredBay, setHoveredBay] = useState<number | null>(null);
   const [dragVisual, setDragVisual] = useState<{ uid: string; x: number; y: number } | null>(null);
@@ -187,9 +189,14 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 openOrder.preferredBaristaId === order.preferredBaristaId
             );
             const isSelected = selectedOrderId === order.id;
-            // While dragging, cancel the card's offset on the pad so the finger can slide onto 1-6.
+            const isDragging = dragVisual?.uid === orderUid(order);
+            // The sidebar scrolls and clips its cards, so there the dragged card floats as a
+            // fixed copy above the page while the original (and its 1-6 pad) stays put.
+            const isFloatingDrag = isDragging && isSidebar;
+            const isInlineDrag = isDragging && !isSidebar;
+            // While dragging inline, cancel the card's offset on the pad so the finger can slide onto 1-6.
             const padStyle =
-              dragVisual?.uid === orderUid(order)
+              isInlineDrag && dragVisual
                 ? { transform: `translate3d(${-dragVisual.x}px, ${-dragVisual.y}px, 0)` }
                 : undefined;
             const cardStyle = order.isRebrew
@@ -206,6 +213,49 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   : order.totalItemsInOrder && order.totalItemsInOrder > 1
                     ? 'text-slate-950'
                     : 'text-slate-600';
+            const cardBody = (
+              <>
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span
+                      className={`font-mono font-black ${idColor} tracking-tight leading-none ${isSidebar ? 'text-[32px]' : 'text-[25px]'}`}
+                    >
+                      {order.id}
+                    </span>
+                    {order.isRebrew && (
+                      <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                        入れ直し
+                      </span>
+                    )}
+                    {order.totalItemsInOrder && order.totalItemsInOrder > 1 && (
+                      <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-mono font-black text-slate-700 whitespace-nowrap">
+                        {order.itemIndex}/{order.totalItemsInOrder}・計{order.totalOrderCups}杯
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`${isSidebar ? 'text-[20px]' : 'text-[17px]'} font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? (order.cupCount === 1 ? 'border border-violet-700 bg-white text-violet-700' : 'border border-violet-700 bg-violet-700 text-white') : order.cupCount === 1 ? 'border border-black bg-white text-black' : 'border border-slate-950 bg-slate-950 text-white'}`}
+                  >
+                    {order.cupCount}杯
+                  </span>
+                </div>
+
+                {/* Coffee Name - Clean display without cut off */}
+                <div className="flex items-center justify-between gap-2">
+                  <h3
+                    className={`${isSidebar ? 'text-[18px]' : 'text-[15px]'} font-bold leading-snug truncate`}
+                    title={order.beanName}
+                  >
+                    {order.beanName} ×{order.cupCount}
+                  </h3>
+                  {order.preferredBaristaId && (
+                    <span className="text-[12px] font-black text-violet-700 whitespace-nowrap">
+                      指名 {order.preferredBaristaId}
+                    </span>
+                  )}
+                </div>
+              </>
+            );
 
             return (
               <div
@@ -238,6 +288,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   if (event.pointerType === 'mouse' && event.button !== 0) return;
                   event.currentTarget.setPointerCapture(event.pointerId);
                   dragStart.current = { x: event.clientX, y: event.clientY };
+                  dragOriginRect.current = event.currentTarget.getBoundingClientRect();
                   padBeforePress.current = openPadUid;
                   setOpenPadUid(orderUid(order));
                   setHoveredBay(null);
@@ -273,15 +324,15 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 }}
                 style={{
                   ...(isSidebar ? { gridColumn, gridRow } : {}),
-                  ...(dragVisual?.uid === orderUid(order)
+                  ...(isInlineDrag && dragVisual
                     ? { transform: `translate3d(${dragVisual.x}px, ${dragVisual.y}px, 0)` }
                     : {}),
                 }}
-                className={`rounded-lg border min-h-0 flex flex-col transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing ${isSidebar && openPadUid !== orderUid(order) ? 'touch-pan-y' : 'touch-none'} select-none relative ${isSidebar ? 'justify-center p-4' : 'justify-between p-2'} ${dragVisual?.uid === orderUid(order) ? 'overflow-visible z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
+                className={`rounded-lg border min-h-0 flex flex-col transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing ${isSidebar && openPadUid !== orderUid(order) ? 'touch-pan-y' : 'touch-none'} select-none relative ${isSidebar ? 'justify-center p-4' : 'justify-between p-2'} ${isInlineDrag ? 'overflow-visible z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
                   isSelected ? 'ring-4 ring-amber-400 border-amber-500 shadow-lg z-10' : ''
                 }`}
               >
-                {dragVisual?.uid === orderUid(order) && hoveredBay && (
+                {isInlineDrag && hoveredBay && (
                   <div className="absolute right-1 top-1 z-[130] rounded-full bg-blue-700 px-2 py-1 font-mono text-[12px] font-black text-white shadow-md pointer-events-none">
                     → {hoveredBay}
                   </div>
@@ -355,47 +406,30 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 )}
 
                 {/* Top row: Big ID and Cup/Badge tag */}
-                <div>
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span
-                        className={`font-mono font-black ${idColor} tracking-tight leading-none ${isSidebar ? 'text-[32px]' : 'text-[25px]'}`}
-                      >
-                        {order.id}
-                      </span>
-                      {order.isRebrew && (
-                        <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
-                          入れ直し
-                        </span>
-                      )}
-                      {order.totalItemsInOrder && order.totalItemsInOrder > 1 && (
-                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-mono font-black text-slate-700 whitespace-nowrap">
-                          {order.itemIndex}/{order.totalItemsInOrder}・計{order.totalOrderCups}杯
-                        </span>
-                      )}
-                    </div>
-                    <span
-                      className={`${isSidebar ? 'text-[20px]' : 'text-[17px]'} font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? (order.cupCount === 1 ? 'border border-violet-700 bg-white text-violet-700' : 'border border-violet-700 bg-violet-700 text-white') : order.cupCount === 1 ? 'border border-black bg-white text-black' : 'border border-slate-950 bg-slate-950 text-white'}`}
+                <div className={isFloatingDrag ? 'opacity-30' : undefined}>{cardBody}</div>
+                {isFloatingDrag &&
+                  dragVisual &&
+                  dragOriginRect.current &&
+                  createPortal(
+                    <div
+                      aria-hidden="true"
+                      className={`pointer-events-none fixed z-[1000] flex scale-[1.03] flex-col justify-center rounded-lg border p-4 opacity-90 shadow-2xl ring-2 ring-blue-500 ${cardStyle}`}
+                      style={{
+                        left: dragOriginRect.current.left + dragVisual.x,
+                        top: dragOriginRect.current.top + dragVisual.y,
+                        width: dragOriginRect.current.width,
+                        height: dragOriginRect.current.height,
+                      }}
                     >
-                      {order.cupCount}杯
-                    </span>
-                  </div>
-
-                  {/* Coffee Name - Clean display without cut off */}
-                  <div className="flex items-center justify-between gap-2">
-                    <h3
-                      className={`${isSidebar ? 'text-[18px]' : 'text-[15px]'} font-bold leading-snug truncate`}
-                      title={order.beanName}
-                    >
-                      {order.beanName} ×{order.cupCount}
-                    </h3>
-                    {order.preferredBaristaId && (
-                      <span className="text-[12px] font-black text-violet-700 whitespace-nowrap">
-                        指名 {order.preferredBaristaId}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                      {hoveredBay && (
+                        <div className="absolute right-1 top-1 rounded-full bg-blue-700 px-2 py-1 font-mono text-[12px] font-black text-white shadow-md">
+                          → {hoveredBay}
+                        </div>
+                      )}
+                      {cardBody}
+                    </div>,
+                    document.body
+                  )}
               </div>
             );
           })}
