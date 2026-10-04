@@ -45,6 +45,7 @@ export interface OrderTicket {
   rebrewOfTicketUid?: string;
   isInterrupted?: boolean; // original drip stopped because a remake was required
   imminent?: boolean; // e.g. "残 0:07" or "まもなく完了"
+  queuePos?: number; // 待機列の並び順（DB の caos.drips.queue_pos）
   recipe?: {
     grindSize: string;
     waterTemp: string;

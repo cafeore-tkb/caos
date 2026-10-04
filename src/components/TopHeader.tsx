@@ -6,6 +6,7 @@ import {
   Coffee,
   Database,
   LayoutGrid,
+  LogIn,
   Pause,
   Play,
   RotateCcw,
@@ -14,7 +15,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import type React from 'react';
-import type { PosConnectionStatus } from '../hooks/usePosOrders';
+import type { LiveStatus } from '../live/useLiveDrips';
 import type { ControlViewMode } from './ControlWorkspace';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
@@ -43,11 +44,17 @@ interface TopHeaderProps {
   testProgressLabel: string | null;
   onOpenTestPlay: () => void;
   onEndTestPlay: () => void;
-  posStatus: PosConnectionStatus;
+  liveStatus: LiveStatus;
+  liveEmail?: string;
+  onSignIn: () => void;
+  onSignOut: () => void;
 }
 
-const POS_STATUS_LABEL: Record<PosConnectionStatus, string> = {
+const LIVE_STATUS_LABEL: Record<LiveStatus, string> = {
   off: '実データテスト中は停止',
+  unconfigured: 'Supabase 未設定',
+  'signed-out': '未ログイン',
+  'not-staff': 'スタッフ未登録',
   connecting: '接続中',
   open: '接続済み',
   reconnecting: '再接続中',
@@ -77,7 +84,10 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   testProgressLabel,
   onOpenTestPlay,
   onEndTestPlay,
-  posStatus,
+  liveStatus,
+  liveEmail,
+  onSignIn,
+  onSignOut,
 }) => {
   const navItems = [
     { id: 'control' as const, label: 'CaOS', icon: null },
@@ -217,17 +227,35 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Right side: only persistent operational controls */}
       <div className="flex items-center gap-2">
-        <div
-          role="status"
-          aria-label={`cafeore-pos ${POS_STATUS_LABEL[posStatus]}`}
-          title={`cafeore-posの注文: ${POS_STATUS_LABEL[posStatus]}`}
-          className={`min-h-[44px] flex items-center gap-1 rounded-lg border px-2 text-xs font-black ${posStatus === 'open' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : posStatus === 'off' ? 'border-slate-200 bg-slate-100 text-slate-400' : 'border-amber-300 bg-amber-50 text-amber-800'}`}
-        >
-          <Database className="h-4 w-4" />
-          <span
-            className={`h-2 w-2 rounded-full ${posStatus === 'open' ? 'bg-emerald-500' : posStatus === 'off' ? 'bg-slate-300' : 'bg-amber-400'}`}
-          />
-        </div>
+        {liveStatus === 'signed-out' ? (
+          <button
+            type="button"
+            onClick={onSignIn}
+            className="min-h-[44px] flex items-center gap-1.5 rounded-lg border border-emerald-700 bg-emerald-700 px-3 text-xs font-black text-white shadow-xs touch-manipulation"
+            title="cafeore-pos と同じ DB に Google アカウントでログイン"
+          >
+            <LogIn className="h-4 w-4" />
+            <span>ログイン</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={liveEmail ? onSignOut : undefined}
+            disabled={!liveEmail}
+            aria-label={`cafeore-pos ${LIVE_STATUS_LABEL[liveStatus]}`}
+            title={`cafeore-pos の DB: ${LIVE_STATUS_LABEL[liveStatus]}${liveEmail ? `（${liveEmail}）。押すとログアウト` : ''}`}
+            className={`min-h-[44px] flex items-center gap-1 rounded-lg border px-2 text-xs font-black touch-manipulation ${liveStatus === 'open' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : liveStatus === 'off' || liveStatus === 'unconfigured' ? 'border-slate-200 bg-slate-100 text-slate-400' : liveStatus === 'not-staff' ? 'border-red-300 bg-red-50 text-red-700' : 'border-amber-300 bg-amber-50 text-amber-800'}`}
+          >
+            <Database className="h-4 w-4" />
+            {liveStatus === 'not-staff' ? (
+              <span>未登録</span>
+            ) : (
+              <span
+                className={`h-2 w-2 rounded-full ${liveStatus === 'open' ? 'bg-emerald-500' : liveStatus === 'off' || liveStatus === 'unconfigured' ? 'bg-slate-300' : 'bg-amber-400'}`}
+              />
+            )}
+          </button>
+        )}
         <button
           type="button"
           onClick={testPlaying ? onEndTestPlay : onOpenTestPlay}
