@@ -4,6 +4,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Coffee,
+  Database,
   LayoutGrid,
   Pause,
   Play,
@@ -13,6 +14,7 @@ import {
   VolumeX,
 } from 'lucide-react';
 import type React from 'react';
+import type { PosConnectionStatus } from '../hooks/usePosOrders';
 import type { ControlViewMode } from './ControlWorkspace';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
@@ -41,7 +43,15 @@ interface TopHeaderProps {
   testProgressLabel: string | null;
   onOpenTestPlay: () => void;
   onEndTestPlay: () => void;
+  posStatus: PosConnectionStatus;
 }
+
+const POS_STATUS_LABEL: Record<PosConnectionStatus, string> = {
+  off: '実データテスト中は停止',
+  connecting: '接続中',
+  open: '接続済み',
+  reconnecting: '再接続中',
+};
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
   activeTab,
@@ -67,6 +77,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   testProgressLabel,
   onOpenTestPlay,
   onEndTestPlay,
+  posStatus,
 }) => {
   const navItems = [
     { id: 'control' as const, label: 'CaOS', icon: null },
@@ -205,7 +216,18 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
       </div>
 
       {/* Right side: only persistent operational controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
+        <div
+          role="status"
+          aria-label={`cafeore-pos ${POS_STATUS_LABEL[posStatus]}`}
+          title={`cafeore-posの注文: ${POS_STATUS_LABEL[posStatus]}`}
+          className={`min-h-[44px] flex items-center gap-1 rounded-lg border px-2 text-xs font-black ${posStatus === 'open' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : posStatus === 'off' ? 'border-slate-200 bg-slate-100 text-slate-400' : 'border-amber-300 bg-amber-50 text-amber-800'}`}
+        >
+          <Database className="h-4 w-4" />
+          <span
+            className={`h-2 w-2 rounded-full ${posStatus === 'open' ? 'bg-emerald-500' : posStatus === 'off' ? 'bg-slate-300' : 'bg-amber-400'}`}
+          />
+        </div>
         <button
           type="button"
           onClick={testPlaying ? onEndTestPlay : onOpenTestPlay}
