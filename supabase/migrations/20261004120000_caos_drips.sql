@@ -529,6 +529,10 @@ to authenticated;
 
 -- ---------------------------------------------------------------------------
 -- トリガー（POS の表から）
+--
+-- POS の注文の書き込みの中で動くので、ここで失敗すると POS の注文の登録・編集・準備完了まで
+-- 失敗してしまう。CaOS の処理が失敗しても POS は必ず通るよう、警告を残して握りつぶす
+-- （カードは次にその注文が変わったときに作り直される）。
 -- ---------------------------------------------------------------------------
 
 -- 明細が変わったら、トランザクションの終わりでカードを作り直す。
@@ -539,6 +543,9 @@ language plpgsql security definer set search_path = ''
 as $$
 begin
   perform caos.sync_order(coalesce(new.order_id, old.order_id));
+  return null;
+exception when others then
+  raise warning 'caos.sync_order failed: % (%)', sqlerrm, sqlstate;
   return null;
 end
 $$;
@@ -555,6 +562,9 @@ as $$
 begin
   perform caos.sync_order(old.id);
   return null;
+exception when others then
+  raise warning 'caos.sync_order failed: % (%)', sqlerrm, sqlstate;
+  return null;
 end
 $$;
 
@@ -568,6 +578,9 @@ language plpgsql security definer set search_path = ''
 as $$
 begin
   perform caos.finish_order(new.id);
+  return null;
+exception when others then
+  raise warning 'caos.finish_order failed: % (%)', sqlerrm, sqlstate;
   return null;
 end
 $$;
