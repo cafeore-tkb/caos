@@ -50,6 +50,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   const isNamed = Boolean(ticket.preferredBaristaId);
   const ticketKey = ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`;
   const isActionOpen = ticket.status === 'scheduled' && actionTicketKey === ticketKey;
+  // While dragging, cancel the card's offset on the pad so the finger can slide onto 1-6.
+  const padDragStyle = dragOffset ? { transform: `translate3d(${-dragOffset.x}px, ${-dragOffset.y}px, 0)` } : {};
 
   useEffect(() => {
     if (!isActionOpen) return;
@@ -61,8 +63,17 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   }, [isActionOpen, onCloseAction]);
 
   const bayAtPoint = (clientX: number, clientY: number) => {
-    const lane = document
-      .elementsFromPoint(clientX, clientY)
+    const elements = document.elementsFromPoint(clientX, clientY);
+    // A 1-6 pad button decides on its own: releasing on this card's own (disabled) number
+    // must not fall through to the lane underneath the pad.
+    const padButton = elements.find(
+      (element): element is HTMLElement => element instanceof HTMLElement && element.matches('button[data-bay-target]')
+    );
+    if (padButton) {
+      const bayId = Number(padButton.dataset.bayTarget);
+      return bayId >= 1 && bayId <= 6 && bayId !== currentBayId ? bayId : null;
+    }
+    const lane = elements
       .map((element) => element.closest<HTMLElement>('[data-bay-target]'))
       .find((element) => {
         const bayId = Number(element?.dataset.bayTarget);
@@ -97,6 +108,8 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         onOpenDetail(ticket);
       }}
       onPointerDown={(event) => {
+        // A touch drag ends without a click, so drop any suppression left by it.
+        suppressNextClick.current = false;
         if (ticket.status !== 'scheduled') return;
         if ((event.target as HTMLElement).closest('button')) return;
         if (event.pointerType === 'mouse' && event.button !== 0) return;
@@ -133,7 +146,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         ...(widthPx ? { width: `${widthPx}px` } : {}),
         ...(dragOffset ? { transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)` } : {}),
       }}
-      className={`relative group h-full ${dragOffset ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : isActionOpen ? 'overflow-visible z-[80]' : 'overflow-hidden'} shrink-0 min-w-[135px] rounded-lg border-2 border-l-[5px] ${leftBorderColor} px-2 py-1.5 transition-[box-shadow,border-color] select-none flex flex-col justify-center ${ticket.status === 'scheduled' ? 'cursor-grab active:cursor-grabbing touch-none' : 'cursor-default touch-manipulation'} ${
+      className={`relative group h-full ${dragOffset ? `${isActionOpen ? 'overflow-visible' : 'overflow-hidden'} z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500` : isActionOpen ? 'overflow-visible z-[80]' : 'overflow-hidden'} shrink-0 min-w-[135px] rounded-lg border-2 border-l-[5px] ${leftBorderColor} px-2 py-1.5 transition-[box-shadow,border-color] select-none flex flex-col justify-center ${ticket.status === 'scheduled' ? 'cursor-grab active:cursor-grabbing touch-none' : 'cursor-default touch-manipulation'} ${
         isRebrew
           ? `bg-red-50 border-red-300 text-slate-900 shadow-xs ${isCompleted ? 'opacity-55 hover:opacity-75' : 'hover:border-red-500 hover:shadow-md'}`
           : isCompleted
@@ -159,6 +172,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
               <button
                 key={bayId}
                 type="button"
+                data-bay-target={bayId}
                 disabled={disabled}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -166,7 +180,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                   onCloseAction();
                 }}
                 className="absolute -top-[38px] z-[90] h-[34px] rounded-md border bg-white text-[17px] font-mono font-black shadow-lg disabled:bg-slate-200 disabled:text-slate-400 touch-none"
-                style={{ left: `${index * 33.333}%`, width: '33.333%' }}
+                style={{ left: `${index * 33.333}%`, width: '33.333%', ...padDragStyle }}
               >
                 {bayId}
               </button>
@@ -179,6 +193,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
               <button
                 key={bayId}
                 type="button"
+                data-bay-target={bayId}
                 disabled={disabled}
                 onClick={(event) => {
                   event.stopPropagation();
@@ -186,7 +201,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
                   onCloseAction();
                 }}
                 className="absolute -bottom-[38px] z-[90] h-[34px] rounded-md border bg-white text-[17px] font-mono font-black shadow-lg disabled:bg-slate-200 disabled:text-slate-400 touch-none"
-                style={{ left: `${index * 33.333}%`, width: '33.333%' }}
+                style={{ left: `${index * 33.333}%`, width: '33.333%', ...padDragStyle }}
               >
                 {bayId}
               </button>

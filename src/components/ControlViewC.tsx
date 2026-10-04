@@ -2,6 +2,7 @@ import { ArrowRightCircle, CircleDot, RotateCcw } from 'lucide-react';
 import type React from 'react';
 import { useMemo } from 'react';
 import type { Barista } from '../types';
+import { queueWaitSeconds } from '../utils/orderQueue';
 import type { ControlViewBProps } from './ControlViewB';
 import { DripperOrderCard } from './DripperOrderCard';
 import { UnassignedOrdersPanel } from './UnassignedOrdersPanel';
@@ -56,12 +57,12 @@ export const ControlViewC: React.FC<ControlViewCProps> = ({
       sortedBaristas
         .map((barista) => ({
           bayNumber: barista.bayNumber,
-          seconds: remainingSeconds(barista, simTimeSec),
+          seconds: queueWaitSeconds(barista.queue, barista.coefficient),
           isStandby: barista.queue.length === 0,
         }))
         .sort((left, right) => left.seconds - right.seconds || left.bayNumber - right.bayNumber)
         .slice(0, 3),
-    [simTimeSec, sortedBaristas]
+    [sortedBaristas]
   );
 
   return (
@@ -146,7 +147,7 @@ export const ControlViewC: React.FC<ControlViewCProps> = ({
                           queuePosition={index + 1}
                           emptyLabel="待ちへ割当"
                           onClick={() => {
-                            onSelectOrder(ticket.id);
+                            if (selectedOrderId !== ticket.id) onSelectOrder(ticket.id);
                             onOpenTicketDetail(ticket);
                           }}
                         />
