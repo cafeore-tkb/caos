@@ -43,7 +43,7 @@
 
 ## 主な挙動
 
-- 初期状態は全ドリッパーが空で、cafeore-pos で受けた注文が届いた順に未割当へ追加されます。
+- cafeore-pos で受けた注文は、抽出カードになって未割当に並びます。割当や抽出の状態は DB に保存され、どの iPad で開いても同じ盤面になります。
 - 未割当注文と各ドリッパーの待機列は、指名注文を含めて原則オーダー番号順です。
 - 指名注文は指定されたドリッパーにのみ割り当てられます。
 - 1回の抽出は最大2杯です。3杯以上の注文は2杯以下のカードへ自動分割します。
@@ -57,14 +57,54 @@
 
 ## cafeore-pos 連携
 
-- 注文は常に cafeore-pos と同じDBから取り込みます（画面内でモック注文を作る機能はありません）。ヘッダーのDBアイコンの点が接続状態で、緑は接続済み、黄は接続中・再接続中です。
-- 実データテスト中はDBからの取り込みを止め、テストの注文だけで動かします。終了後の実績表示中も止めたままで、リセットするとDBの注文に戻ります（未準備の注文を取り込み直します）。
-- 注文は cafeore-pos のAPI（`/api/ws/orders`）からWebSocketで受け取ります。当日の注文のうち、準備完了・提供済みでないものを未割当に追加し、POS側で準備完了・提供済み・削除になった注文は、未割当に残っている分だけ外します。
-- 読み取り専用です。ドリッパーへの割当や `次へ` はCaOSの画面内だけの状態で、DBには書き込みません。
-- メニュー名から豆を判定します（優勝ブレンド→チャンプ、俺ブレ、ケニア、タンザニア、ブラジル、アイスコーヒー→氷、アイスオレ→牛、それ以外のホット→★SP）。アイスミルクとグッズは除外します。
-- POSの指名は、`1`〜`6` の番号か現在のドリッパー名に一致したときだけその担当者に固定し、一致しないときはカードに「（指名:名前）」と表示します。
-- 開発サーバー（`npm run dev`）では Vite の中継（`/cafeore-pos-api`）を通して本番APIにつなぎます。ローカルのAPIを使うときは `VITE_CAFEORE_API_BASE_URL=http://localhost:8080` を指定します。
-- 公開版はブラウザから本番APIへ直接つなぐため、APIの `FRONTEND_ORIGINS`（infraリポジトリの `gcp/cloud_run.tf`）に `https://cafeore-tkb.github.io` が入っている必要があります。入っていないとWebSocketの接続が403で拒否され、DBアイコンの点が黄色（再接続中）のままになります。
+CaOS は cafeore-pos と同じ Postgres（Supabase）の `caos` スキーマを、supabase-js で直接読み書きします。間に CaOS 専用のサーバーやプロキシは置きません。
+
+```
+[CaOS の画面（iPad 数台）]
+   │ supabase-js
+   ▼
+[Supabase]
+ ・ログイン = Supabase Auth（Google）。書き込めるのは caos.staff に登録したスタッフだけ
+ ・権限     = RLS。スタッフは caos.drips を読めるだけで、書き込みは RPC に限る
+ ・同期     = Realtime。変わったカードの行だけが届く
+ ・操作     = Postgres 関数（caos.assign / unassign / next / merge / rebrew / restore）
+ └ 中身は POS と同じ Postgres（caos スキーマ。POS の表は public スキーマ）
+```
+
+- 抽出カード（1 回のドリップ、最大 2 杯）を `caos.drips` に 1 枚 1 行で持ちます。保存するのは担当・状態・開始/終了時刻などの事実だけで、待機カードの予定時刻は画面で計算します。
+- 注文が入ると、`public.order_menus` のトリガーがカードを作ります（2 杯ずつ分割。アイスミルクとグッズは除く）。注文を編集・削除すると、未割当のカードだけを作り直します。
+- `次へ` で注文のカードが全部終わると、その注文に `ready_at` を付けます（POS の準備完了）。逆に POS で準備完了・提供済みにすると、その注文のカードを抽出終了にし、抽出中だったドリッパーは次のカードを始めます。CaOS が 1 台も開いていなくても DB の中で動きます。
+- 割当・移動・未割当へ戻す・統合・入れ直し・`次へ`・`1つ戻す` は、どれも RPC を 1 回呼ぶだけです。サーバー側で順に処理するので、複数の iPad で同時に操作しても上書きし合いません。`1つ戻す` は、ほかの端末がその後にカードを動かしていたら断ります。
+- 実データテスト中は DB を使わず、テストの注文だけで手元の盤面を動かします。終了後の実績表示中も DB は使わず、リセットすると DB の盤面に戻ります。
+- ヘッダーの DB アイコンが状態を表します。緑は接続済み、黄は接続中・再接続中、赤の「未登録」はログインしたアカウントが `caos.staff` に無いとき、灰色は実データテスト中か Supabase 未設定です。未ログインのときは「ログイン」ボタンになります。
+- メニュー名から豆を判定します（優勝ブレンド→チャンプ、俺ブレ、ケニア、タンザニア、ブラジル、アイスコーヒー→氷、アイスオレ→牛、それ以外のホット→★SP）。
+- POS の指名は、`1`〜`6` の番号か現在のドリッパー名に一致したときだけその担当者に固定し、一致しないときはカードに「（指名:名前）」と表示します。
+- POS の画面へは、cafeore-pos の API が DB の `orders_changed` 通知を受けて配り直します（cafeore-pos の `api/sql/2026-10_orders_notify.sql`）。CaOS が付けた `ready_at` もこれで POS に届きます。
+
+### Supabase のセットアップ
+
+本番の Supabase プロジェクトで、管理者が 1 度だけ行います。
+
+1. `supabase/migrations/` の SQL を順に流します（SQL Editor か `supabase db push`）。`public` スキーマの表から `anon` / `authenticated` の権限を外すので、POS の API（Go）は今までどおりオーナーのロールで接続していることを確かめてから流してください。
+2. Data API の Exposed schemas に `caos` を足し、`public` は外します（POS の表を匿名キーから見えなくするため）。
+3. Authentication の Providers で Google を有効にし、Redirect URLs に公開版（`https://cafeore-tkb.github.io/digital-master-sheet-pages/`）と開発用（`http://localhost:3000/`）を足します。
+4. 使うスタッフの Google アカウントを登録します。
+
+   ```sql
+   insert into caos.staff (email) values ('someone@example.com');
+   ```
+
+5. CaOS のビルドに Project URL と anon key を渡します（`.env.local` か、GitHub Actions の Variables の `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`）。anon key は公開してよい鍵です。
+
+マイグレーションは、共有 DB のスキーマ用リポジトリができたらそちらへ移します。
+
+### SQL のテスト
+
+ローカルの Postgres に使い捨てのデータベースを作り、マイグレーションを流して運用の流れ（注文 → カード作成 → 割当 → 次へ → 準備完了、POS 側の準備完了、統合、入れ直し、1つ戻す、権限）を確かめます。
+
+```bash
+TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres bash scripts/test-supabase.sh
+```
 
 ## 実データ・テストプレイ
 
@@ -101,7 +141,7 @@ npm install
 npm run dev
 ```
 
-開発サーバーは `http://localhost:3000` で起動します。
+開発サーバーは `http://localhost:3000` で起動します。DB につなぐには `.env.local` に Supabase の接続先を書きます（`.env.example` を参照）。本番の DB を指すと実際の注文を操作することになるので、開発用の Supabase プロジェクトを使ってください。
 
 ```bash
 npm run lint
