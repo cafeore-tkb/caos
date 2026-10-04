@@ -14,7 +14,7 @@ end $$;
 -- スタッフとして RPC を呼ぶ
 create function pg_temp.as_staff() returns void language plpgsql as $$
 begin
-  perform set_config('request.jwt.claims', '{"email":"Staff@Example.com"}', true);
+  perform set_config('request.jwt.claims', '{"email":"Staff@Example.com","app_metadata":{"providers":["google"]}}', true);
   perform set_config('role', 'authenticated', true);
 end $$;
 
@@ -47,12 +47,23 @@ commit;
 
 -- スタッフ以外は RPC を呼べない
 do $$ begin
-  perform set_config('request.jwt.claims', '{"email":"guest@example.com"}', true);
+  perform set_config('request.jwt.claims', '{"email":"guest@example.com","app_metadata":{"providers":["google"]}}', true);
   perform set_config('role', 'authenticated', true);
   begin
     perform caos.next(1::smallint);
     raise exception 'NG: スタッフ以外が呼べてしまう';
   exception when insufficient_privilege then raise notice 'OK: スタッフ以外は RPC を呼べない';
+  end;
+end $$;
+
+-- Google 以外（メール・パスワード）でログインした人は、スタッフのアドレスでも認めない
+do $$ begin
+  perform set_config('request.jwt.claims', '{"email":"staff@example.com","app_metadata":{"providers":["email"]}}', true);
+  perform set_config('role', 'authenticated', true);
+  begin
+    perform caos.next(1::smallint);
+    raise exception 'NG: メールのログインで呼べてしまう';
+  exception when insufficient_privilege then raise notice 'OK: Google 以外のログインは RPC を呼べない';
   end;
 end $$;
 
@@ -124,7 +135,7 @@ select pg_temp.check((select ready_at is null from orders where order_id = 1), '
 
 -- 古い結果での 1つ戻すは断る
 do $$ begin
-  perform set_config('request.jwt.claims', '{"email":"staff@example.com"}', true);
+  perform set_config('request.jwt.claims', '{"email":"staff@example.com","app_metadata":{"providers":["google"]}}', true);
   perform set_config('role', 'authenticated', true);
   begin
     perform caos.restore('[]', jsonb_build_array(jsonb_build_object('id', (select id from caos.drips where dripper = 2), 'updated_at', '2000-01-01T00:00:00Z')), '{}');
@@ -179,13 +190,13 @@ do $$ begin
   exception when insufficient_privilege then raise notice 'OK: anon は caos.drips を読めない'; end;
 end $$;
 do $$ begin
-  perform set_config('request.jwt.claims', '{"email":"staff@example.com"}', true);
+  perform set_config('request.jwt.claims', '{"email":"staff@example.com","app_metadata":{"providers":["google"]}}', true);
   perform set_config('role', 'authenticated', true);
   if (select count(*) from caos.drips) = 0 then raise exception 'NG: スタッフが読めない'; end if;
   raise notice 'OK: スタッフは caos.drips を読める';
   begin update caos.drips set cups = 1; raise exception 'NG: スタッフが表を直接書ける';
   exception when insufficient_privilege then raise notice 'OK: 表は直接書き換えられない（RPC だけ）'; end;
-  perform set_config('request.jwt.claims', '{"email":"guest@example.com"}', true);
+  perform set_config('request.jwt.claims', '{"email":"guest@example.com","app_metadata":{"providers":["google"]}}', true);
   if (select count(*) from caos.drips) <> 0 then raise exception 'NG: スタッフ以外が読める'; end if;
   raise notice 'OK: スタッフ以外には 0 件に見える（RLS）';
 end $$;
