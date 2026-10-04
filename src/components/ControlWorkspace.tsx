@@ -47,14 +47,10 @@ export const ControlWorkspace: React.FC<ControlWorkspaceProps> = ({
   onAssignToBay,
   onMergeOrders,
 }) => {
-  const originalBaristas = baristas.map((barista) =>
-    barista.id === 1 && barista.name === 'なかにしゆうな' ? { ...barista, name: '鈴木' } : barista
-  );
-
   if (mode === 'new') {
     return (
       <ControlViewB
-        baristas={originalBaristas}
+        baristas={baristas}
         unassignedOrders={unassignedOrders}
         simTimeSec={currentTimeSec}
         selectedOrderId={selectedOrderId}
@@ -91,7 +87,7 @@ export const ControlWorkspace: React.FC<ControlWorkspaceProps> = ({
 
   return (
     <ControlViewA
-      baristas={originalBaristas}
+      baristas={baristas}
       unassignedOrders={unassignedOrders}
       nextAvailable={nextAvailable}
       selectedOrderId={selectedOrderId}
