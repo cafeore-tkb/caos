@@ -14,7 +14,6 @@ import {
   VolumeX,
 } from 'lucide-react';
 import type React from 'react';
-import type { OrderSource } from '../App';
 import type { PosConnectionStatus } from '../hooks/usePosOrders';
 import type { ControlViewMode } from './ControlWorkspace';
 
@@ -44,13 +43,11 @@ interface TopHeaderProps {
   testProgressLabel: string | null;
   onOpenTestPlay: () => void;
   onEndTestPlay: () => void;
-  orderSource: OrderSource;
   posStatus: PosConnectionStatus;
-  onToggleOrderSource: () => void;
 }
 
 const POS_STATUS_LABEL: Record<PosConnectionStatus, string> = {
-  off: '未接続',
+  off: '実データテスト中は停止',
   connecting: '接続中',
   open: '接続済み',
   reconnecting: '再接続中',
@@ -80,11 +77,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   testProgressLabel,
   onOpenTestPlay,
   onEndTestPlay,
-  orderSource,
   posStatus,
-  onToggleOrderSource,
 }) => {
-  const posLinked = orderSource === 'pos';
   const navItems = [
     { id: 'control' as const, label: 'CaOS', icon: null },
     { id: 'bays' as const, label: 'ドリッパー', icon: LayoutGrid },
@@ -223,27 +217,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Right side: only persistent operational controls */}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={onToggleOrderSource}
-          aria-pressed={posLinked}
-          aria-label="POS連携"
-          className={`min-h-[44px] flex items-center gap-1 rounded-lg border px-2 text-xs font-black shadow-xs touch-manipulation ${posLinked ? 'border-emerald-700 bg-emerald-700 text-white' : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-100'}`}
-          title={
-            posLinked
-              ? `cafeore-posの注文を表示中（${POS_STATUS_LABEL[posStatus]}）。押すとモック注文に戻します`
-              : 'cafeore-posと同じDBの注文に切り替える'
-          }
+        <div
+          role="status"
+          aria-label={`cafeore-pos ${POS_STATUS_LABEL[posStatus]}`}
+          title={`cafeore-posの注文: ${POS_STATUS_LABEL[posStatus]}`}
+          className={`min-h-[44px] flex items-center gap-1 rounded-lg border px-2 text-xs font-black ${posStatus === 'open' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : posStatus === 'off' ? 'border-slate-200 bg-slate-100 text-slate-400' : 'border-amber-300 bg-amber-50 text-amber-800'}`}
         >
           <Database className="h-4 w-4" />
-          <span className="hidden 2xl:inline">POS連携</span>
-          {posLinked && (
-            <span
-              className={`h-2 w-2 rounded-full ${posStatus === 'open' ? 'bg-emerald-200' : posStatus === 'off' ? 'bg-slate-300' : 'bg-amber-300'}`}
-              title={POS_STATUS_LABEL[posStatus]}
-            />
-          )}
-        </button>
+          <span
+            className={`h-2 w-2 rounded-full ${posStatus === 'open' ? 'bg-emerald-500' : posStatus === 'off' ? 'bg-slate-300' : 'bg-amber-400'}`}
+          />
+        </div>
         <button
           type="button"
           onClick={testPlaying ? onEndTestPlay : onOpenTestPlay}
