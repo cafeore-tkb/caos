@@ -1,4 +1,4 @@
-import { Barista, BeanCode, BeanConfig, BeanItem, LearningEngineLog, UnassignedOrder } from '../types';
+import type { Barista, BeanCode, BeanConfig, BeanItem, LearningEngineLog, UnassignedOrder } from '../types';
 
 export const BEAN_NAME_MAP: Record<BeanCode, string> = {
   CHAMP: 'チャンプ',

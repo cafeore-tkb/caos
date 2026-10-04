@@ -1,34 +1,16 @@
-import React, { useState } from 'react';
-import {
-  Coffee,
-  Flame,
-  Calendar,
-  Tag,
-  CheckCircle2,
-  Edit3,
-  Save,
-  X,
-  Plus,
-  Trash2,
-  Search,
-  Filter,
-} from 'lucide-react';
-import { BeanCode, BeanItem } from '../types';
+import { Calendar, CheckCircle2, Coffee, Edit3, Filter, Flame, Plus, Save, Search, Tag, X } from 'lucide-react';
+import type React from 'react';
+import { useState } from 'react';
 import { BEAN_LEGENDS } from '../data/initialData';
+import type { BeanCode, BeanItem } from '../types';
 
 interface BeanQueueViewProps {
   beans: BeanItem[];
   onUpdateBean: (updatedBean: BeanItem) => void;
   onAddBean: (newBean: BeanItem) => void;
-  onDeleteBean: (code: BeanCode) => void;
 }
 
-export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
-  beans,
-  onUpdateBean,
-  onAddBean,
-  onDeleteBean,
-}) => {
+export const BeanQueueView: React.FC<BeanQueueViewProps> = ({ beans, onUpdateBean, onAddBean }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRoastFilter, setSelectedRoastFilter] = useState<string>('all');
   const [editingCode, setEditingCode] = useState<BeanCode | null>(null);
@@ -53,8 +35,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
       b.flavorNotes.toLowerCase().includes(searchQuery.toLowerCase()) ||
       b.origin.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesRoast =
-      selectedRoastFilter === 'all' || b.roastProfile.includes(selectedRoastFilter);
+    const matchesRoast = selectedRoastFilter === 'all' || b.roastProfile.includes(selectedRoastFilter);
 
     return matchesSearch && matchesRoast;
   });
@@ -102,9 +83,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
             <Coffee className="w-5 h-5 text-[#006c4a]" />
             <span>豆キュー</span>
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
-            銘柄と在庫を確認・編集
-          </p>
+          <p className="text-xs text-slate-500 mt-0.5">銘柄と在庫を確認・編集</p>
         </div>
 
         <button
@@ -171,9 +150,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   <label className="block font-bold text-slate-700 mb-1">豆コード</label>
                   <select
                     value={newBeanData.code}
-                    onChange={(e) =>
-                      setNewBeanData({ ...newBeanData, code: e.target.value as BeanCode })
-                    }
+                    onChange={(e) => setNewBeanData({ ...newBeanData, code: e.target.value as BeanCode })}
                     className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-mono font-bold"
                   >
                     {BEAN_LEGENDS.map((leg) => (
@@ -188,9 +165,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   <input
                     type="number"
                     value={newBeanData.stockGrams}
-                    onChange={(e) =>
-                      setNewBeanData({ ...newBeanData, stockGrams: Number(e.target.value) })
-                    }
+                    onChange={(e) => setNewBeanData({ ...newBeanData, stockGrams: Number(e.target.value) })}
                     className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg font-mono"
                     required
                   />
@@ -215,9 +190,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   <input
                     type="text"
                     value={newBeanData.roastProfile}
-                    onChange={(e) =>
-                      setNewBeanData({ ...newBeanData, roastProfile: e.target.value })
-                    }
+                    onChange={(e) => setNewBeanData({ ...newBeanData, roastProfile: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg"
                     required
                   />
@@ -227,9 +200,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   <input
                     type="text"
                     value={newBeanData.roastDate}
-                    onChange={(e) =>
-                      setNewBeanData({ ...newBeanData, roastDate: e.target.value })
-                    }
+                    onChange={(e) => setNewBeanData({ ...newBeanData, roastDate: e.target.value })}
                     className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg"
                     required
                   />
@@ -254,9 +225,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   rows={2}
                   placeholder="例: ジャスミン, アールグレイ, ピーチ, シトラス"
                   value={newBeanData.flavorNotes}
-                  onChange={(e) =>
-                    setNewBeanData({ ...newBeanData, flavorNotes: e.target.value })
-                  }
+                  onChange={(e) => setNewBeanData({ ...newBeanData, flavorNotes: e.target.value })}
                   className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-800"
                   required
                 />
@@ -315,24 +284,18 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                      銘柄名
-                    </label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">銘柄名</label>
                     <input
                       type="text"
                       value={editFormData.name}
-                      onChange={(e) =>
-                        setEditFormData({ ...editFormData, name: e.target.value })
-                      }
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
                       className="w-full p-1.5 border border-slate-300 rounded text-xs font-bold text-slate-900 bg-white"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        在庫 (g)
-                      </label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">在庫 (g)</label>
                       <input
                         type="number"
                         value={editFormData.stockGrams}
@@ -346,9 +309,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                        焙煎度
-                      </label>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-0.5">焙煎度</label>
                       <input
                         type="text"
                         value={editFormData.roastProfile}
@@ -364,9 +325,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                      焙煎日・エイジング
-                    </label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">焙煎日・エイジング</label>
                     <input
                       type="text"
                       value={editFormData.roastDate}
@@ -381,9 +340,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                      産地・規格
-                    </label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">産地・規格</label>
                     <input
                       type="text"
                       value={editFormData.origin}
@@ -398,9 +355,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">
-                      フレーバーノート
-                    </label>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-0.5">フレーバーノート</label>
                     <textarea
                       rows={2}
                       value={editFormData.flavorNotes}
@@ -456,9 +411,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
                     </div>
 
                     {/* Bean Name */}
-                    <h3 className="font-bold text-[14px] text-slate-900 leading-tight mb-2">
-                      {bean.name}
-                    </h3>
+                    <h3 className="font-bold text-[14px] text-slate-900 leading-tight mb-2">{bean.name}</h3>
 
                     {/* Metadata list */}
                     <div className="space-y-1.5 text-xs text-slate-600">
@@ -480,9 +433,7 @@ export const BeanQueueView: React.FC<BeanQueueViewProps> = ({
 
                     {/* Flavor Notes Box */}
                     <div className="mt-3 p-2 bg-slate-50 rounded-lg border border-slate-200 text-[11px] text-slate-700">
-                      <span className="font-bold text-slate-500 block mb-0.5">
-                        フレーバーノート:
-                      </span>
+                      <span className="font-bold text-slate-500 block mb-0.5">フレーバーノート:</span>
                       <span className="leading-snug">{bean.flavorNotes}</span>
                     </div>
                   </div>
