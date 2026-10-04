@@ -62,6 +62,18 @@ export const reanchorQueueInOrder = (queue: OrderTicket[], coefficient: number, 
   return result;
 };
 
+// Seconds until the dripper has finished everything already queued, using the
+// same 15-second changeover gap as the scheduler.
+export const queueWaitSeconds = (queue: OrderTicket[], coefficient: number) =>
+  queue.reduce(
+    (sum, ticket, index) =>
+      sum +
+      (index === 0
+        ? (ticket.timeRemainingSec ?? Math.round(ticket.totalDurationSec * coefficient))
+        : ticket.totalDurationSec + 15),
+    0
+  );
+
 export const splitIntoDripUnits = (orders: UnassignedOrder[]) => {
   const totalOrderCups = orders.reduce((sum, order) => sum + order.cupCount, 0);
   const units = orders.flatMap((order) => {

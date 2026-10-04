@@ -1,6 +1,7 @@
 import { ClipboardList, Sparkles } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type { UnassignedOrder } from '../types';
 import { MENU_PRESENTATION } from '../utils/menuPresentation';
 
@@ -58,6 +59,9 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
 }) => {
   const suppressNextClick = useRef(false);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const padBeforePress = useRef<string | null>(null);
+  const dragOriginRect = useRef<DOMRect | null>(null);
+  const isSidebar = layout === 'sidebar';
   const [openPadUid, setOpenPadUid] = useState<string | null>(null);
   const [hoveredBay, setHoveredBay] = useState<number | null>(null);
   const [dragVisual, setDragVisual] = useState<{ uid: string; x: number; y: number } | null>(null);
@@ -69,13 +73,16 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
       const openCard = document.querySelector(`[data-unassigned-uid="${openPadUid}"]`);
       if (openCard?.contains(target)) return;
       if (target.closest('[data-merge-candidate="true"]')) return;
+      // In the scrolling sidebar a press on another card may just be a scroll; that card's
+      // own tap or drag replaces the selection, so keep the current one until then.
+      if (isSidebar && target.closest('[data-unassigned-uid]')) return;
       setOpenPadUid(null);
       setHoveredBay(null);
       onClearSelection?.();
     };
     document.addEventListener('pointerdown', closeOnOutsidePress);
     return () => document.removeEventListener('pointerdown', closeOnOutsidePress);
-  }, [openPadUid, onClearSelection]);
+  }, [openPadUid, onClearSelection, isSidebar]);
 
   const orderUid = (order: UnassignedOrder) => order.ticketUid || order.id;
   const bayAtPoint = (clientX: number, clientY: number) => {
@@ -97,7 +104,6 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
     setHoveredBay(null);
   };
   const totalCups = orders.reduce((sum, o) => sum + o.cupCount, 0);
-  const isSidebar = layout === 'sidebar';
   const visibleOrders = isSidebar ? orders : orders.slice(0, 12);
   const displayedOrders = (() => {
     if (!isSidebar) {
@@ -186,6 +192,16 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 openOrder.preferredBaristaId === order.preferredBaristaId
             );
             const isSelected = selectedOrderId === order.id;
+            const isDragging = dragVisual?.uid === orderUid(order);
+            // The sidebar scrolls and clips its cards, so there the dragged card floats as a
+            // fixed copy above the page while the original (and its 1-6 pad) stays put.
+            const isFloatingDrag = isDragging && isSidebar;
+            const isInlineDrag = isDragging && !isSidebar;
+            // While dragging inline, cancel the card's offset on the pad so the finger can slide onto 1-6.
+            const padStyle =
+              isInlineDrag && dragVisual
+                ? { transform: `translate3d(${-dragVisual.x}px, ${-dragVisual.y}px, 0)` }
+                : undefined;
             const cardStyle = order.isRebrew
               ? 'bg-red-50 border-red-300 text-slate-900'
               : order.preferredBaristaId
@@ -200,6 +216,49 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   : order.totalItemsInOrder && order.totalItemsInOrder > 1
                     ? 'text-slate-950'
                     : 'text-slate-600';
+            const cardBody = (
+              <>
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span
+                      className={`font-mono font-black ${idColor} tracking-tight leading-none ${isSidebar ? 'text-[32px]' : 'text-[25px]'}`}
+                    >
+                      {order.id}
+                    </span>
+                    {order.isRebrew && (
+                      <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                        入れ直し
+                      </span>
+                    )}
+                    {order.totalItemsInOrder && order.totalItemsInOrder > 1 && (
+                      <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-mono font-black text-slate-700 whitespace-nowrap">
+                        {order.itemIndex}/{order.totalItemsInOrder}・計{order.totalOrderCups}杯
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`${isSidebar ? 'text-[20px]' : 'text-[17px]'} font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? (order.cupCount === 1 ? 'border border-violet-700 bg-white text-violet-700' : 'border border-violet-700 bg-violet-700 text-white') : order.cupCount === 1 ? 'border border-black bg-white text-black' : 'border border-slate-950 bg-slate-950 text-white'}`}
+                  >
+                    {order.cupCount}杯
+                  </span>
+                </div>
+
+                {/* Coffee Name - Clean display without cut off */}
+                <div className="flex items-center justify-between gap-2">
+                  <h3
+                    className={`${isSidebar ? 'text-[18px]' : 'text-[15px]'} font-bold leading-snug truncate`}
+                    title={order.beanName}
+                  >
+                    {order.beanName} ×{order.cupCount}
+                  </h3>
+                  {order.preferredBaristaId && (
+                    <span className="text-[12px] font-black text-violet-700 whitespace-nowrap">
+                      指名 {order.preferredBaristaId}
+                    </span>
+                  )}
+                </div>
+              </>
+            );
 
             return (
               <div
@@ -218,23 +277,44 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                     setHoveredBay(null);
                     return;
                   }
-                  if (onSelectQueueOrder) onSelectQueueOrder(order);
-                  else if (onSelectOrder) onSelectOrder(order.id);
+                  if (selectedOrderId !== order.id) {
+                    if (onSelectQueueOrder) onSelectQueueOrder(order);
+                    else if (onSelectOrder) onSelectOrder(order.id);
+                  }
                   setOpenPadUid(orderUid(order));
                 }}
                 onPointerDown={(event) => {
+                  // A touch drag ends without a click, so drop any suppression left by it.
+                  suppressNextClick.current = false;
                   if (isMergeCandidate) return;
                   if ((event.target as HTMLElement).closest('button[data-bay-target]')) return;
                   if (event.pointerType === 'mouse' && event.button !== 0) return;
                   event.currentTarget.setPointerCapture(event.pointerId);
                   dragStart.current = { x: event.clientX, y: event.clientY };
-                  setOpenPadUid(orderUid(order));
+                  dragOriginRect.current = event.currentTarget.getBoundingClientRect();
+                  padBeforePress.current = openPadUid;
+                  // A closed sidebar card may be the start of a scroll, so its pad waits for a tap or drag.
+                  if (!isSidebar || openPadUid === orderUid(order)) setOpenPadUid(orderUid(order));
                   setHoveredBay(null);
                 }}
                 onPointerMove={(event) => {
                   if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
                   const start = dragStart.current;
                   if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) < 12) return;
+                  // On a closed sidebar card vertical movement belongs to scrolling, not to a drag.
+                  const isClosedSidebarCard = isSidebar && openPadUid !== orderUid(order);
+                  if (
+                    isClosedSidebarCard &&
+                    !dragVisual &&
+                    Math.abs(event.clientY - start.y) > Math.abs(event.clientX - start.x)
+                  ) {
+                    return;
+                  }
+                  if (openPadUid !== orderUid(order)) {
+                    // Same as pressing a card in the strip: switching cards drops the old selection.
+                    if (openPadUid) onClearSelection?.();
+                    setOpenPadUid(orderUid(order));
+                  }
                   const bayId = bayAtPoint(event.clientX, event.clientY);
                   setHoveredBay(bayId);
                   setDragVisual({ uid: orderUid(order), x: event.clientX - start.x, y: event.clientY - start.y });
@@ -257,18 +337,23 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   dragStart.current = null;
                   setDragVisual(null);
                   setHoveredBay(null);
+                  // The browser took the gesture as a scroll. The sidebar left the previous pad and
+                  // selection alone, so restore it; the strip already cleared both on press.
+                  setOpenPadUid(
+                    isSidebar || padBeforePress.current === orderUid(order) ? padBeforePress.current : null
+                  );
                 }}
                 style={{
                   ...(isSidebar ? { gridColumn, gridRow } : {}),
-                  ...(dragVisual?.uid === orderUid(order)
+                  ...(isInlineDrag && dragVisual
                     ? { transform: `translate3d(${dragVisual.x}px, ${dragVisual.y}px, 0)` }
                     : {}),
                 }}
-                className={`rounded-lg border min-h-0 flex flex-col transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing touch-none select-none relative ${isSidebar ? 'justify-center p-4' : 'justify-between p-2'} ${dragVisual?.uid === orderUid(order) ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
+                className={`rounded-lg border min-h-0 flex flex-col transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing ${isSidebar && openPadUid !== orderUid(order) ? 'touch-pan-y' : 'touch-none'} select-none relative ${isSidebar ? 'justify-center p-4' : 'justify-between p-2'} ${isInlineDrag ? 'overflow-visible z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
                   isSelected ? 'ring-4 ring-amber-400 border-amber-500 shadow-lg z-10' : ''
                 }`}
               >
-                {dragVisual?.uid === orderUid(order) && hoveredBay && (
+                {isInlineDrag && hoveredBay && (
                   <div className="absolute right-1 top-1 z-[130] rounded-full bg-blue-700 px-2 py-1 font-mono text-[12px] font-black text-white shadow-md pointer-events-none">
                     → {hoveredBay}
                   </div>
@@ -291,6 +376,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   <>
                     <div
                       className="absolute -top-[38px] left-0 right-0 z-30 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+                      style={padStyle}
                       aria-label={`${order.id}の割当先 1から3`}
                     >
                       {[1, 2, 3].map((bayId) => (
@@ -311,6 +397,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                     </div>
                     <div
                       className="absolute -bottom-[38px] left-0 right-0 z-30 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+                      style={padStyle}
                       aria-label={`${order.id}の割当先 4から6`}
                     >
                       {[4, 5, 6].map((bayId) => (
@@ -340,47 +427,30 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 )}
 
                 {/* Top row: Big ID and Cup/Badge tag */}
-                <div>
-                  <div className="flex items-center justify-between gap-1 mb-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span
-                        className={`font-mono font-black ${idColor} tracking-tight leading-none ${isSidebar ? 'text-[32px]' : 'text-[25px]'}`}
-                      >
-                        {order.id}
-                      </span>
-                      {order.isRebrew && (
-                        <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
-                          入れ直し
-                        </span>
-                      )}
-                      {order.totalItemsInOrder && order.totalItemsInOrder > 1 && (
-                        <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[11px] font-mono font-black text-slate-700 whitespace-nowrap">
-                          {order.itemIndex}/{order.totalItemsInOrder}・計{order.totalOrderCups}杯
-                        </span>
-                      )}
-                    </div>
-                    <span
-                      className={`${isSidebar ? 'text-[20px]' : 'text-[17px]'} font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? (order.cupCount === 1 ? 'border border-violet-700 bg-white text-violet-700' : 'border border-violet-700 bg-violet-700 text-white') : order.cupCount === 1 ? 'border border-black bg-white text-black' : 'border border-slate-950 bg-slate-950 text-white'}`}
+                <div className={isFloatingDrag ? 'opacity-30' : undefined}>{cardBody}</div>
+                {isFloatingDrag &&
+                  dragVisual &&
+                  dragOriginRect.current &&
+                  createPortal(
+                    <div
+                      aria-hidden="true"
+                      className={`pointer-events-none fixed z-[1000] flex scale-[1.03] flex-col justify-center rounded-lg border p-4 opacity-90 shadow-2xl ring-2 ring-blue-500 ${cardStyle}`}
+                      style={{
+                        left: dragOriginRect.current.left + dragVisual.x,
+                        top: dragOriginRect.current.top + dragVisual.y,
+                        width: dragOriginRect.current.width,
+                        height: dragOriginRect.current.height,
+                      }}
                     >
-                      {order.cupCount}杯
-                    </span>
-                  </div>
-
-                  {/* Coffee Name - Clean display without cut off */}
-                  <div className="flex items-center justify-between gap-2">
-                    <h3
-                      className={`${isSidebar ? 'text-[18px]' : 'text-[15px]'} font-bold leading-snug truncate`}
-                      title={order.beanName}
-                    >
-                      {order.beanName} ×{order.cupCount}
-                    </h3>
-                    {order.preferredBaristaId && (
-                      <span className="text-[12px] font-black text-violet-700 whitespace-nowrap">
-                        指名 {order.preferredBaristaId}
-                      </span>
-                    )}
-                  </div>
-                </div>
+                      {hoveredBay && (
+                        <div className="absolute right-1 top-1 rounded-full bg-blue-700 px-2 py-1 font-mono text-[12px] font-black text-white shadow-md">
+                          → {hoveredBay}
+                        </div>
+                      )}
+                      {cardBody}
+                    </div>,
+                    document.body
+                  )}
               </div>
             );
           })}

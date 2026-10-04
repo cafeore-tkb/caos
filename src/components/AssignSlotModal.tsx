@@ -31,6 +31,9 @@ export const AssignSlotModal: React.FC<AssignSlotModalProps> = ({
 
   const currentBay = baristas.find((b) => b.id === selectedBayId);
   const selectedOrder = unassignedOrders.find((order) => (order.ticketUid || order.id) === selectedOrderUid);
+  const canAssign = Boolean(
+    selectedOrder && (!selectedOrder.preferredBaristaId || selectedOrder.preferredBaristaId === selectedBayId)
+  );
 
   return (
     <div className="fixed top-[56px] right-0 bottom-0 z-50 pointer-events-none select-none">
@@ -146,9 +149,9 @@ export const AssignSlotModal: React.FC<AssignSlotModalProps> = ({
             キャンセル
           </button>
           <button
-            disabled={!selectedOrderUid}
+            disabled={!canAssign}
             onClick={() => {
-              if (selectedOrderUid) {
+              if (canAssign) {
                 onAssign(selectedOrderUid, selectedBayId);
                 onClose();
               }
