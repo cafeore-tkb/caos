@@ -61,6 +61,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
   const dragStart = useRef<{ x: number; y: number } | null>(null);
   const padBeforePress = useRef<string | null>(null);
   const dragOriginRect = useRef<DOMRect | null>(null);
+  const isSidebar = layout === 'sidebar';
   const [openPadUid, setOpenPadUid] = useState<string | null>(null);
   const [hoveredBay, setHoveredBay] = useState<number | null>(null);
   const [dragVisual, setDragVisual] = useState<{ uid: string; x: number; y: number } | null>(null);
@@ -72,13 +73,16 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
       const openCard = document.querySelector(`[data-unassigned-uid="${openPadUid}"]`);
       if (openCard?.contains(target)) return;
       if (target.closest('[data-merge-candidate="true"]')) return;
+      // In the scrolling sidebar a press on another card may just be a scroll; that card's
+      // own tap or drag replaces the selection, so keep the current one until then.
+      if (isSidebar && target.closest('[data-unassigned-uid]')) return;
       setOpenPadUid(null);
       setHoveredBay(null);
       onClearSelection?.();
     };
     document.addEventListener('pointerdown', closeOnOutsidePress);
     return () => document.removeEventListener('pointerdown', closeOnOutsidePress);
-  }, [openPadUid, onClearSelection]);
+  }, [openPadUid, onClearSelection, isSidebar]);
 
   const orderUid = (order: UnassignedOrder) => order.ticketUid || order.id;
   const bayAtPoint = (clientX: number, clientY: number) => {
@@ -100,7 +104,6 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
     setHoveredBay(null);
   };
   const totalCups = orders.reduce((sum, o) => sum + o.cupCount, 0);
-  const isSidebar = layout === 'sidebar';
   const visibleOrders = isSidebar ? orders : orders.slice(0, 12);
   const displayedOrders = (() => {
     if (!isSidebar) {
@@ -290,13 +293,15 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   dragStart.current = { x: event.clientX, y: event.clientY };
                   dragOriginRect.current = event.currentTarget.getBoundingClientRect();
                   padBeforePress.current = openPadUid;
-                  setOpenPadUid(orderUid(order));
+                  // A closed sidebar card may be the start of a scroll, so its pad waits for a tap or drag.
+                  if (!isSidebar || openPadUid === orderUid(order)) setOpenPadUid(orderUid(order));
                   setHoveredBay(null);
                 }}
                 onPointerMove={(event) => {
                   if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
                   const start = dragStart.current;
                   if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) < 12) return;
+                  if (openPadUid !== orderUid(order)) setOpenPadUid(orderUid(order));
                   const bayId = bayAtPoint(event.clientX, event.clientY);
                   setHoveredBay(bayId);
                   setDragVisual({ uid: orderUid(order), x: event.clientX - start.x, y: event.clientY - start.y });
@@ -319,8 +324,8 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   dragStart.current = null;
                   setDragVisual(null);
                   setHoveredBay(null);
-                  // The browser took the gesture as a scroll: don't leave a pad opened by it.
-                  if (padBeforePress.current !== orderUid(order)) setOpenPadUid(null);
+                  // The browser took the gesture as a scroll: put the pads back as they were.
+                  setOpenPadUid(padBeforePress.current);
                 }}
                 style={{
                   ...(isSidebar ? { gridColumn, gridRow } : {}),

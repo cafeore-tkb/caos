@@ -58,6 +58,8 @@ const readPanelSnapshot = (): PanelSnapshot | null => {
   }
 };
 
+const ticketKey = (ticket: OrderTicket) => ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`;
+
 const startOfLocalDay = (ms: number) => {
   const date = new Date(ms);
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
@@ -227,11 +229,13 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
   // Modals
-  const [selectedTicket, setSelectedTicket] = useState<OrderTicket | null>(null);
+  // Panels hold only the ticket key; the ticket itself is always read from the live
+  // queues so a drip that started or finished meanwhile is never acted on as stale.
+  const [selectedTicketKey, setSelectedTicketKey] = useState<string | null>(null);
   const [assignSlotData, setAssignSlotData] = useState<{ bayId: number | null; order: UnassignedOrder | null } | null>(
     null
   );
-  const [rebrewSource, setRebrewSource] = useState<{ ticket: OrderTicket; bayId: number } | null>(null);
+  const [rebrewSource, setRebrewSource] = useState<{ ticketKey: string; bayId: number } | null>(null);
 
   const [isRunning, setIsRunning] = useState<boolean>(true);
   const [simSpeed, setSimSpeed] = useState<number>(1);
@@ -259,6 +263,23 @@ export default function App() {
   // increasing past 24:00 instead of wrapping and scrambling every queue.
   const operationalDayStartMs = testPlaySession ? startOfLocalDay(testPlaySession.startMs) : realDayStartMs;
   const realTimeSec = Math.floor((operationalTime.getTime() - operationalDayStartMs) / 1000);
+
+  const findLiveTicket = (key: string) => {
+    for (const bay of baristas) {
+      const ticket =
+        bay.queue.find((item) => ticketKey(item) === key) || bay.pastTickets?.find((item) => ticketKey(item) === key);
+      if (ticket) return ticket;
+    }
+    return null;
+  };
+  const selectedTicket = selectedTicketKey ? findLiveTicket(selectedTicketKey) : null;
+  const selectedTicketStatus = selectedTicket?.status;
+  const rebrewTicket = rebrewSource ? findLiveTicket(rebrewSource.ticketKey) : null;
+
+  // Only drips that have not started can be moved, so close the move UI once it starts.
+  useEffect(() => {
+    if (selectedTicketKey && selectedTicketStatus !== 'scheduled') setSelectedTicketKey(null);
+  }, [selectedTicketKey, selectedTicketStatus]);
 
   const sortedUnassignedOrders = [...unassignedOrders].sort(
     (a, b) =>
@@ -371,7 +392,7 @@ export default function App() {
     setShiftRosterIndex(snapshot.shiftRosterIndex);
     setSelectedOrderId(null);
     setRebrewSource(null);
-    setSelectedTicket(null);
+    setSelectedTicketKey(null);
     undoSnapshotRef.current = null;
     arrivalsAfterUndoSnapshotRef.current = [];
     setUndoLabel(null);
@@ -574,28 +595,8 @@ export default function App() {
     );
   };
 
-  const ticketKey = (ticket: OrderTicket) => ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`;
-
-  // Panels keep the ticket object from the moment they opened. Resolve it again
-  // before acting so a drip that started or finished meanwhile is not moved.
-  const findLiveTicket = (key: string) => {
-    for (const bay of baristas) {
-      const ticket =
-        bay.queue.find((item) => ticketKey(item) === key) || bay.pastTickets?.find((item) => ticketKey(item) === key);
-      if (ticket) return ticket;
-    }
-    return null;
-  };
-
-  const liveSelectedTicket = selectedTicket ? findLiveTicket(ticketKey(selectedTicket)) : null;
-  const liveSelectedTicketStatus = liveSelectedTicket?.status;
-  useEffect(() => {
-    if (selectedTicket && liveSelectedTicketStatus !== 'scheduled') setSelectedTicket(null);
-  }, [selectedTicket, liveSelectedTicketStatus]);
-
-  const handleMoveScheduledTicket = (requestedTicket: OrderTicket, targetBayId: number) => {
-    const ticket = findLiveTicket(ticketKey(requestedTicket));
-    if (ticket?.status !== 'scheduled') return;
+  const handleMoveScheduledTicket = (ticket: OrderTicket, targetBayId: number) => {
+    if (ticket.status !== 'scheduled') return;
     if (ticket.preferredBaristaId && ticket.preferredBaristaId !== targetBayId) return;
     captureUndo(`${ticket.id}の割当変更`);
     const key = ticketKey(ticket);
@@ -639,7 +640,7 @@ export default function App() {
         })
     );
     setShiftRosterIndex((index) => (index + 1) % SHIFT_ROSTERS.length);
-    setSelectedTicket(null);
+    setSelectedTicketKey(null);
     setSelectedOrderId(null);
     soundManager.playDispatch();
   };
@@ -659,9 +660,8 @@ export default function App() {
   const nextShiftHour = (realTime.getHours() + 1) % 24;
   const nextShiftLabel = `${nextShiftHour.toString().padStart(2, '0')}:00`;
 
-  const handleReturnScheduledTicket = (requestedTicket: OrderTicket) => {
-    const ticket = findLiveTicket(ticketKey(requestedTicket));
-    if (ticket?.status !== 'scheduled') return;
+  const handleReturnScheduledTicket = (ticket: OrderTicket) => {
+    if (ticket.status !== 'scheduled') return;
     captureUndo(`${ticket.id}を未割当に戻す`);
     const key = ticketKey(ticket);
     setBaristas((prev) =>
@@ -702,9 +702,9 @@ export default function App() {
   };
 
   const handleConfirmRebrew = (decision: RebrewDecision) => {
-    if (!rebrewSource) return;
+    if (!rebrewSource || !rebrewTicket) return;
     const { bayId: sourceBayId } = rebrewSource;
-    const ticket = findLiveTicket(ticketKey(rebrewSource.ticket)) ?? rebrewSource.ticket;
+    const ticket = rebrewTicket;
     captureUndo(`${ticket.id}の入れ直し`);
     const originalKey = ticketKey(ticket);
     const duration = decision.cupCount > 1 ? 195 : 135;
@@ -808,7 +808,7 @@ export default function App() {
     });
 
     setRebrewSource(null);
-    setSelectedTicket(null);
+    setSelectedTicketKey(null);
     setSelectedOrderId(ticket.id);
     soundManager.playDispatch();
   };
@@ -878,7 +878,7 @@ export default function App() {
     setUndoLabel(null);
     setLearningLogs(INITIAL_LEARNING_LOGS);
     setSelectedOrderId(null);
-    setSelectedTicket(null);
+    setSelectedTicketKey(null);
     setAssignSlotData(null);
     setRebrewSource(null);
     setShiftRosterIndex(0);
@@ -904,7 +904,7 @@ export default function App() {
     undoSnapshotRef.current = null;
     arrivalsAfterUndoSnapshotRef.current = [];
     setUndoLabel(null);
-    setSelectedTicket(null);
+    setSelectedTicketKey(null);
     setAssignSlotData(null);
     setRebrewSource(null);
     historicalOrderCursor.current = 0;
@@ -1021,18 +1021,18 @@ export default function App() {
             unassignedOrders={sortedUnassignedOrders}
             nextAvailable={nextAvailable}
             selectedOrderId={selectedOrderId}
-            actionTicketKey={selectedTicket ? ticketKey(selectedTicket) : null}
+            actionTicketKey={selectedTicket ? selectedTicketKey : null}
             currentTimeSec={realTimeSec}
             timelineCommand={timelineCommand}
             onSelectOrder={handleToggleOrderSelection}
             onAdvanceBay={handleAdvanceBay}
-            onOpenTicketDetail={setSelectedTicket}
+            onOpenTicketDetail={(ticket) => setSelectedTicketKey(ticketKey(ticket))}
             onMoveTicket={handleMoveScheduledTicket}
             onReturnToUnassigned={handleReturnScheduledTicket}
-            onCloseTicketAction={() => setSelectedTicket(null)}
+            onCloseTicketAction={() => setSelectedTicketKey(null)}
             onRequestRebrew={(ticket, bayId) => {
-              setSelectedTicket(null);
-              setRebrewSource({ ticket, bayId });
+              setSelectedTicketKey(null);
+              setRebrewSource({ ticketKey: ticketKey(ticket), bayId });
             }}
             onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
             onAssignToBay={(order, bayId) => handleAssignOrderToBay(order.ticketUid || order.id, bayId)}
@@ -1054,13 +1054,12 @@ export default function App() {
       {/* Ticket Detail Recipe Modal */}
       {selectedTicket && controlViewMode !== 'current' && (
         <TicketDetailModal
-          ticket={liveSelectedTicket}
+          ticket={selectedTicket}
           currentBayId={
-            baristas.find((bay) => bay.queue.some((ticket) => ticketKey(ticket) === ticketKey(selectedTicket)))?.id ||
-            null
+            baristas.find((bay) => bay.queue.some((ticket) => ticketKey(ticket) === selectedTicketKey))?.id || null
           }
           onClose={() => {
-            setSelectedTicket(null);
+            setSelectedTicketKey(null);
             setSelectedOrderId(null);
           }}
           onMoveTicket={handleMoveScheduledTicket}
@@ -1080,9 +1079,9 @@ export default function App() {
         />
       )}
 
-      {rebrewSource && (
+      {rebrewSource && rebrewTicket && (
         <RebrewPanel
-          ticket={findLiveTicket(ticketKey(rebrewSource.ticket)) ?? rebrewSource.ticket}
+          ticket={rebrewTicket}
           sourceBayId={rebrewSource.bayId}
           baristas={baristas}
           onClose={() => setRebrewSource(null)}

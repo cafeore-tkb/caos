@@ -63,8 +63,17 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   }, [isActionOpen, onCloseAction]);
 
   const bayAtPoint = (clientX: number, clientY: number) => {
-    const lane = document
-      .elementsFromPoint(clientX, clientY)
+    const elements = document.elementsFromPoint(clientX, clientY);
+    // A 1-6 pad button decides on its own: releasing on this card's own (disabled) number
+    // must not fall through to the lane underneath the pad.
+    const padButton = elements.find(
+      (element): element is HTMLElement => element instanceof HTMLElement && element.matches('button[data-bay-target]')
+    );
+    if (padButton) {
+      const bayId = Number(padButton.dataset.bayTarget);
+      return bayId >= 1 && bayId <= 6 && bayId !== currentBayId ? bayId : null;
+    }
+    const lane = elements
       .map((element) => element.closest<HTMLElement>('[data-bay-target]'))
       .find((element) => {
         const bayId = Number(element?.dataset.bayTarget);

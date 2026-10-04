@@ -53,7 +53,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   // The board follows NOW until the viewer scrolls (or pages with ±5分) away from it,
   // and stays where they left it until they come back or press 現在.
   const [isFollowingNow, setIsFollowingNow] = useState(true);
-  const [viewLeftPx, setViewLeftPx] = useState(0);
+  const [isScrolledToPast, setIsScrolledToPast] = useState(false);
 
   const _formatClock = (seconds: number) => {
     const normalized = ((seconds % 86400) + 86400) % 86400;
@@ -65,7 +65,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   // Position of current NOW cursor along timeline
   const nowX = (simTimeSec - timelineStartSec) * PIXELS_PER_SEC;
   const followLeftPx = Math.max(0, nowX - NOW_VIEWPORT_OFFSET);
-  const isPastView = !isFollowingNow && viewLeftPx < nowX - 600;
+  const isPastView = !isFollowingNow && isScrolledToPast;
   const followLeftRef = useRef(followLeftPx);
   followLeftRef.current = followLeftPx;
 
@@ -91,7 +91,8 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const currentLeft = scrollContainerRef.current.scrollLeft;
-    setViewLeftPx(currentLeft);
+    // A boolean, so scrolling re-renders the board only when it crosses the threshold.
+    setIsScrolledToPast(currentLeft < nowX - 600);
     window.clearTimeout(followSettleTimerRef.current);
     if (Math.abs(currentLeft - followLeftPx) > FOLLOW_TOLERANCE_PX) {
       setIsFollowingNow(false);
