@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { UnassignedOrder } from '../types';
 import { MENU_PRESENTATION } from '../utils/menuPresentation';
+import { canMergeDripUnits } from '../utils/orderQueue';
 
 const MergeCupsIcon = ({ className = '' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 25.04 19.03" aria-hidden="true">
@@ -181,16 +182,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
             const isOrderBoundary =
               !isSidebar && orderIndex > 0 && displayedOrders[orderIndex - 1]?.order.id !== order.id;
             const openOrder = orders.find((candidate) => orderUid(candidate) === openPadUid);
-            const isMergeCandidate = Boolean(
-              openOrder &&
-                !openOrder.isRebrew &&
-                !order.isRebrew &&
-                orderUid(openOrder) !== orderUid(order) &&
-                openOrder.cupCount === 1 &&
-                order.cupCount === 1 &&
-                openOrder.beanCode === order.beanCode &&
-                openOrder.preferredBaristaId === order.preferredBaristaId
-            );
+            const isMergeCandidate = Boolean(openOrder && canMergeDripUnits(openOrder, order));
             const isSelected = selectedOrderId === order.id;
             const isDragging = dragVisual?.uid === orderUid(order);
             // The sidebar scrolls and clips its cards, so there the dragged card floats as a

@@ -26,10 +26,12 @@ import type {
 import { soundManager } from './utils/audio';
 import {
   arrangeQueue,
+  canMergeDripUnits,
   orderNumber,
   queueWaitSeconds,
   reanchorQueueInOrder,
   splitIntoDripUnits,
+  ticketKey,
 } from './utils/orderQueue';
 
 type UndoSnapshot = {
@@ -57,8 +59,6 @@ const readPanelSnapshot = (): PanelSnapshot | null => {
     return null;
   }
 };
-
-const ticketKey = (ticket: OrderTicket) => ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`;
 
 const startOfLocalDay = (ms: number) => {
   const date = new Date(ms);
@@ -816,17 +816,7 @@ export default function App() {
   const handleMergeUnassignedOrders = (firstUid: string, secondUid: string) => {
     const first = unassignedOrders.find((order) => (order.ticketUid || order.id) === firstUid);
     const second = unassignedOrders.find((order) => (order.ticketUid || order.id) === secondUid);
-    if (
-      !first ||
-      !second ||
-      first.isRebrew ||
-      second.isRebrew ||
-      first.cupCount !== 1 ||
-      second.cupCount !== 1 ||
-      first.beanCode !== second.beanCode
-    )
-      return;
-    if (first.preferredBaristaId !== second.preferredBaristaId) return;
+    if (!first || !second || !canMergeDripUnits(first, second)) return;
     captureUndo(`${first.id}と${second.id}の統合`);
     setUnassignedOrders((prev) => {
       const sourceOrderIds = Array.from(
