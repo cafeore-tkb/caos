@@ -200,3 +200,13 @@ do $$ begin
   if (select count(*) from caos.drips) <> 0 then raise exception 'NG: スタッフ以外が読める'; end if;
   raise notice 'OK: スタッフ以外には 0 件に見える（RLS）';
 end $$;
+
+-- CaOS の処理が壊れていても、POS の注文の登録・準備完了は通る
+begin;
+alter table caos.drips rename to drips_broken;
+insert into orders (id, order_id, created_at, billing_amount, received) values ('10000000-0000-0000-0000-000000000010', 10, now(), 0, 0);
+insert into order_menus (order_id, menu_id, menu_name, unit_price) values ('10000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-0000000000c1', '優勝ブレンド', 500);
+update orders set ready_at = now() where order_id = 10;
+set constraints all immediate;
+select pg_temp.check((select ready_at is not null from orders where order_id = 10), 'CaOS が失敗しても POS の注文の登録と準備完了は通る');
+rollback;
