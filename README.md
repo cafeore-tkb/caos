@@ -8,16 +8,14 @@
 
 [CaOSをGitHub Pagesで開く](https://cafeore-tkb.github.io/digital-master-sheet-pages/)
 
-- `main`: [本番プレビュー](https://cafeore-tkb.github.io/digital-master-sheet-pages/)
-- `astalum-dev`: [開発プレビュー](https://cafeore-tkb.github.io/digital-master-sheet-pages/astalum-dev/)
-
-Privateのソースをビルドし、`npm run publish:pages` で現在のブランチに対応するパスへ公開します。両方の成果物はPublicの配信用リポジトリ内に同居し、片方の公開で他方を削除しません。
+`main` のソースをビルドし、`npm run publish:pages` で公開します。
 
 ## 画面
 
 - **A**: NOW線を基準に、6人のレーンと時間軸で進行・待機カードを確認する管制盤
 - **B**: 現在・次の抽出と未割当注文を、よりコンパクトに確認する比較案
-- 最上段のヘッダーからA/Bを切り替えます。
+- **C**: 担当者ごとのドリッパー（H1/H2・I1/I2）と残り時間を並べ、現在の抽出と次に空く担当者を確認する比較案
+- 最上段のヘッダーまたはサイドバーからA/B/Cを切り替えます。
 - 補助情報は右側パネルに表示し、管制盤全体を隠しません。
 
 ## 主な挙動
@@ -48,7 +46,7 @@ Privateのソースをビルドし、`npm run publish:pages` で現在のブラ�
 - ソースと実績データはPrivateの `cafeore-tkb/CaOS` で管理します。
 - Private側のActionsはPages用ビルドを検証し、成果物を保存します。
 - `npm run publish:pages` を実行すると、ビルド済みの `site/` だけをPublicの `cafeore-tkb/digital-master-sheet-pages` へ送り、公開側のPagesワークフローが更新します。
-- `main` は `site/` 直下、`astalum-dev` は `site/astalum-dev/` に配置します。
+- `main` の成果物を `site/` 直下に配置します。
 - 公開成果物には生JSONを置かず、実績データはハッシュ付きの遅延読込JavaScriptに内包します。
 
 ## タッチ操作
