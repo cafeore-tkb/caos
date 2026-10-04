@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     role="group"
                     aria-label="管制盤の表示切替"
                   >
-                    {(['current', 'new', 'c'] as const).map((mode) => (
+                    {(['current', 'new', 'c', 'd'] as const).map((mode) => (
                       <button
                         key={mode}
                         type="button"
@@ -75,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onClick={() => onSelectControlViewMode(mode)}
                         className={`min-h-[44px] rounded-lg text-[12px] font-black transition-colors touch-manipulation ${controlViewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600'}`}
                       >
-                        {mode === 'current' ? 'A' : mode === 'new' ? 'B' : 'C'}
+                        {mode === 'current' ? 'A' : mode === 'new' ? 'B' : mode.toUpperCase()}
                       </button>
                     ))}
                   </div>
