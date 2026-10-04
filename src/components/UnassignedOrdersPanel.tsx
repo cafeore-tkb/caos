@@ -360,7 +360,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                       )}
                     </div>
                     <span
-                      className={`${isSidebar ? 'text-[20px]' : 'text-[17px]'} font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? 'bg-violet-700 text-white' : 'bg-slate-950 text-white'}`}
+                      className={`${isSidebar ? 'text-[20px]' : 'text-[17px]'} font-mono font-black px-2.5 py-1 rounded-md leading-none shrink-0 ${order.preferredBaristaId ? (order.cupCount === 1 ? 'border border-violet-700 bg-white text-violet-700' : 'border border-violet-700 bg-violet-700 text-white') : order.cupCount === 1 ? 'border border-black bg-white text-black' : 'border border-slate-950 bg-slate-950 text-white'}`}
                     >
                       {order.cupCount}杯
                     </span>
