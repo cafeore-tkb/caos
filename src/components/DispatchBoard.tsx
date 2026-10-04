@@ -27,6 +27,8 @@ const STICKY_LEFT_WIDTH = 290; // 195px barista + 95px action
 const NOW_VIEWPORT_OFFSET = 90 * PIXELS_PER_SEC;
 // Scroll positions this close to NOW count as following it.
 const FOLLOW_TOLERANCE_PX = 24;
+// Scrolled this far behind NOW, the board shows the past-history banner.
+const PAST_VIEW_THRESHOLD_PX = 600;
 
 export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   baristas,
@@ -109,14 +111,14 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   // While browsing, NOW keeps moving away from a still view; re-check the banner each tick.
   useEffect(() => {
     if (isFollowingNow || !scrollContainerRef.current) return;
-    setIsScrolledToPast(scrollContainerRef.current.scrollLeft < nowX - 600);
+    setIsScrolledToPast(scrollContainerRef.current.scrollLeft < nowX - PAST_VIEW_THRESHOLD_PX);
   }, [nowX, isFollowingNow]);
 
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const currentLeft = scrollContainerRef.current.scrollLeft;
     // A boolean, so scrolling re-renders the board only when it crosses the threshold.
-    setIsScrolledToPast(currentLeft < nowX - 600);
+    setIsScrolledToPast(currentLeft < nowX - PAST_VIEW_THRESHOLD_PX);
     window.clearTimeout(followSettleTimerRef.current);
     if (Math.abs(currentLeft - followLeftPx) > FOLLOW_TOLERANCE_PX) {
       setIsFollowingNow(false);
