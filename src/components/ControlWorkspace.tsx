@@ -3,8 +3,9 @@ import type { Barista, OrderTicket, UnassignedOrder } from '../types';
 import { ControlViewA } from './ControlViewA';
 import { ControlViewB } from './ControlViewB';
 import { ControlViewC } from './ControlViewC';
+import { ControlViewD } from './ControlViewD';
 
-export type ControlViewMode = 'current' | 'new' | 'c';
+export type ControlViewMode = 'current' | 'new' | 'c' | 'd';
 
 interface ControlWorkspaceProps {
   mode: ControlViewMode;
@@ -66,9 +67,10 @@ export const ControlWorkspace: React.FC<ControlWorkspaceProps> = ({
     );
   }
 
-  if (mode === 'c') {
+  if (mode === 'c' || mode === 'd') {
+    const ControlView = mode === 'c' ? ControlViewC : ControlViewD;
     return (
-      <ControlViewC
+      <ControlView
         baristas={baristas}
         unassignedOrders={unassignedOrders}
         simTimeSec={currentTimeSec}
