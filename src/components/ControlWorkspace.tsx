@@ -67,10 +67,31 @@ export const ControlWorkspace: React.FC<ControlWorkspaceProps> = ({
     );
   }
 
-  if (mode === 'c' || mode === 'd') {
-    const ControlView = mode === 'c' ? ControlViewC : ControlViewD;
+  if (mode === 'd') {
     return (
-      <ControlView
+      <ControlViewD
+        baristas={baristas}
+        unassignedOrders={unassignedOrders}
+        simTimeSec={currentTimeSec}
+        selectedOrderId={selectedOrderId}
+        highlightFilter={null}
+        onSelectOrder={onSelectOrder}
+        onSelectQueueOrder={(order) => onSelectOrder(order.id)}
+        onAdvanceBay={onAdvanceBay}
+        onOpenTicketDetail={onOpenTicketDetail}
+        onOpenEmptySlot={onOpenEmptySlot}
+        onAssignToBay={onAssignToBay}
+        onRequestRebrew={onRequestRebrew}
+        onMoveTicket={onMoveTicket}
+        onReturnToUnassigned={onReturnToUnassigned}
+        onMergeOrders={onMergeOrders}
+      />
+    );
+  }
+
+  if (mode === 'c') {
+    return (
+      <ControlViewC
         baristas={baristas}
         unassignedOrders={unassignedOrders}
         simTimeSec={currentTimeSec}

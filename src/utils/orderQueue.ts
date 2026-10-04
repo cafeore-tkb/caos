@@ -1,5 +1,17 @@
 import type { OrderTicket, UnassignedOrder } from '../types';
 
+export const ticketKey = (ticket: OrderTicket) => ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`;
+
+// 同じメニュー・同じ指名の1杯同士だけを、2杯の同時抽出へ統合できる（入れ直しは除く）。
+export const canMergeDripUnits = (first: UnassignedOrder, second: UnassignedOrder) =>
+  (first.ticketUid || first.id) !== (second.ticketUid || second.id) &&
+  !first.isRebrew &&
+  !second.isRebrew &&
+  first.cupCount === 1 &&
+  second.cupCount === 1 &&
+  first.beanCode === second.beanCode &&
+  first.preferredBaristaId === second.preferredBaristaId;
+
 export const orderNumber = (id: string) => Number(id.match(/\d+/)?.[0]) || Number.MAX_SAFE_INTEGER;
 
 const compareQueueOrder = (a: OrderTicket, b: OrderTicket) =>
