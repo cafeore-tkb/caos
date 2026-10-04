@@ -1,6 +1,6 @@
-import React from 'react';
 import { ArrowRightCircle, Plus } from 'lucide-react';
-import { Barista, BeanCode, OrderTicket } from '../types';
+import type React from 'react';
+import type { Barista, BeanCode, OrderTicket } from '../types';
 import { TicketCard } from './TicketCard';
 
 interface BayLaneRowProps {
@@ -73,15 +73,58 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
   if (positionedTickets.length > 0) {
     lastTicketEndSec = positionedTickets[positionedTickets.length - 1].endSec;
   }
-  const emptySlotLeftPx = Math.max(
-    1300,
-    (lastTicketEndSec - timelineStartSec) * pixelsPerSec + 16
-  );
+  const emptySlotLeftPx = Math.max(1300, (lastTicketEndSec - timelineStartSec) * pixelsPerSec + 16);
 
   return (
-    <div data-bay-target={barista.id} className="flex items-center h-[72px] border-b border-[#e2e8f0] bg-white hover:bg-[#fcfdff] transition-colors relative touch-manipulation">
-      {/* 1. Action Button - left edge for immediate thumb access */}
-      <div className="sticky left-0 z-[51] w-[95px] shrink-0 self-stretch px-2 flex items-center justify-center bg-white border-r border-[#cbd5e1] isolate">
+    <div
+      data-bay-target={barista.id}
+      className="flex items-center h-[72px] border-b border-[#e2e8f0] bg-white hover:bg-[#fcfdff] transition-colors relative touch-manipulation"
+    >
+      {/* 1. Dripper information - stable locator on the far left */}
+      <div className="sticky left-0 z-[51] w-[195px] shrink-0 self-stretch px-2 py-1.5 flex items-center gap-2 bg-white border-r border-[#e2e8f0] isolate">
+        {/* The number is a quiet locator; name and active order carry the hierarchy. */}
+        <div className="w-9 h-9 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-slate-600 font-mono font-bold text-[18px] shrink-0">
+          {barista.bayNumber}
+        </div>
+
+        <div className="flex flex-col justify-center min-w-0 flex-1 h-full">
+          <div className="flex items-center gap-1 min-w-0 leading-none">
+            <span className="font-black text-[15px] text-[#0f172a] tracking-tight truncate">{barista.name}</span>
+            {barista.canHandleSpecial && (
+              <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-100 text-[9px] font-black whitespace-nowrap">
+                ★SP
+              </span>
+            )}
+            {activeTicket && (
+              <span className="ml-auto font-mono text-[16px] font-black text-slate-950 shrink-0">
+                {activeTicket.id}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-1 flex items-center gap-1 min-w-0 leading-none">
+            <span className="text-[13px] font-bold text-slate-800 truncate" title={activeTicket?.beanName}>
+              {activeTicket?.beanName || '待機中'}
+            </span>
+            {activeTicket && (
+              <span className="rounded bg-slate-950 px-1.5 py-0.5 text-[12px] font-mono font-black text-white shrink-0">
+                {activeTicket.cupCount}杯
+              </span>
+            )}
+          </div>
+          <div
+            className={`mt-1 flex items-baseline gap-1 font-mono leading-none font-black ${isImminent ? 'text-red-600' : 'text-slate-950'}`}
+          >
+            {activeTicket && !isOvertime && <span className="text-[9px] font-sans font-black tracking-wide">残り</span>}
+            <span className={isOvertime ? 'text-[17px]' : 'text-[21px]'}>
+              {activeTicket ? (isOvertime ? '継続中' : formatRemaining(activeTicket.timeRemainingSec)) : '--:--'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Operation - immediately to the right of the dripper */}
+      <div className="sticky left-[195px] z-50 w-[95px] shrink-0 self-stretch px-2 flex items-center justify-center bg-white border-r border-[#cbd5e1] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
         <button
           id={`bay-action-btn-${barista.id}`}
           disabled={barista.queue.length === 0}
@@ -94,49 +137,15 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
         </button>
       </div>
 
-      {/* 2. Barista Info Module - immediately after the action */}
-      <div className="sticky left-[95px] z-50 w-[195px] shrink-0 self-stretch px-2 py-1.5 flex items-center gap-2 bg-white border-r border-[#e2e8f0] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
-        {/* The number is a quiet locator; name and active order carry the hierarchy. */}
-        <div className="w-9 h-9 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-slate-600 font-mono font-bold text-[18px] shrink-0">
-          {barista.bayNumber}
-        </div>
-
-        <div className="flex flex-col justify-center min-w-0 flex-1 h-full">
-          <div className="flex items-center gap-1 min-w-0 leading-none">
-            <span className="font-black text-[15px] text-[#0f172a] tracking-tight truncate">
-              {barista.name}
-            </span>
-            {barista.canHandleSpecial && (
-              <span className="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-100 text-[9px] font-black whitespace-nowrap">
-                ★SP
-              </span>
-            )}
-            {activeTicket && <span className="ml-auto font-mono text-[16px] font-black text-slate-950 shrink-0">{activeTicket.id}</span>}
-          </div>
-
-          <div className="mt-1 flex items-center gap-1 min-w-0 leading-none">
-            <span className="text-[13px] font-bold text-slate-800 truncate" title={activeTicket?.beanName}>{activeTicket?.beanName || '待機中'}</span>
-            {activeTicket && <span className="rounded bg-slate-950 px-1.5 py-0.5 text-[12px] font-mono font-black text-white shrink-0">{activeTicket.cupCount}杯</span>}
-          </div>
-          <div className={`mt-1 flex items-baseline gap-1 font-mono leading-none font-black ${isImminent ? 'text-red-600' : 'text-slate-950'}`}>
-            {activeTicket && !isOvertime && <span className="text-[9px] font-sans font-black tracking-wide">残り</span>}
-            <span className={isOvertime ? 'text-[17px]' : 'text-[21px]'}>{activeTicket ? (isOvertime ? '継続中' : formatRemaining(activeTicket.timeRemainingSec)) : '--:--'}</span>
-          </div>
-        </div>
-      </div>
-
       {/* 3. Timeline Track with Ticket Queue scaled by duration */}
-      <div
-        className="relative h-[72px] py-1.5"
-        style={{ width: `${timelineWidthPx}px` }}
-      >
-        {positionedTickets.map(({ ticket, startSec, endSec }, idx) => {
+      <div className="relative h-[72px] py-1.5" style={{ width: `${timelineWidthPx}px` }}>
+        {positionedTickets.map(({ ticket, startSec, endSec }) => {
           const leftPx = Math.max(10, (startSec - timelineStartSec) * pixelsPerSec);
           const widthPx = Math.max(130, (endSec - startSec) * pixelsPerSec);
 
           return (
             <div
-              key={`${ticket.ticketUid || ticket.id}-${idx}`}
+              key={ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`}
               className="absolute top-1.5 bottom-1.5"
               style={{
                 left: `${leftPx}px`,
@@ -162,10 +171,7 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
         })}
 
         {/* Empty Slot Button positioned after the last scheduled ticket */}
-        <div
-          className="absolute top-1.5 bottom-1.5"
-          style={{ left: `${emptySlotLeftPx}px` }}
-        >
+        <div className="absolute top-1.5 bottom-1.5" style={{ left: `${emptySlotLeftPx}px` }}>
           <button
             id={`empty-slot-bay-${barista.id}`}
             onClick={() => onOpenEmptySlot(barista.id)}

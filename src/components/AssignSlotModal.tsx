@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { X, ArrowRight, Check } from 'lucide-react';
-import { Barista, UnassignedOrder } from '../types';
+import { ArrowRight, Check, X } from 'lucide-react';
+import type React from 'react';
+import { useState } from 'react';
+import type { Barista, UnassignedOrder } from '../types';
 
 interface AssignSlotModalProps {
   bayId: number | null;
@@ -20,7 +21,9 @@ export const AssignSlotModal: React.FC<AssignSlotModalProps> = ({
   onAssign,
 }) => {
   const [selectedOrderUid, setSelectedOrderUid] = useState<string>(
-    targetOrder ? (targetOrder.ticketUid || targetOrder.id) : (unassignedOrders[0]?.ticketUid || unassignedOrders[0]?.id || '')
+    targetOrder
+      ? targetOrder.ticketUid || targetOrder.id
+      : unassignedOrders[0]?.ticketUid || unassignedOrders[0]?.id || ''
   );
   const [selectedBayId, setSelectedBayId] = useState<number>(
     bayId ?? (targetOrder?.preferredBaristaId || targetOrder?.recommendedBayIds[0] || 1)
@@ -49,9 +52,7 @@ export const AssignSlotModal: React.FC<AssignSlotModalProps> = ({
         <div className="p-5 space-y-4 text-xs">
           {/* 1. Select Order */}
           <div>
-            <label className="block font-bold text-slate-700 mb-1.5">
-              割り当てる未割当オーダー:
-            </label>
+            <label className="block font-bold text-slate-700 mb-1.5">割り当てる未割当オーダー:</label>
             {unassignedOrders.length === 0 ? (
               <div className="p-3 bg-slate-50 border border-slate-200 rounded text-slate-500">
                 未割当オーダーがありません
@@ -88,21 +89,21 @@ export const AssignSlotModal: React.FC<AssignSlotModalProps> = ({
                             </span>
                           )}
                           <span className="font-bold text-slate-800">{ord.beanName}</span>
-                          {ord.preferredBaristaId && <span className="rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">指名 {ord.preferredBaristaId}</span>}
-                          <span className="text-[10px] bg-slate-200 text-slate-700 font-semibold px-1.5 py-0.5 rounded">{ord.badgeTag}</span>
+                          {ord.preferredBaristaId && (
+                            <span className="rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">
+                              指名 {ord.preferredBaristaId}
+                            </span>
+                          )}
+                          <span className="text-[10px] bg-slate-200 text-slate-700 font-semibold px-1.5 py-0.5 rounded">
+                            {ord.badgeTag}
+                          </span>
                         </div>
                         {ord.orderNotes && (
-                          <div className="text-[10.5px] text-slate-500 mt-0.5 font-medium">
-                            {ord.orderNotes}
-                          </div>
+                          <div className="text-[10.5px] text-slate-500 mt-0.5 font-medium">{ord.orderNotes}</div>
                         )}
-                        <div className="text-[11px] text-slate-500 mt-1">
-                          標準予測: {ord.predictedTimeStr}
-                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">標準予測: {ord.predictedTimeStr}</div>
                       </div>
-                      {isSelected && (
-                        <Check className="w-4 h-4 text-blue-600 shrink-0" />
-                      )}
+                      {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
                     </div>
                   );
                 })}
@@ -112,9 +113,7 @@ export const AssignSlotModal: React.FC<AssignSlotModalProps> = ({
 
           {/* 2. Select Bay */}
           <div>
-            <label className="block font-bold text-slate-700 mb-1.5">
-              割当先のドリッパー（抽出担当者）:
-            </label>
+            <label className="block font-bold text-slate-700 mb-1.5">割当先のドリッパー（抽出担当者）:</label>
             <div className="grid grid-cols-3 gap-2">
               {baristas.map((b) => (
                 <button
