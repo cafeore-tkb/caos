@@ -360,7 +360,7 @@ export const ControlViewD: React.FC<ControlViewDProps> = ({
                                     : isNow
                                       ? () => onRequestRebrew(ticket, barista.id)
                                       : () => {
-                                          onSelectOrder(ticket.id);
+                                          if (selectedOrderId !== ticket.id) onSelectOrder(ticket.id);
                                           onOpenTicketDetail(ticket);
                                         }
                                 }

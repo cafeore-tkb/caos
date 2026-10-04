@@ -58,6 +58,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
 }) => {
   const suppressNextClick = useRef(false);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const padBeforePress = useRef<string | null>(null);
   const [openPadUid, setOpenPadUid] = useState<string | null>(null);
   const [hoveredBay, setHoveredBay] = useState<number | null>(null);
   const [dragVisual, setDragVisual] = useState<{ uid: string; x: number; y: number } | null>(null);
@@ -186,6 +187,11 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                 openOrder.preferredBaristaId === order.preferredBaristaId
             );
             const isSelected = selectedOrderId === order.id;
+            // While dragging, cancel the card's offset on the pad so the finger can slide onto 1-6.
+            const padStyle =
+              dragVisual?.uid === orderUid(order)
+                ? { transform: `translate3d(${-dragVisual.x}px, ${-dragVisual.y}px, 0)` }
+                : undefined;
             const cardStyle = order.isRebrew
               ? 'bg-red-50 border-red-300 text-slate-900'
               : order.preferredBaristaId
@@ -218,16 +224,21 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                     setHoveredBay(null);
                     return;
                   }
-                  if (onSelectQueueOrder) onSelectQueueOrder(order);
-                  else if (onSelectOrder) onSelectOrder(order.id);
+                  if (selectedOrderId !== order.id) {
+                    if (onSelectQueueOrder) onSelectQueueOrder(order);
+                    else if (onSelectOrder) onSelectOrder(order.id);
+                  }
                   setOpenPadUid(orderUid(order));
                 }}
                 onPointerDown={(event) => {
+                  // A touch drag ends without a click, so drop any suppression left by it.
+                  suppressNextClick.current = false;
                   if (isMergeCandidate) return;
                   if ((event.target as HTMLElement).closest('button[data-bay-target]')) return;
                   if (event.pointerType === 'mouse' && event.button !== 0) return;
                   event.currentTarget.setPointerCapture(event.pointerId);
                   dragStart.current = { x: event.clientX, y: event.clientY };
+                  padBeforePress.current = openPadUid;
                   setOpenPadUid(orderUid(order));
                   setHoveredBay(null);
                 }}
@@ -257,6 +268,8 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   dragStart.current = null;
                   setDragVisual(null);
                   setHoveredBay(null);
+                  // The browser took the gesture as a scroll: don't leave a pad opened by it.
+                  if (padBeforePress.current !== orderUid(order)) setOpenPadUid(null);
                 }}
                 style={{
                   ...(isSidebar ? { gridColumn, gridRow } : {}),
@@ -264,7 +277,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                     ? { transform: `translate3d(${dragVisual.x}px, ${dragVisual.y}px, 0)` }
                     : {}),
                 }}
-                className={`rounded-lg border min-h-0 flex flex-col transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing touch-none select-none relative ${isSidebar ? 'justify-center p-4' : 'justify-between p-2'} ${dragVisual?.uid === orderUid(order) ? 'overflow-hidden z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
+                className={`rounded-lg border min-h-0 flex flex-col transition-[box-shadow,border-color] hover:shadow-md cursor-grab active:cursor-grabbing ${isSidebar && openPadUid !== orderUid(order) ? 'touch-pan-y' : 'touch-none'} select-none relative ${isSidebar ? 'justify-center p-4' : 'justify-between p-2'} ${dragVisual?.uid === orderUid(order) ? 'overflow-visible z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500' : openPadUid === orderUid(order) ? 'overflow-visible z-40' : 'overflow-hidden'} ${cardStyle} ${
                   isSelected ? 'ring-4 ring-amber-400 border-amber-500 shadow-lg z-10' : ''
                 }`}
               >
@@ -291,6 +304,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   <>
                     <div
                       className="absolute -top-[38px] left-0 right-0 z-30 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+                      style={padStyle}
                       aria-label={`${order.id}の割当先 1から3`}
                     >
                       {[1, 2, 3].map((bayId) => (
@@ -311,6 +325,7 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                     </div>
                     <div
                       className="absolute -bottom-[38px] left-0 right-0 z-30 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+                      style={padStyle}
                       aria-label={`${order.id}の割当先 4から6`}
                     >
                       {[4, 5, 6].map((bayId) => (

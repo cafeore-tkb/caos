@@ -68,12 +68,10 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
     return { ticket, startSec, endSec };
   });
 
-  // Calculate the end of the last ticket to position the Empty Slot button
-  let lastTicketEndSec = 29300;
-  if (positionedTickets.length > 0) {
-    lastTicketEndSec = positionedTickets[positionedTickets.length - 1].endSec;
-  }
-  const emptySlotLeftPx = Math.max(1300, (lastTicketEndSec - timelineStartSec) * pixelsPerSec + 16);
+  // Place the Empty Slot button after the last ticket, but never behind NOW where
+  // it would scroll out of view on an idle lane.
+  const lastTicketEndSec = positionedTickets[positionedTickets.length - 1]?.endSec ?? simTimeSec;
+  const emptySlotLeftPx = (Math.max(lastTicketEndSec, simTimeSec) - timelineStartSec) * pixelsPerSec + 16;
 
   return (
     <div
@@ -140,6 +138,8 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
       {/* 3. Timeline Track with Ticket Queue scaled by duration */}
       <div className="relative h-[72px] py-1.5" style={{ width: `${timelineWidthPx}px` }}>
         {positionedTickets.map(({ ticket, startSec, endSec }) => {
+          // Drips that ended before the track starts would otherwise pile up at its left edge.
+          if (endSec <= timelineStartSec) return null;
           const leftPx = Math.max(10, (startSec - timelineStartSec) * pixelsPerSec);
           const widthPx = Math.max(130, (endSec - startSec) * pixelsPerSec);
 

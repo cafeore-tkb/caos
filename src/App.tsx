@@ -24,7 +24,13 @@ import type {
   UnassignedOrder,
 } from './types';
 import { soundManager } from './utils/audio';
-import { arrangeQueue, orderNumber, reanchorQueueInOrder, splitIntoDripUnits } from './utils/orderQueue';
+import {
+  arrangeQueue,
+  orderNumber,
+  queueWaitSeconds,
+  reanchorQueueInOrder,
+  splitIntoDripUnits,
+} from './utils/orderQueue';
 
 type UndoSnapshot = {
   baristas: Barista[];
@@ -50,6 +56,11 @@ const readPanelSnapshot = (): PanelSnapshot | null => {
   } catch {
     return null;
   }
+};
+
+const startOfLocalDay = (ms: number) => {
+  const date = new Date(ms);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
 };
 
 type ShiftMember = { name: string; canHandleSpecial: boolean };
@@ -238,13 +249,16 @@ export default function App() {
   // Linked multi-item order selection (e.g. #152 has items in Bay 1 and Bay 2)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [realTime, setRealTime] = useState(() => new Date());
+  const [realDayStartMs] = useState(() => startOfLocalDay(Date.now()));
   const testPlayStatus = testPlaySession?.status;
   const testPlayCurrentMs = testPlaySession?.currentMs;
   const testPlayEndMs = testPlaySession?.endMs;
   const testPlayOrders = testPlaySession?.orders;
   const operationalTime = testPlaySession ? new Date(testPlaySession.currentMs) : realTime;
-  const realTimeSec =
-    operationalTime.getHours() * 3600 + operationalTime.getMinutes() * 60 + operationalTime.getSeconds();
+  // Seconds are counted from the session's first midnight so the clock keeps
+  // increasing past 24:00 instead of wrapping and scrambling every queue.
+  const operationalDayStartMs = testPlaySession ? startOfLocalDay(testPlaySession.startMs) : realDayStartMs;
+  const realTimeSec = Math.floor((operationalTime.getTime() - operationalDayStartMs) / 1000);
 
   const sortedUnassignedOrders = [...unassignedOrders].sort(
     (a, b) =>
@@ -331,7 +345,11 @@ export default function App() {
       incoming.push(...historicalOrderToDripUnits(order));
       historicalOrderCursor.current += 1;
     }
-    if (incoming.length > 0) setUnassignedOrders((prev) => [...prev, ...incoming]);
+    if (incoming.length === 0) return;
+    if (undoSnapshotRef.current) {
+      arrivalsAfterUndoSnapshotRef.current.push(...incoming);
+    }
+    setUnassignedOrders((prev) => [...prev, ...incoming]);
   }, [testPlayCurrentMs, testPlayOrders, testPlayStatus]);
 
   const captureUndo = (label: string) => {
@@ -558,8 +576,26 @@ export default function App() {
 
   const ticketKey = (ticket: OrderTicket) => ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`;
 
-  const handleMoveScheduledTicket = (ticket: OrderTicket, targetBayId: number) => {
-    if (ticket.status !== 'scheduled') return;
+  // Panels keep the ticket object from the moment they opened. Resolve it again
+  // before acting so a drip that started or finished meanwhile is not moved.
+  const findLiveTicket = (key: string) => {
+    for (const bay of baristas) {
+      const ticket =
+        bay.queue.find((item) => ticketKey(item) === key) || bay.pastTickets?.find((item) => ticketKey(item) === key);
+      if (ticket) return ticket;
+    }
+    return null;
+  };
+
+  const liveSelectedTicket = selectedTicket ? findLiveTicket(ticketKey(selectedTicket)) : null;
+  const liveSelectedTicketStatus = liveSelectedTicket?.status;
+  useEffect(() => {
+    if (selectedTicket && liveSelectedTicketStatus !== 'scheduled') setSelectedTicket(null);
+  }, [selectedTicket, liveSelectedTicketStatus]);
+
+  const handleMoveScheduledTicket = (requestedTicket: OrderTicket, targetBayId: number) => {
+    const ticket = findLiveTicket(ticketKey(requestedTicket));
+    if (ticket?.status !== 'scheduled') return;
     if (ticket.preferredBaristaId && ticket.preferredBaristaId !== targetBayId) return;
     captureUndo(`${ticket.id}の割当変更`);
     const key = ticketKey(ticket);
@@ -623,8 +659,9 @@ export default function App() {
   const nextShiftHour = (realTime.getHours() + 1) % 24;
   const nextShiftLabel = `${nextShiftHour.toString().padStart(2, '0')}:00`;
 
-  const handleReturnScheduledTicket = (ticket: OrderTicket) => {
-    if (ticket.status !== 'scheduled') return;
+  const handleReturnScheduledTicket = (requestedTicket: OrderTicket) => {
+    const ticket = findLiveTicket(ticketKey(requestedTicket));
+    if (ticket?.status !== 'scheduled') return;
     captureUndo(`${ticket.id}を未割当に戻す`);
     const key = ticketKey(ticket);
     setBaristas((prev) =>
@@ -666,7 +703,8 @@ export default function App() {
 
   const handleConfirmRebrew = (decision: RebrewDecision) => {
     if (!rebrewSource) return;
-    const { ticket, bayId: sourceBayId } = rebrewSource;
+    const { bayId: sourceBayId } = rebrewSource;
+    const ticket = findLiveTicket(ticketKey(rebrewSource.ticket)) ?? rebrewSource.ticket;
     captureUndo(`${ticket.id}の入れ直し`);
     const originalKey = ticketKey(ticket);
     const duration = decision.cupCount > 1 ? 195 : 135;
@@ -891,7 +929,7 @@ export default function App() {
   const nextAvailable = [...baristas]
     .map((barista) => ({
       bayNumber: barista.bayNumber,
-      seconds: barista.queue[0]?.timeRemainingSec ?? 0,
+      seconds: queueWaitSeconds(barista.queue, barista.coefficient),
       isStandby: barista.queue.length === 0,
     }))
     .sort((a, b) => a.seconds - b.seconds || a.bayNumber - b.bayNumber)
@@ -1016,7 +1054,7 @@ export default function App() {
       {/* Ticket Detail Recipe Modal */}
       {selectedTicket && controlViewMode !== 'current' && (
         <TicketDetailModal
-          ticket={selectedTicket}
+          ticket={liveSelectedTicket}
           currentBayId={
             baristas.find((bay) => bay.queue.some((ticket) => ticketKey(ticket) === ticketKey(selectedTicket)))?.id ||
             null
@@ -1044,7 +1082,7 @@ export default function App() {
 
       {rebrewSource && (
         <RebrewPanel
-          ticket={rebrewSource.ticket}
+          ticket={findLiveTicket(ticketKey(rebrewSource.ticket)) ?? rebrewSource.ticket}
           sourceBayId={rebrewSource.bayId}
           baristas={baristas}
           onClose={() => setRebrewSource(null)}

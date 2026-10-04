@@ -2,6 +2,7 @@ import { CheckCircle2, ChevronRight, CircleDot, ClipboardList, Link2 } from 'luc
 import type React from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import type { Barista, BeanCode, OrderTicket, UnassignedOrder } from '../types';
+import { queueWaitSeconds } from '../utils/orderQueue';
 
 export interface ControlViewBProps {
   baristas: Barista[];
@@ -68,7 +69,7 @@ export const ControlViewB: React.FC<ControlViewBProps> = ({
   }, [openPadUid, onSelectOrder]);
 
   const openAssignmentPad = (order: UnassignedOrder) => {
-    onSelectQueueOrder(order);
+    if (selectedOrderId !== order.id) onSelectQueueOrder(order);
     setOpenPadUid(orderUid(order));
   };
 
@@ -94,12 +95,12 @@ export const ControlViewB: React.FC<ControlViewBProps> = ({
       sortedBaristas
         .map((barista) => ({
           bayNumber: barista.bayNumber,
-          seconds: getRemainingSeconds(barista, simTimeSec),
+          seconds: queueWaitSeconds(barista.queue, barista.coefficient),
           isStandby: barista.queue.length === 0,
         }))
         .sort((a, b) => a.seconds - b.seconds || a.bayNumber - b.bayNumber)
         .slice(0, 3),
-    [sortedBaristas, simTimeSec]
+    [sortedBaristas]
   );
 
   const selectedRoutes = useMemo(() => {
@@ -244,7 +245,7 @@ export const ControlViewB: React.FC<ControlViewBProps> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        onSelectOrder(next.id);
+                        if (selectedOrderId !== next.id) onSelectOrder(next.id);
                         onOpenTicketDetail(next);
                       }}
                       className="w-full mt-1 text-left flex items-center justify-between gap-1 hover:text-blue-700 touch-manipulation"

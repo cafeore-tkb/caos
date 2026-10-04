@@ -57,7 +57,11 @@ export const RebrewPanel: React.FC<RebrewPanelProps> = ({ ticket, sourceBayId, b
       ? selectedBay.queue.slice(1)
       : selectedBay.queue
     : [];
-  const canConfirm = targetBayId === null || insertIndex !== null;
+  // Position 0 is offered only for an empty queue or when replacing the drip being
+  // interrupted; a stale 0 (e.g. the drip finished while this panel was open) must be re-picked.
+  const canInsertAtFront =
+    selectedQueue.length === 0 || (interruptCurrent && isBrewing && selectedBay?.id === sourceBayId);
+  const canConfirm = targetBayId === null || (insertIndex !== null && (insertIndex > 0 || canInsertAtFront));
 
   return (
     <aside
@@ -235,7 +239,9 @@ export const RebrewPanel: React.FC<RebrewPanelProps> = ({ ticket, sourceBayId, b
         <button
           type="button"
           disabled={!canConfirm}
-          onClick={() => onConfirm({ cupCount, interruptCurrent, targetBayId, insertIndex })}
+          onClick={() =>
+            onConfirm({ cupCount, interruptCurrent: interruptCurrent && isBrewing, targetBayId, insertIndex })
+          }
           className="min-h-[50px] flex-1 rounded-xl bg-red-600 text-white text-[15px] font-black disabled:bg-slate-300 touch-manipulation"
         >
           この内容で入れ直す

@@ -1,6 +1,6 @@
 import { RotateCcw, Sparkles, X } from 'lucide-react';
 import type React from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { Barista, BeanCode, OrderTicket } from '../types';
 import { BayLaneRow } from './BayLaneRow';
 
@@ -25,6 +25,8 @@ const PIXELS_PER_SEC = 1.2; // 1 min = 72px
 const STICKY_LEFT_WIDTH = 290; // 195px barista + 95px action
 // 90 seconds of past context remains visible to the left of NOW.
 const NOW_VIEWPORT_OFFSET = 90 * PIXELS_PER_SEC;
+// Scroll positions this close to NOW count as following it.
+const FOLLOW_TOLERANCE_PX = 24;
 
 export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   baristas,
@@ -42,13 +44,16 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   simTimeSec,
   timelineCommand,
 }) => {
-  // Build a rolling 12-hour timeline from the current real-world hour.
-  const timelineStartSec = Math.floor(simTimeSec / 3600) * 3600;
-  const timelineEndSec = timelineStartSec + 12 * 3600;
+  // Build a rolling timeline that runs 12 hours ahead of the current hour. It starts
+  // one hour back so drips spanning the top of the hour keep their real position.
+  const timelineStartSec = Math.floor(simTimeSec / 3600) * 3600 - 3600;
+  const timelineEndSec = timelineStartSec + 13 * 3600;
   const timelineWidthPx = (timelineEndSec - timelineStartSec) * PIXELS_PER_SEC;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [hasInitializedScroll, setHasInitializedScroll] = useState(false);
-  const [isPastView, setIsPastView] = useState(false);
+  // The board follows NOW until the viewer scrolls (or pages with ±5分) away from it,
+  // and stays where they left it until they come back or press 現在.
+  const [isFollowingNow, setIsFollowingNow] = useState(true);
+  const [viewLeftPx, setViewLeftPx] = useState(0);
 
   const _formatClock = (seconds: number) => {
     const normalized = ((seconds % 86400) + 86400) % 86400;
@@ -59,42 +64,71 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
 
   // Position of current NOW cursor along timeline
   const nowX = (simTimeSec - timelineStartSec) * PIXELS_PER_SEC;
+  const followLeftPx = Math.max(0, nowX - NOW_VIEWPORT_OFFSET);
+  const isPastView = !isFollowingNow && viewLeftPx < nowX - 600;
+  const followLeftRef = useRef(followLeftPx);
+  followLeftRef.current = followLeftPx;
+
+  // When the hour rolls over the track origin moves; shift the scroll by the same
+  // amount before paint so whatever is on screen stays put.
+  const previousTimelineStartRef = useRef(timelineStartSec);
+  useLayoutEffect(() => {
+    const shiftPx = (timelineStartSec - previousTimelineStartRef.current) * PIXELS_PER_SEC;
+    previousTimelineStartRef.current = timelineStartSec;
+    if (shiftPx && scrollContainerRef.current) scrollContainerRef.current.scrollLeft -= shiftPx;
+  }, [timelineStartSec]);
 
   // Keep NOW at one fixed screen position; the timeline moves underneath it.
-  useEffect(() => {
-    if (!scrollContainerRef.current || isPastView) return;
-    scrollContainerRef.current.scrollLeft = Math.max(0, nowX - NOW_VIEWPORT_OFFSET);
-    if (!hasInitializedScroll) setHasInitializedScroll(true);
-  }, [nowX, hasInitializedScroll, isPastView]);
+  useLayoutEffect(() => {
+    if (!scrollContainerRef.current || !isFollowingNow) return;
+    scrollContainerRef.current.scrollLeft = followLeftPx;
+  }, [followLeftPx, isFollowingNow]);
 
-  // Track scroll position to indicate if viewing past
+  // Leave follow mode as soon as the view moves away, but resume only once scrolling
+  // has settled near NOW so a scroll that merely passes NOW is not captured.
+  const followSettleTimerRef = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(followSettleTimerRef.current), []);
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const currentLeft = scrollContainerRef.current.scrollLeft;
-    // If scrolled significantly to the left of NOW
-    setIsPastView(currentLeft < nowX - 600);
+    setViewLeftPx(currentLeft);
+    window.clearTimeout(followSettleTimerRef.current);
+    if (Math.abs(currentLeft - followLeftPx) > FOLLOW_TOLERANCE_PX) {
+      setIsFollowingNow(false);
+      return;
+    }
+    followSettleTimerRef.current = window.setTimeout(() => {
+      const settledLeft = scrollContainerRef.current?.scrollLeft;
+      if (settledLeft !== undefined && Math.abs(settledLeft - followLeftRef.current) <= FOLLOW_TOLERANCE_PX) {
+        setIsFollowingNow(true);
+      }
+    }, 150);
   };
 
+  // Run each header command once. ±5分 pages from the current view; 現在 returns to NOW,
+  // and arriving there resumes following through handleScroll.
+  const handledCommandIdRef = useRef(timelineCommand?.id);
   useEffect(() => {
-    if (!timelineCommand) return;
-    const targetSec =
-      timelineCommand.direction === 'back'
-        ? simTimeSec - 300
-        : timelineCommand.direction === 'forward'
-          ? simTimeSec + 300
-          : simTimeSec;
-    const targetX = (targetSec - timelineStartSec) * PIXELS_PER_SEC;
-    scrollContainerRef.current?.scrollTo({
-      left: Math.max(0, targetX - 380),
-      behavior: 'smooth',
-    });
-  }, [timelineCommand, simTimeSec, timelineStartSec]);
+    if (!timelineCommand || timelineCommand.id === handledCommandIdRef.current) return;
+    handledCommandIdRef.current = timelineCommand.id;
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const pagePx = 300 * PIXELS_PER_SEC;
+    // Stop following first so the next clock tick does not cut the smooth scroll short.
+    if (timelineCommand.direction !== 'now') setIsFollowingNow(false);
+    const left =
+      timelineCommand.direction === 'now'
+        ? followLeftRef.current
+        : container.scrollLeft + (timelineCommand.direction === 'back' ? -pagePx : pagePx);
+    container.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+  }, [timelineCommand]);
 
   // Generate timeline markers every 1 minute, with major labels every 5 minutes
   const timeMarkers = [];
   for (let sec = timelineStartSec; sec <= timelineEndSec; sec += 60) {
-    const m = Math.floor(sec / 60) % 60;
-    const h = Math.floor(sec / 3600) % 24;
+    const clockSec = ((sec % 86400) + 86400) % 86400;
+    const m = Math.floor(clockSec / 60) % 60;
+    const h = Math.floor(clockSec / 3600);
     const isMajor = m % 5 === 0;
     const left = (sec - timelineStartSec) * PIXELS_PER_SEC;
 
@@ -250,17 +284,15 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
                 aria-hidden="true"
               />
             ))}
-        </div>
-        <div
-          className="absolute bottom-0 z-40 w-[2px] bg-red-500 pointer-events-none"
-          style={{
-            left: `${STICKY_LEFT_WIDTH + NOW_VIEWPORT_OFFSET}px`,
-            top: selectedOrderId ? '86px' : '44px',
-          }}
-          aria-hidden="true"
-        >
-          <div className="absolute top-1 -translate-x-1/2 rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-black text-white shadow-sm">
-            NOW
+          {/* Drawn on the track so it marks the real time even while browsing away from NOW. */}
+          <div
+            className="absolute top-[44px] bottom-0 z-40 w-[2px] bg-red-500 pointer-events-none"
+            style={{ left: `${STICKY_LEFT_WIDTH + nowX}px` }}
+            aria-hidden="true"
+          >
+            <div className="absolute top-1 -translate-x-1/2 rounded-md bg-red-500 px-2 py-0.5 text-[10px] font-black text-white shadow-sm">
+              NOW
+            </div>
           </div>
         </div>
       </div>
