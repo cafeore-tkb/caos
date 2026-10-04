@@ -57,50 +57,56 @@
 
 ## cafeore-pos 連携
 
-CaOS は cafeore-pos と同じ Postgres（Supabase）の `caos` スキーマを、supabase-js で直接読み書きします。間に CaOS 専用のサーバーやプロキシは置きません。
+CaOS は cafeore-pos・ShiftMaker と同じ Supabase プロジェクトの `caos` スキーマを、supabase-js で直接使います。間に CaOS 専用のサーバーやプロキシは置きません。作法は ShiftMaker（[cafeore-tkb/sohosai-shift](https://github.com/cafeore-tkb/sohosai-shift)）にそろえています。
 
 ```
 [CaOS の画面（iPad 数台）]
    │ supabase-js
    ▼
 [Supabase]
- ・ログイン = Supabase Auth（Google）。書き込めるのは caos.staff に登録したスタッフだけ（ShiftMaker と同じプロジェクト）
- ・権限     = RLS。スタッフは caos.drips を読めるだけで、書き込みは RPC に限る
- ・同期     = Realtime。変わったカードの行だけが届く
- ・操作     = Postgres 関数（caos.assign / unassign / next / merge / rebrew / restore）
- └ 中身は POS と同じ Postgres（caos スキーマ。POS の表は public スキーマ）
+ ・ログイン = Supabase Auth（Google）。使えるのは caos.staff に登録したスタッフだけ
+ ・読み書き = caos スキーマの関数（RPC）だけ。テーブルは直接読ませない（権限の確認は関数の中）
+ ・同期     = Realtime の Broadcast（private チャンネル caos:drips）。変わったカードだけが、スタッフにだけ届く
+ └ 中身は POS と同じ Postgres（caos スキーマ。POS の表は public スキーマで、CaOS はトリガーを付けるだけ）
 ```
 
 - 抽出カード（1 回のドリップ、最大 2 杯）を `caos.drips` に 1 枚 1 行で持ちます。保存するのは担当・状態・開始/終了時刻などの事実だけで、待機カードの予定時刻は画面で計算します。
-- 注文が入ると、`public.order_menus` のトリガーがカードを作ります（2 杯ずつ分割。アイスミルクとグッズは除く）。注文を編集・削除すると、未割当のカードだけを作り直します。
+- 注文が入ると、`public.order_menus` のトリガーがカードを作ります（2 杯ずつ分割。アイスミルクとグッズは除く）。注文を編集・削除すると、未割当のカードだけを作り直します。トリガーの中で CaOS の処理が失敗しても、POS の注文の書き込みは止めません。
 - `次へ` で注文のカードが全部終わると、その注文に `ready_at` を付けます（POS の準備完了）。逆に POS で準備完了・提供済みにすると、その注文のカードを抽出終了にし、抽出中だったドリッパーは次のカードを始めます。CaOS が 1 台も開いていなくても DB の中で動きます。
-- 割当・移動・未割当へ戻す・統合・入れ直し・`次へ`・`1つ戻す` は、どれも RPC を 1 回呼ぶだけです。サーバー側で順に処理するので、複数の iPad で同時に操作しても上書きし合いません。`1つ戻す` は、ほかの端末がその後にカードを動かしていたら断ります。
+- 割当・移動・未割当へ戻す・統合・入れ直し・`次へ`・`1つ戻す` は、どれも関数を 1 回呼ぶだけです。DB の中で順に処理するので、複数の iPad で同時に操作しても上書きし合いません。`1つ戻す` は、ほかの端末がその後にカードを動かしていたら断ります。
+- Broadcast には版（`v`）が付いています。画面は版が飛んだら取りこぼしたとみなし、`caos.list_drips` でその日のカードを読み直します。つなぎ直したときも読み直します。
 - 実データテスト中は DB を使わず、テストの注文だけで手元の盤面を動かします。終了後の実績表示中も DB は使わず、リセットすると DB の盤面に戻ります。
 - ヘッダーの DB アイコンが状態を表します。緑は接続済み、黄は接続中・再接続中、赤の「未登録」はログインしたアカウントが `caos.staff` に無いとき、灰色は実データテスト中か Supabase 未設定です。未ログインのときは「ログイン」ボタンになります。
 - メニュー名から豆を判定します（優勝ブレンド→チャンプ、俺ブレ、ケニア、タンザニア、ブラジル、アイスコーヒー→氷、アイスオレ→牛、それ以外のホット→★SP）。
 - POS の指名は、`1`〜`6` の番号か現在のドリッパー名に一致したときだけその担当者に固定し、一致しないときはカードに「（指名:名前）」と表示します。
 - POS の画面へは、cafeore-pos の API が DB の `orders_changed` 通知を受けて配り直します（cafeore-pos の `api/sql/2026-10_orders_notify.sql`）。CaOS が付けた `ready_at` もこれで POS に届きます。
 
-### Supabase のセットアップ
+### 構成
 
-本番の Supabase プロジェクトで、管理者が 1 度だけ行います。
+- **`supabase/migrations/`** … `caos` スキーマ（テーブル・関数・POS の表のトリガー・Realtime の受信の許可）。変えるときは新しいファイルを足し、本番に psql で流す
+- **`supabase/tests/caos_test.sql`** … 運用の流れと権限の確認。トランザクションの中で行い、最後に取り消す。本番では流さない
+- **`public/site-config.js`** … `window.SUPABASE_CONFIG = { url, key }`（Project URL と公開キー。公開してよい値で、何ができるかは DB の関数が決める）。ビルドし直さずに差し替えられるよう別ファイルのまま読み込む。空にすると DB を使わない
+- **`src/live/backend.ts`** … つなぎ先（ログイン・関数の呼び出し・Broadcast の受信）。`window.__CAOS_BACKEND_MOCK__` に同じ形のものを入れると、本物の代わりに使う（動作確認用）
+- **`src/live/useLiveDrips.ts`** … その日のカードを最新に保つ。`src/live/drips.ts` … カードを管制盤の形に組み立てる
 
-1. `supabase/migrations/` の SQL を順に流します（SQL Editor か `supabase db push`）。`public` スキーマの表から `anon` / `authenticated` の権限を外すので、POS の API（Go）は今までどおりオーナーのロールで接続していることを確かめてから流してください。
-2. Data API の Exposed schemas に `caos` を足します。ShiftMaker の `shift` は残し、`public`・`graphql_public` は外したままにします（POS の表を匿名キーから見えなくするため）。
-3. Authentication → URL Configuration の Redirect URLs に、公開版（`https://cafeore-tkb.github.io/digital-master-sheet-pages/`）と開発用（`http://localhost:3000/`）を足します。Google ログインは ShiftMaker で有効にしてあります。スタッフかどうかは Google でログインした人だけで判定するので、メール（パスワード）のログインは ShiftMaker の README どおり無効にしておきます。
+### Supabase の設定
+
+本番の Supabase プロジェクトで、管理者が 1 度だけ行います（Google ログインと、Data API で `public` を出さない設定は ShiftMaker で済んでいます）。
+
+1. `supabase/migrations/` の SQL を psql で流します（1 トランザクションで：`psql "$DB" -1 -v ON_ERROR_STOP=1 -f supabase/migrations/….sql`）。cafeore-pos の `api/sql/2026-10_orders_notify.sql` も流します。
+2. Data API の Exposed schemas に `caos` を足します（`shift` は残し、`public`・`graphql_public` は外したまま）。
+3. Authentication → URL Configuration の Redirect URLs に、公開版（`https://cafeore-tkb.github.io/digital-master-sheet-pages/**`）と開発用（`http://localhost:3000/**`）を足します。メール（パスワード）での新規登録と匿名ログインは、ShiftMaker の README どおり無効にしておきます（関数は Google でログインした人しか認めません）。
 4. 使うスタッフの Google アカウントを登録します。
 
    ```sql
    insert into caos.staff (email) values ('someone@example.com');
    ```
 
-5. CaOS のビルドに Project URL と anon key を渡します（`.env.local` か、GitHub Actions の Variables の `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`）。anon key は公開してよい鍵です。
-
 マイグレーションは、共有 DB のスキーマ用リポジトリができたらそちらへ移します。
 
 ### SQL のテスト
 
-ローカルの Postgres に使い捨てのデータベースを作り、マイグレーションを流して運用の流れ（注文 → カード作成 → 割当 → 次へ → 準備完了、POS 側の準備完了、統合、入れ直し、1つ戻す、権限）を確かめます。
+使い捨てのデータベースを作り、マイグレーションを流して運用の流れ（注文 → カード作成 → 割当 → 次へ → 準備完了、POS 側の準備完了、統合、入れ直し、1つ戻す、Broadcast、権限）を確かめます。素の Postgres なら Supabase の代役（`supabase/tests/stub_supabase.sql`）を入れ、ローカルの Supabase（`supabase start`）なら本物の auth・realtime を使います。
 
 ```bash
 TEST_DATABASE_URL=postgres://postgres@127.0.0.1:5432/postgres bash scripts/test-supabase.sh
@@ -141,7 +147,7 @@ npm install
 npm run dev
 ```
 
-開発サーバーは `http://localhost:3000` で起動します。DB につなぐには `.env.local` に Supabase の接続先を書きます（`.env.example` を参照）。本番の DB を指すと実際の注文を操作することになるので、開発用の Supabase プロジェクトを使ってください。
+開発サーバーは `http://localhost:3000` で起動します。DB のつなぎ先は `public/site-config.js` です。そのままだと本番の DB につながり、スタッフとしてログインすると実際の注文を操作することになるので、試すときは開発用の Supabase プロジェクトか `window.__CAOS_BACKEND_MOCK__` を使ってください。
 
 ```bash
 npm run lint

@@ -1,60 +1,51 @@
-import type { Session } from '@supabase/supabase-js';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { type Backend, BackendError, backendEnabled, type DripsEvent, loadBackend } from './backend';
 import type { Drip, DripRpcResult } from './drips';
-import { supabase } from './supabase';
 
 export type LiveStatus =
   | 'off' // 実データテスト中など、DB を使っていない
-  | 'unconfigured' // VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY が無い
+  | 'unconfigured' // site-config.js に Supabase の設定が無い
   | 'signed-out'
   | 'not-staff'
   | 'connecting'
   | 'open'
   | 'reconnecting';
 
-const PAGE_SIZE = 1000;
-
-// 古い行で新しい行を上書きしない（RPC の結果と Realtime の通知は順番が前後することがある）
+// 古い行で新しい行を上書きしない（RPC の結果と Broadcast は順番が前後することがある）
 const isNewer = (incoming: Drip, current: Drip | undefined) =>
   !current || new Date(incoming.updated_at).getTime() >= new Date(current.updated_at).getTime();
 
-// その日のカードを読み、Realtime で変わった行だけを受け取って手元の一覧を最新に保つ。
-// 書き込みは call() で RPC を呼ぶ。結果の行は Realtime を待たずにすぐ反映する。
+// その日のカードを読み、caos:drips の Broadcast で変わったカードだけを受け取って手元の一覧を最新に保つ。
+// 版（v）が飛んだら取りこぼしたとみなして読み直す。書き込みは call() で関数を呼び、結果のカードはすぐ反映する。
 export const useLiveDrips = (enabled: boolean, dayStartMs: number) => {
-  const [session, setSession] = useState<Session | null>(null);
-  const [authReady, setAuthReady] = useState(!supabase);
-  const [isStaff, setIsStaff] = useState<boolean | null>(null);
-  const [channelStatus, setChannelStatus] = useState<'connecting' | 'open' | 'reconnecting'>('connecting');
+  const configured = backendEnabled();
+  const [backend, setBackend] = useState<Backend | null>(null);
+  const [email, setEmail] = useState<string | null | undefined>(undefined);
+  const [access, setAccess] = useState<'unknown' | 'staff' | 'denied'>('unknown');
+  const [channel, setChannel] = useState<'connecting' | 'live' | 'offline'>('connecting');
   const [drips, setDrips] = useState<Map<string, Drip>>(() => new Map());
   const dripsRef = useRef(drips);
   dripsRef.current = drips;
+  const versionRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!supabase) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setAuthReady(true);
-    });
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => setSession(nextSession));
-    return () => data.subscription.unsubscribe();
-  }, []);
-
-  const email = session?.user.email;
-  useEffect(() => {
-    if (!supabase || !email) {
-      setIsStaff(null);
-      return;
-    }
+    if (!configured) return;
+    let stop: (() => void) | undefined;
     let cancelled = false;
-    supabase.rpc('is_staff').then(({ data, error }) => {
-      if (!cancelled) setIsStaff(error ? false : Boolean(data));
-    });
+    loadBackend()
+      .then((loaded) => {
+        if (cancelled) return;
+        setBackend(loaded);
+        stop = loaded.onUser((user) => setEmail(user?.email ?? null));
+      })
+      .catch(() => setEmail(null));
     return () => {
       cancelled = true;
+      stop?.();
     };
-  }, [email]);
+  }, [configured]);
 
-  const apply = useCallback((changed: Drip[], deleted: string[] = []) => {
+  const apply = useCallback((changed: Drip[] = [], deleted: string[] = []) => {
     if (changed.length === 0 && deleted.length === 0) return;
     setDrips((prev) => {
       const next = new Map<string, Drip>(prev);
@@ -68,102 +59,105 @@ export const useLiveDrips = (enabled: boolean, dayStartMs: number) => {
     });
   }, []);
 
-  const active = enabled && Boolean(supabase) && Boolean(isStaff);
+  const active = enabled && Boolean(backend) && Boolean(email);
   useEffect(() => {
-    const client = supabase;
-    if (!active || !client) return;
+    if (!active || !backend) return;
     let cancelled = false;
-    const since = new Date(dayStartMs).toISOString();
+    setAccess('unknown');
+    versionRef.current = null;
 
-    // その日のカードを丸ごと読み直す。つないだ直後と、つなぎ直したとき（切れていた間の変更を拾う）に使う
+    // その日のカードを丸ごと読み直す。つないだとき・つなぎ直したとき・版が飛んだときに使う
     const reload = async () => {
       const startedMs = Date.now();
-      const loaded = new Map<string, Drip>();
-      for (let from = 0; ; from += PAGE_SIZE) {
-        const { data, error } = await client
-          .from('drips')
-          .select('*')
-          .gte('created_at', since)
-          .order('created_at')
-          .range(from, from + PAGE_SIZE - 1);
-        if (error || cancelled) return;
-        (data as Drip[]).forEach((drip) => {
-          loaded.set(drip.id, drip);
+      try {
+        const snapshot = await backend.rpc<{ v: number; drips: Drip[] }>('list_drips', {
+          p_since: new Date(dayStartMs).toISOString(),
         });
-        if (data.length < PAGE_SIZE) break;
+        if (cancelled) return;
+        versionRef.current = Math.max(versionRef.current ?? 0, snapshot.v);
+        const loaded = new Map<string, Drip>(snapshot.drips.map((drip) => [drip.id, drip]));
+        // 読んでいる間に Broadcast や関数の結果で届いた新しいカードは残す
+        setDrips((prev) => {
+          prev.forEach((drip, id) => {
+            const recent = new Date(drip.updated_at).getTime() >= startedMs - 1_000;
+            if (recent && isNewer(drip, loaded.get(id))) loaded.set(id, drip);
+          });
+          return loaded;
+        });
+        setAccess('staff');
+      } catch (error) {
+        if (cancelled) return;
+        if (error instanceof BackendError && (error.kind === 'denied' || error.kind === 'login')) setAccess('denied');
       }
-      if (cancelled) return;
-      // 読んでいる間に Realtime や RPC で届いた新しい行は残す
-      setDrips((prev) => {
-        prev.forEach((drip, id) => {
-          const recent = new Date(drip.updated_at).getTime() >= startedMs - 1_000;
-          if (recent && isNewer(drip, loaded.get(id))) loaded.set(id, drip);
-        });
-        return loaded;
-      });
     };
 
-    setChannelStatus('connecting');
-    const channel = client
-      .channel('caos-drips')
-      .on('postgres_changes', { event: '*', schema: 'caos', table: 'drips' }, (payload) => {
-        if (payload.eventType === 'DELETE') {
-          const id = (payload.old as Partial<Drip>).id;
-          if (id) apply([], [id]);
-        } else {
-          apply([payload.new as Drip]);
-        }
-      })
-      .subscribe((state) => {
-        if (state === 'SUBSCRIBED') {
-          setChannelStatus('open');
-          void reload();
-        } else if (state === 'CHANNEL_ERROR' || state === 'TIMED_OUT' || state === 'CLOSED') {
-          // supabase-js が自動でつなぎ直す。つながったら SUBSCRIBED がもう一度来る
-          setChannelStatus('reconnecting');
-        }
-      });
+    const onDrips = (event: DripsEvent) => {
+      const last = versionRef.current;
+      if (event.reload) {
+        void reload();
+        return;
+      }
+      apply(event.drips, event.deleted);
+      if (last !== null && event.v > last + 1) void reload();
+      versionRef.current = Math.max(last ?? 0, event.v);
+    };
 
+    const stop = backend.watchDrips({
+      drips: onDrips,
+      status: (status) => {
+        if (status === 'live') {
+          setChannel('live');
+          void reload();
+        } else if (status === 'denied') {
+          setAccess('denied');
+        } else {
+          setChannel(status === 'connecting' ? 'connecting' : 'offline');
+        }
+      },
+    });
     return () => {
       cancelled = true;
-      void client.removeChannel(channel);
+      stop();
     };
-  }, [active, dayStartMs, apply]);
+  }, [active, backend, dayStartMs, apply]);
 
-  // RPC を呼び、結果をすぐ手元に反映する。失敗したらエラーの文を返す。
+  // 関数を呼び、結果をすぐ手元に反映する。失敗したらエラーの文を返す。
   const call = useCallback(
     async (fn: string, args: Record<string, unknown>): Promise<{ result?: DripRpcResult; error?: string }> => {
-      if (!supabase) return { error: 'Supabase が設定されていません' };
-      const { data, error } = await supabase.rpc(fn, args);
-      if (error) return { error: error.message };
-      const result = data as DripRpcResult;
-      apply(result.changed, result.deleted);
-      return { result };
+      if (!backend) return { error: 'DB につながっていません' };
+      try {
+        const result = await backend.rpc<DripRpcResult>(fn, args);
+        apply(result.changed, result.deleted);
+        return { result };
+      } catch (error) {
+        return { error: (error as Error).message };
+      }
     },
-    [apply]
+    [backend, apply]
   );
 
   const signIn = useCallback(() => {
-    void supabase?.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: `${window.location.origin}${window.location.pathname}` },
-    });
-  }, []);
+    void backend?.signIn();
+  }, [backend]);
   const signOut = useCallback(() => {
-    void supabase?.auth.signOut();
-  }, []);
+    void backend?.signOut();
+  }, [backend]);
 
   const status: LiveStatus = !enabled
     ? 'off'
-    : !supabase
+    : !configured
       ? 'unconfigured'
-      : !authReady || (session && isStaff === null)
+      : email === undefined
         ? 'connecting'
-        : !session
+        : email === null
           ? 'signed-out'
-          : !isStaff
+          : access === 'denied'
             ? 'not-staff'
-            : channelStatus;
+            : access === 'unknown' || channel === 'connecting'
+              ? 'connecting'
+              : channel === 'live'
+                ? 'open'
+                : 'reconnecting';
 
-  return { status, email, drips, dripsRef, call, signIn, signOut };
+  return { status, email: email ?? undefined, drips, dripsRef, call, signIn, signOut };
 };

@@ -1,37 +1,37 @@
--- CaOS（ドリップ管制）のテーブル・関数・トリガー。
+-- CaOS（ドリップ管制）の抽出カード。
+-- cafeore-pos と同じ Supabase プロジェクトに置くので、すべて caos スキーマの中に作る。
+-- public（POS の表）には、注文と抽出カードをつなぐトリガーを付けるだけで、表も権限も変えない。
+-- Data API（Exposed schemas）には caos を足す（ShiftMaker の shift と並べる。public は出さない）。
 --
--- cafeore-pos と同じ Postgres（Supabase）の caos スキーマに置く。CaOS の画面は
--- supabase-js で caos.drips を読み、Realtime で変わった行だけを受け取り、
--- 書き込みはすべて下の RPC（caos.assign など）で行う。表を直接は書き換えさせない。
+-- ブラウザ（anon / authenticated）からはテーブルを直接読み書きさせず、このファイルの関数（RPC）だけを呼ばせる。
+-- テーブルは RLS を有効にしてポリシーを作らない（関数を通さない読み書きはすべて拒否）。
+-- カードの変更は Realtime の Broadcast（private チャンネル caos:drips）で、スタッフにだけ届ける。
+-- 作法は ShiftMaker（cafeore-tkb/sohosai-shift の supabase/migrations）にそろえている。
 --
--- POS（public スキーマ）とのつながりはトリガーだけで持つ。
+-- POS とのつながり：
 --   - 注文の明細（public.order_menus）が入る・変わる → 抽出カードを作る（caos.sync_order）
---   - 注文に ready_at が付く → その注文のカードを抽出終了にし、次のカードを始める（caos.finish_order）
+--   - 注文に ready_at が付く（POS で準備完了・提供済み）→ その注文のカードを抽出終了にし、次のカードを始める（caos.finish_order）
 --   - CaOS で「次へ」を押して注文のカードが全部終わる → 注文に ready_at を付ける（caos.complete_orders）
---
--- 共有 DB のスキーマ用リポジトリができたら、そちらへ移す。
--- 流し方は README の「Supabase のセットアップ」を参照。
 
 create schema if not exists caos;
+grant usage on schema caos to anon, authenticated, service_role;
 
--- ---------------------------------------------------------------------------
--- 表
--- ---------------------------------------------------------------------------
+-- このスキーマに作る関数は、明示して渡したものだけを実行できるようにする（Postgres の既定では PUBLIC が実行できる）
+alter default privileges in schema caos revoke execute on functions from public;
 
--- 書き込んでよいスタッフ。Google ログインのメールアドレスで照合する。
--- 画面からは編集させない（Supabase のダッシュボードか SQL で足す）。
+-- ---------------------------------------------------------------- テーブル
+
+-- 書き込んでよいスタッフ（Google ログインのメールアドレス、小文字）。ダッシュボードか SQL で足す
 create table caos.staff (
   email text primary key check (email = lower(email)),
   created_at timestamptz not null default now()
 );
 
 -- 抽出カード。1 回のドリップ（最大 2 杯）が 1 行。
---
--- 保存するのは事実だけ（どの注文の何杯か、担当、状態、開始・終了時刻）。
--- 待機カードの予定時刻のように計算で出せるものは CaOS の画面で計算する。
+-- 保存するのは事実だけ（どの注文の何杯か、担当、状態、開始・終了時刻）。待機カードの予定時刻は画面で計算する。
 create table caos.drips (
   id uuid primary key default gen_random_uuid(),
-  -- unassigned: 未割当 / queued: 担当の待機列 / brewing: 抽出中 / done: 抽出終了
+  -- unassigned：未割当 / queued：担当の待機列 / brewing：抽出中 / done：抽出終了
   status text not null default 'unassigned' check (status in ('unassigned', 'queued', 'brewing', 'done')),
   -- 担当のドリッパー（1〜6）
   dripper smallint check (dripper between 1 and 6),
@@ -63,63 +63,124 @@ create unique index drips_one_brewing_per_dripper on caos.drips (dripper) where 
 create index drips_order_ids on caos.drips using gin (order_ids);
 create index drips_created_at on caos.drips (created_at);
 
--- ---------------------------------------------------------------------------
--- 権限
--- ---------------------------------------------------------------------------
+-- Broadcast の版。送るたびに 1 ずつ増える。画面は飛んだのに気づいたら読み直す
+create sequence caos.board_version;
 
 alter table caos.staff enable row level security;
 alter table caos.drips enable row level security;
+revoke all on all tables in schema caos from anon, authenticated;
+revoke all on all sequences in schema caos from anon, authenticated;
 
--- Google でログインしたスタッフか。メール・パスワードや匿名のログインは認めない
--- （ShiftMaker の shift.me() と同じ判定。app_metadata は本人が書き換えられない）。
-create function caos.is_staff() returns boolean
-language sql stable security definer set search_path = ''
+-- ---------------------------------------------------------------- だれか
+
+-- ログインしている人のメールアドレス（小文字）。Google でログインした人だけ（メール・パスワードや匿名のログインは認めない）。
+-- app_metadata は本人が書き換えられない（user_metadata は書き換えられるので見ない）。ShiftMaker の shift.me() と同じ
+create function caos.me() returns text
+language sql stable
+set search_path = ''
 as $$
-  select not coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false)
-     and coalesce(auth.jwt() -> 'app_metadata' -> 'providers', '[]'::jsonb) ? 'google'
-     and exists (select 1 from caos.staff where email = lower(auth.jwt() ->> 'email'))
+  select case
+    when coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then null
+    when coalesce(auth.jwt() -> 'app_metadata' -> 'providers', '[]'::jsonb) ? 'google' then lower(auth.jwt() ->> 'email')
+  end
 $$;
 
-create function caos.require_staff() returns void
-language plpgsql stable security definer set search_path = ''
+create function caos.is_staff() returns boolean
+language sql stable
+security definer
+set search_path = ''
 as $$
+  select exists (select 1 from caos.staff where email = caos.me())
+$$;
+
+-- スタッフでなければ止める。画面はエラーの hint（login / denied）で出し分ける
+create function caos.require_staff() returns text
+language plpgsql stable
+security definer
+set search_path = ''
+as $$
+declare
+  e text := caos.me();
 begin
-  if not caos.is_staff() then
-    raise exception 'CaOS のスタッフとして登録されていません' using errcode = '42501';
+  if e is null then
+    raise exception 'ログインが必要です' using errcode = '42501', hint = 'login';
   end if;
+  if not caos.is_staff() then
+    raise exception '% は CaOS のスタッフとして登録されていません', e using errcode = '42501', hint = 'denied';
+  end if;
+  return e;
 end
 $$;
 
--- スタッフは読めるだけ。書き込みは RPC に限る
-create policy drips_staff_read on caos.drips for select to authenticated using (caos.is_staff());
-
-revoke all on all tables in schema caos from anon, authenticated;
-revoke all on all functions in schema caos from public, anon, authenticated;
-grant usage on schema caos to authenticated;
-grant select on caos.drips to authenticated;
-grant execute on function caos.is_staff() to authenticated;
-
--- POS の表（public）は Go の API だけが使う。CaOS の画面に配る匿名キーからは
--- 読めも書けもしないようにしておく（Supabase は既定で anon / authenticated に権限を付ける）。
-revoke all on all tables in schema public from anon, authenticated;
-revoke all on all sequences in schema public from anon, authenticated;
-revoke all on all functions in schema public from anon, authenticated;
-alter default privileges in schema public revoke all on tables from anon, authenticated;
-alter default privileges in schema public revoke all on sequences from anon, authenticated;
-alter default privileges in schema public revoke all on functions from anon, authenticated;
-
--- ---------------------------------------------------------------------------
--- 内部の関数（RPC とトリガーから使う）
--- ---------------------------------------------------------------------------
-
--- ドリッパーが空いていれば、待機列の先頭（queue_pos が一番小さいもの）の抽出を始める。
-create function caos.promote(p_dripper smallint) returns void
-language plpgsql security definer set search_path = ''
+create function caos.invalid(msg text) returns void
+language plpgsql
+set search_path = ''
 as $$
+begin
+  raise exception '%', msg using errcode = 'P0001', hint = 'invalid';
+end
+$$;
+
+-- ---------------------------------------------------------------- 知らせる
+
+-- 変わったカードをスタッフみんなに知らせる（Realtime の Broadcast、private チャンネル caos:drips）。
+-- payload：v＝版、drips＝変わった後のカード、deleted＝消したカード。大きすぎるときは reload だけ（受け取った側が読み直す）
+create function caos.emit(p_ids uuid[], p_deleted uuid[] default '{}') returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  payload jsonb;
+begin
+  -- 何も変わっていなければ版を進めない（進めると、受け取った側が取りこぼしと思って読み直す）
+  if coalesce(cardinality(p_ids), 0) = 0 and coalesce(cardinality(p_deleted), 0) = 0 then
+    return;
+  end if;
+  payload := jsonb_build_object(
+    'v', nextval('caos.board_version'),
+    'drips', coalesce((select jsonb_agg(to_jsonb(d)) from caos.drips d where d.id = any (p_ids)), '[]'),
+    'deleted', to_jsonb(coalesce(p_deleted, '{}'))
+  );
+  if octet_length(payload::text) > 100000 then
+    payload := jsonb_build_object('v', payload -> 'v', 'reload', true);
+  end if;
+  perform realtime.send(payload, 'drips', 'caos:drips', true);
+end
+$$;
+
+-- RPC の返り値。知らせたうえで、呼んだ画面には変わったカード・消したカード・準備完了にした注文を返す
+-- （画面は Broadcast を待たずにすぐ反映し、「1つ戻す」に使う）
+create function caos.reply(p_ids uuid[], p_deleted uuid[] default '{}', p_readied uuid[] default '{}') returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  p_ids := array(select distinct x from unnest(p_ids) x where x is not null);
+  perform caos.emit(p_ids, p_deleted);
+  return jsonb_build_object(
+    'changed', coalesce((select jsonb_agg(to_jsonb(d)) from caos.drips d where d.id = any (p_ids)), '[]'),
+    'deleted', to_jsonb(coalesce(p_deleted, '{}')),
+    'readied', to_jsonb(coalesce(p_readied, '{}'))
+  );
+end
+$$;
+
+-- ---------------------------------------------------------------- 内部（RPC とトリガーから使う）
+
+-- ドリッパーが空いていれば、待機列の先頭（queue_pos が一番小さいもの）の抽出を始め、そのカードを返す
+create function caos.promote(p_dripper int) returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_id uuid;
 begin
   if p_dripper is null
     or exists (select 1 from caos.drips where dripper = p_dripper and status = 'brewing') then
-    return;
+    return null;
   end if;
   update caos.drips
   set status = 'brewing', started_at = now(), updated_at = now()
@@ -128,14 +189,18 @@ begin
     where dripper = p_dripper and status = 'queued'
     order by queue_pos, created_at
     limit 1
-  );
+  )
+  returning id into v_id;
+  return v_id;
 end
 $$;
 
 -- カードが全部抽出終了になった注文に ready_at を付け、付けた注文を返す。
--- 入れ直しのカードも終わるまで待つ。既に準備完了の注文はそのまま。
+-- 入れ直しのカードも終わるまで待つ。既に準備完了の注文はそのまま
 create function caos.complete_orders(p_order_ids uuid[]) returns uuid[]
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
   v_readied uuid[];
@@ -161,12 +226,13 @@ $$;
 
 -- 注文の明細から、あるべき抽出カード（最大 2 杯ずつ）を作り直す。
 --
--- 作り直すのは「未割当で、その注文だけのカード」だけ。割当済み・抽出中・終了・統合・
--- 入れ直しのカードには触らず、その分の杯数を差し引いて足りない分だけ作る。
--- 明細のトリガーから 1 行ごとに呼ばれるので、中身が変わらないときは何もしない
--- （カードの id が変わると、画面で選んでいたカードが外れてしまう）。
+-- 作り直すのは「未割当で、その注文だけのカード」だけ。割当済み・抽出中・終了・統合・入れ直しのカードには触らず、
+-- その分の杯数を差し引いて足りない分だけ作る。明細のトリガーから 1 行ごとに呼ばれるので、
+-- 中身が変わらないときは何もしない（カードの id が変わると、画面で選んでいたカードが外れてしまう）。
 create function caos.sync_order(p_order_id uuid) returns void
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
   v_order public.orders%rowtype;
@@ -175,25 +241,36 @@ declare
   v_group record;
   v_remaining int;
   v_cups int;
+  v_deleted uuid[];
+  v_changed uuid[];
 begin
   select * into v_order from public.orders where id = p_order_id;
 
   if not found then
     -- 注文が消えた。終わっていないカードからその注文を外す
-    delete from caos.drips
-    where order_ids = array[p_order_id] and status <> 'done';
-    update caos.drips d
-    set lines = coalesce((
-          select jsonb_agg(l) from jsonb_array_elements(d.lines) l
-          where (l ->> 'order_id')::uuid <> p_order_id
-        ), '[]'),
-        order_ids = array_remove(d.order_ids, p_order_id),
-        cups = (
-          select coalesce(sum((l ->> 'cups')::int), 0) from jsonb_array_elements(d.lines) l
-          where (l ->> 'order_id')::uuid <> p_order_id
-        ),
-        updated_at = now()
-    where p_order_id = any (d.order_ids) and d.status <> 'done';
+    with gone as (
+      delete from caos.drips
+      where order_ids = array[p_order_id] and status <> 'done'
+      returning id
+    )
+    select coalesce(array_agg(id), '{}') into v_deleted from gone;
+    with trimmed as (
+      update caos.drips d
+      set lines = coalesce((
+            select jsonb_agg(l) from jsonb_array_elements(d.lines) l
+            where (l ->> 'order_id')::uuid <> p_order_id
+          ), '[]'),
+          order_ids = array_remove(d.order_ids, p_order_id),
+          cups = (
+            select coalesce(sum((l ->> 'cups')::int), 0) from jsonb_array_elements(d.lines) l
+            where (l ->> 'order_id')::uuid <> p_order_id
+          ),
+          updated_at = now()
+      where p_order_id = any (d.order_ids) and d.status <> 'done'
+      returning d.id
+    )
+    select coalesce(array_agg(id), '{}') into v_changed from trimmed;
+    perform caos.emit(v_changed, v_deleted);
     return;
   end if;
 
@@ -257,91 +334,107 @@ begin
     return;
   end if;
 
-  delete from caos.drips
-  where order_ids = array[p_order_id] and status = 'unassigned' and rebrew_of is null;
+  with gone as (
+    delete from caos.drips
+    where order_ids = array[p_order_id] and status = 'unassigned' and rebrew_of is null
+    returning id
+  )
+  select coalesce(array_agg(id), '{}') into v_deleted from gone;
 
-  insert into caos.drips (status, queue_pos, order_ids, lines, cups, created_at)
-  select 'unassigned', v_order.order_id, array[p_order_id], jsonb_build_array(x), (x ->> 'cups')::int,
-         -- 同じ注文の中の順番を保つため、作った順に少しずつずらす
-         now() + (ordinality * interval '1 microsecond')
-  from jsonb_array_elements(v_wanted) with ordinality as t (x, ordinality);
+  with made as (
+    insert into caos.drips (status, queue_pos, order_ids, lines, cups, created_at)
+    select 'unassigned', v_order.order_id, array[p_order_id], jsonb_build_array(x), (x ->> 'cups')::int,
+           -- 同じ注文の中の順番を保つため、作った順に少しずつずらす
+           now() + (ordinality * interval '1 microsecond')
+    from jsonb_array_elements(v_wanted) with ordinality as t (x, ordinality)
+    returning id
+  )
+  select coalesce(array_agg(id), '{}') into v_changed from made;
+
+  perform caos.emit(v_changed, v_deleted);
 end
 $$;
 
--- 注文に ready_at が付いた（POS で準備完了・提供済みにした）とき、その注文のカードを
--- 抽出終了にする。抽出中だったドリッパーは次のカードを始める。
--- 統合していた相手の注文も、それでカードが全部終わったなら準備完了にする。
+-- 注文に ready_at が付いた（POS で準備完了・提供済みにした）とき、その注文のカードを抽出終了にする。
+-- 抽出中だったドリッパーは次のカードを始める。統合していた相手の注文も、それでカードが全部終わったなら準備完了にする
 create function caos.finish_order(p_order_id uuid) returns void
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
-  v_drippers smallint[];
+  v_finished uuid[];
+  v_drippers int[];
   v_others uuid[];
-  v_dripper smallint;
+  v_dripper int;
+  v_promoted uuid[] := '{}';
 begin
   with finished as (
     update caos.drips
     set status = 'done', finished_at = now(), updated_at = now()
     where p_order_id = any (order_ids) and status <> 'done' and rebrew_of is null
-    returning dripper, order_ids
+    returning id, dripper, order_ids
   )
-  select coalesce(array_agg(distinct f.dripper) filter (where f.dripper is not null), '{}'),
+  select coalesce(array_agg(distinct f.id), '{}'),
+         coalesce(array_agg(distinct f.dripper) filter (where f.dripper is not null), '{}'),
          coalesce(array_agg(distinct o) filter (where o <> p_order_id), '{}')
-  into v_drippers, v_others
+  into v_finished, v_drippers, v_others
   from finished f left join lateral unnest(f.order_ids) as o on true;
 
   foreach v_dripper in array v_drippers loop
-    perform caos.promote(v_dripper);
+    v_promoted := v_promoted || caos.promote(v_dripper);
   end loop;
+  perform caos.emit(array_remove(v_finished || v_promoted, null));
   if cardinality(v_others) > 0 then
     perform caos.complete_orders(v_others);
   end if;
 end
 $$;
 
--- RPC が返す形。変わったカードと、消したカード、準備完了にした注文。
--- 画面は Realtime を待たずにこれを反映し、「1つ戻す」に使う。
-create function caos.result(p_ids uuid[], p_deleted uuid[] default '{}', p_readied uuid[] default '{}')
-returns jsonb
-language sql stable security definer set search_path = ''
+-- ---------------------------------------------------------------- RPC（CaOS の画面から呼ぶ）
+
+-- その日のカードを読む（つないだとき・読み直すとき）。v は今の版（これより後の Broadcast を待つ）
+create function caos.list_drips(p_since timestamptz) returns jsonb
+language plpgsql stable
+security definer
+set search_path = ''
 as $$
-  select jsonb_build_object(
-    'changed', coalesce((select jsonb_agg(to_jsonb(d)) from caos.drips d where d.id = any (p_ids)), '[]'),
-    'deleted', to_jsonb(p_deleted),
-    'readied', to_jsonb(p_readied)
-  )
+begin
+  perform caos.require_staff();
+  return jsonb_build_object(
+    'v', (select case when is_called then last_value else 0 end from caos.board_version),
+    'drips', coalesce((select jsonb_agg(to_jsonb(d) order by d.created_at) from caos.drips d where d.created_at >= p_since), '[]')
+  );
+end
 $$;
 
--- ---------------------------------------------------------------------------
--- RPC（CaOS の画面から呼ぶ）
--- ---------------------------------------------------------------------------
-
 -- 未割当・待機中のカードをドリッパーへ割り当てる（別のドリッパーへの移動も同じ）。
--- ドリッパーが空いていれば、そのまま抽出を始める。
-create function caos.assign(p_drip_id uuid, p_dripper smallint) returns jsonb
-language plpgsql security definer set search_path = ''
+-- ドリッパーが空いていれば、そのまま抽出を始める
+create function caos.assign(p_drip_id uuid, p_dripper int) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
   v_drip caos.drips%rowtype;
-  v_brewing uuid;
 begin
   perform caos.require_staff();
   select * into v_drip from caos.drips where id = p_drip_id for update;
   if not found or v_drip.status not in ('unassigned', 'queued') then
-    raise exception 'このカードは割り当てられません' using errcode = 'P0001';
+    perform caos.invalid('このカードは割り当てられません');
   end if;
   update caos.drips
   set status = 'queued', dripper = p_dripper, updated_at = now()
   where id = p_drip_id;
-  perform caos.promote(p_dripper);
-  select id into v_brewing from caos.drips where dripper = p_dripper and status = 'brewing';
-  return caos.result(array_remove(array[p_drip_id, v_brewing], null));
+  return caos.reply(array[p_drip_id, caos.promote(p_dripper)]);
 end
 $$;
 
--- 待機中のカードを未割当に戻す。
+-- 待機中のカードを未割当に戻す
 create function caos.unassign(p_drip_id uuid) returns jsonb
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 begin
   perform caos.require_staff();
@@ -349,21 +442,21 @@ begin
   set status = 'unassigned', dripper = null, updated_at = now()
   where id = p_drip_id and status = 'queued';
   if not found then
-    raise exception 'このカードは未割当に戻せません' using errcode = 'P0001';
+    perform caos.invalid('このカードは未割当に戻せません');
   end if;
-  return caos.result(array[p_drip_id]);
+  return caos.reply(array[p_drip_id]);
 end
 $$;
 
 -- 「次へ」。ドリッパーの抽出中のカードを終わらせ、待機列の次を始める。
--- 注文のカードが全部終わったら、その注文を準備完了にする。
-create function caos.next(p_dripper smallint) returns jsonb
-language plpgsql security definer set search_path = ''
+-- 注文のカードが全部終わったら、その注文を準備完了にする
+create function caos.next(p_dripper int) returns jsonb
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
   v_done caos.drips%rowtype;
-  v_next uuid;
-  v_readied uuid[];
 begin
   perform caos.require_staff();
   update caos.drips
@@ -371,18 +464,17 @@ begin
   where dripper = p_dripper and status = 'brewing'
   returning * into v_done;
   if not found then
-    raise exception 'ドリッパー % は抽出中ではありません', p_dripper using errcode = 'P0001';
+    perform caos.invalid(format('ドリッパー %s は抽出中ではありません', p_dripper));
   end if;
-  perform caos.promote(p_dripper);
-  select id into v_next from caos.drips where dripper = p_dripper and status = 'brewing';
-  v_readied := caos.complete_orders(v_done.order_ids);
-  return caos.result(array_remove(array[v_done.id, v_next], null), '{}', v_readied);
+  return caos.reply(array[v_done.id, caos.promote(p_dripper)], '{}', caos.complete_orders(v_done.order_ids));
 end
 $$;
 
--- 同じ商品・同じ指名の 1 杯の未割当カード同士を、2 杯の同時抽出にまとめる。
+-- 同じ商品・同じ指名の 1 杯の未割当カード同士を、2 杯の同時抽出にまとめる
 create function caos.merge(p_first_id uuid, p_second_id uuid) returns jsonb
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
   v_first caos.drips%rowtype;
@@ -397,7 +489,7 @@ begin
     or v_first.rebrew_of is not null or v_second.rebrew_of is not null
     or (v_first.lines -> 0 ->> 'item_id') is distinct from (v_second.lines -> 0 ->> 'item_id')
     or (v_first.lines -> 0 ->> 'nominee') is distinct from (v_second.lines -> 0 ->> 'nominee') then
-    raise exception 'このカード同士は統合できません' using errcode = 'P0001';
+    perform caos.invalid('このカード同士は統合できません');
   end if;
   update caos.drips
   set lines = v_first.lines || v_second.lines,
@@ -407,32 +499,33 @@ begin
       updated_at = now()
   where id = p_first_id;
   delete from caos.drips where id = p_second_id;
-  return caos.result(array[p_first_id], array[p_second_id]);
+  return caos.reply(array[p_first_id], array[p_second_id]);
 end
 $$;
 
 -- 入れ直し。元のカード（抽出中・終了）と同じ中身で、杯数を選んだ新しいカードを作る。
---   p_interrupt: 抽出中の元のカードを途中でやめる
---   p_dripper:   担当。null なら未割当に置く
---   p_queue_pos: 待機列での位置（画面が前後のカードの間の値を渡す）。null なら元の注文番号の位置
+--   p_interrupt：抽出中の元のカードを途中でやめる
+--   p_dripper：  担当。null なら未割当に置く
+--   p_queue_pos：待機列での位置（画面が前後のカードの間の値を渡す）。null なら元の注文番号の位置
 create function caos.rebrew(
-  p_source_id uuid, p_cups smallint, p_interrupt boolean, p_dripper smallint, p_queue_pos numeric
+  p_source_id uuid, p_cups int, p_interrupt boolean, p_dripper int, p_queue_pos numeric
 ) returns jsonb
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
   v_source caos.drips%rowtype;
   v_new uuid;
   v_lines jsonb;
-  v_next uuid;
 begin
   perform caos.require_staff();
   if p_cups not between 1 and 2 then
-    raise exception '杯数は 1〜2 杯です' using errcode = 'P0001';
+    perform caos.invalid('杯数は 1〜2 杯です');
   end if;
   select * into v_source from caos.drips where id = p_source_id for update;
   if not found or v_source.status not in ('brewing', 'done') then
-    raise exception 'このカードは入れ直せません' using errcode = 'P0001';
+    perform caos.invalid('このカードは入れ直せません');
   end if;
 
   if p_interrupt and v_source.status = 'brewing' then
@@ -462,19 +555,18 @@ begin
   )
   returning id into v_new;
 
-  perform caos.promote(v_source.dripper);
-  perform caos.promote(p_dripper);
-  select id into v_next from caos.drips where dripper = coalesce(p_dripper, v_source.dripper) and status = 'brewing';
-  return caos.result(array_remove(array[p_source_id, v_new, v_next], null));
+  return caos.reply(array[p_source_id, v_new, caos.promote(v_source.dripper), caos.promote(p_dripper)]);
 end
 $$;
 
 -- 「1つ戻す」。直前の RPC の結果と、その前の行を渡すと元に戻す。
---   p_before:  操作の前の行（RPC の changed と deleted のうち、操作の前からあったもの）
---   p_after:   RPC が返した changed。この時点から誰も触っていないときだけ戻す
---   p_readied: RPC が準備完了にした注文。まだ提供していなければ ready_at を外す
+--   p_before： 操作の前の行（RPC の changed と deleted のうち、操作の前からあったもの）
+--   p_after：  RPC が返した changed。この時点から誰も触っていないときだけ戻す
+--   p_readied：RPC が準備完了にした注文。まだ提供していなければ ready_at を外す
 create function caos.restore(p_before jsonb, p_after jsonb, p_readied uuid[]) returns jsonb
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 declare
   v_after_ids uuid[];
@@ -491,7 +583,7 @@ begin
     left join caos.drips d on d.id = (x ->> 'id')::uuid
     where d.id is null or d.updated_at <> (x ->> 'updated_at')::timestamptz
   ) then
-    raise exception 'ほかの端末で変更されたため、元に戻せません' using errcode = 'P0001';
+    perform caos.invalid('ほかの端末で変更されたため、元に戻せません');
   end if;
 
   -- 操作でできたカードは消す（入れ直し）
@@ -514,32 +606,21 @@ begin
   update public.orders set ready_at = null
   where id = any (p_readied) and served_at is null;
 
-  return caos.result(v_before_ids, v_created);
+  return caos.reply(v_before_ids, v_created);
 end
 $$;
 
-grant execute on function
-  caos.assign(uuid, smallint),
-  caos.unassign(uuid),
-  caos.next(smallint),
-  caos.merge(uuid, uuid),
-  caos.rebrew(uuid, smallint, boolean, smallint, numeric),
-  caos.restore(jsonb, jsonb, uuid[])
-to authenticated;
-
--- ---------------------------------------------------------------------------
--- トリガー（POS の表から）
+-- ---------------------------------------------------------------- トリガー（POS の表から）
 --
--- POS の注文の書き込みの中で動くので、ここで失敗すると POS の注文の登録・編集・準備完了まで
--- 失敗してしまう。CaOS の処理が失敗しても POS は必ず通るよう、警告を残して握りつぶす
--- （カードは次にその注文が変わったときに作り直される）。
--- ---------------------------------------------------------------------------
+-- POS の注文の書き込みの中で動くので、ここで失敗すると POS の注文の登録・編集・準備完了まで失敗してしまう。
+-- CaOS の処理が失敗しても POS は必ず通るよう、警告を残して握りつぶす（カードは次にその注文が変わったときに作り直される）。
 
 -- 明細が変わったら、トランザクションの終わりでカードを作り直す。
--- 注文の作成も編集も、Go の API は 1 トランザクションで明細を全部入れ直すので、
--- 終わりまで待てば最後の状態だけを見られる。
+-- 注文の作成も編集も、Go の API は 1 トランザクションで明細を全部入れ直すので、終わりまで待てば最後の状態だけを見られる
 create function caos.on_order_menus_change() returns trigger
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 begin
   perform caos.sync_order(coalesce(new.order_id, old.order_id));
@@ -555,9 +636,11 @@ after insert or update or delete on public.order_menus
 deferrable initially deferred
 for each row execute function caos.on_order_menus_change();
 
--- 注文が消えたら、その注文のカードを片付ける（明細は Go の API が先に消している）。
+-- 注文が消えたら、その注文のカードを片付ける（明細は Go の API が先に消している）
 create function caos.on_order_delete() returns trigger
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 begin
   perform caos.sync_order(old.id);
@@ -572,9 +655,11 @@ create trigger caos_drop_drips
 after delete on public.orders
 for each row execute function caos.on_order_delete();
 
--- 注文に ready_at が付いたら、その注文のカードを抽出終了にする。
+-- 注文に ready_at が付いたら、その注文のカードを抽出終了にする
 create function caos.on_order_ready() returns trigger
-language plpgsql security definer set search_path = ''
+language plpgsql
+security definer
+set search_path = ''
 as $$
 begin
   perform caos.finish_order(new.id);
@@ -591,14 +676,30 @@ for each row
 when (old.ready_at is null and new.ready_at is not null)
 execute function caos.on_order_ready();
 
--- ---------------------------------------------------------------------------
--- Realtime
--- ---------------------------------------------------------------------------
+-- ---------------------------------------------------------------- Realtime の受信の許可
 
--- 消したカードも id だけは届く。RLS で読めるスタッフにだけ配られる。
-alter publication supabase_realtime add table caos.drips;
+-- private チャンネル caos:drips を受け取れるのは、スタッフだけ
+create policy "caos: staff receive drip broadcasts" on realtime.messages
+for select to authenticated
+using (realtime.messages.extension = 'broadcast' and realtime.topic() = 'caos:drips' and caos.is_staff());
 
--- 流した時点で受け付け中の注文にも、カードを作っておく。
+-- ---------------------------------------------------------------- 実行できる関数
+
+revoke all on all functions in schema caos from public, anon, authenticated;
+grant execute on function
+  caos.is_staff(),
+  caos.list_drips(timestamptz),
+  caos.assign(uuid, int),
+  caos.unassign(uuid),
+  caos.next(int),
+  caos.merge(uuid, uuid),
+  caos.rebrew(uuid, int, boolean, int, numeric),
+  caos.restore(jsonb, jsonb, uuid[])
+to authenticated;
+
+-- ---------------------------------------------------------------- 流した時点の注文
+
+-- 受け付け中の注文にも、カードを作っておく
 do $$
 declare
   v_order_id uuid;
