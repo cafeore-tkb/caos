@@ -11,7 +11,8 @@ import { type RebrewDecision, RebrewPanel } from './components/RebrewPanel';
 import { TestPlaySetup } from './components/TestPlaySetup';
 import { TicketDetailModal } from './components/TicketDetailModal';
 import { type NavTab, TopHeader } from './components/TopHeader';
-import { BEAN_NAME_MAP, INITIAL_BARISTAS, INITIAL_BEANS, INITIAL_LEARNING_LOGS } from './data/initialData';
+import { INITIAL_BARISTAS, INITIAL_BEANS, INITIAL_LEARNING_LOGS } from './data/initialData';
+import { usePosOrders } from './hooks/usePosOrders';
 import type {
   Barista,
   BeanCode,
@@ -33,6 +34,7 @@ import {
   splitIntoDripUnits,
   ticketKey,
 } from './utils/orderQueue';
+import { isPendingPosOrder, POS_API_BASE_URL, posOrderTicketPrefix, posOrderToDripUnits } from './utils/posOrders';
 
 type UndoSnapshot = {
   baristas: Barista[];
@@ -133,30 +135,6 @@ const makeCleanBaristas = (): Barista[] =>
     pastTickets: [],
   }));
 
-const MOCK_MENU: BeanCode[] = ['CHAMP', 'ORE', 'KEN', 'TNZ', 'BRA', 'ICE', 'MILK', 'CHAMP', 'ORE', 'SP'];
-const MOCK_ORDER_GROUPS: UnassignedOrder[][] = Array.from({ length: 120 }, (_, index) => {
-  const number = index + 1;
-  const id = `#${number.toString().padStart(3, '0')}`;
-  const beanCode = MOCK_MENU[index % MOCK_MENU.length];
-  const cupCount = number % 11 === 0 ? 4 : number % 7 === 0 ? 3 : number % 3 === 0 ? 2 : 1;
-  const preferredBaristaId = beanCode === 'SP' ? 2 : number % 17 === 0 ? 6 : undefined;
-  return splitIntoDripUnits([
-    {
-      id,
-      ticketUid: `${number.toString().padStart(3, '0')}-1`,
-      beanCode,
-      beanName: BEAN_NAME_MAP[beanCode],
-      cupCount,
-      badgeTag: `${cupCount}杯`,
-      predictedTimeStr: cupCount > 2 ? '3分30秒' : '2分20秒',
-      recommendedBaristas: preferredBaristaId ? `ドリッパー ${preferredBaristaId}` : '全ドリッパー',
-      recommendedBayIds: preferredBaristaId ? [preferredBaristaId] : [1, 2, 3, 4, 5, 6],
-      preferredBaristaId,
-      cardColor: beanCode === 'ICE' ? 'cyan' : beanCode === 'SP' ? 'emerald' : beanCode === 'KEN' ? 'peach' : 'blue',
-    },
-  ]);
-});
-
 const historicalBeanCode = (name: string, type: string): BeanCode => {
   if (type === 'ice') return 'ICE';
   if (type === 'iceOre' || type === 'milk') return 'MILK';
@@ -215,7 +193,9 @@ export default function App() {
   const [baristas, setBaristas] = useState<Barista[]>(() => standaloneSnapshot?.baristas || makeCleanBaristas());
   const [beans, setBeans] = useState<BeanItem[]>(() => standaloneSnapshot?.beans || INITIAL_BEANS);
   const [unassignedOrders, setUnassignedOrders] = useState<UnassignedOrder[]>([]);
-  const mockOrderCursor = useRef(0);
+  // 取り込み済みの cafeore-pos 注文（UUID）。全件が届くたびに、新しい注文だけを未割当へ足すために使う。
+  const posIngestedOrderIds = useRef(new Set<string>());
+  const [posIngestEpoch, setPosIngestEpoch] = useState(0);
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
   const arrivalsAfterUndoSnapshotRef = useRef<UnassignedOrder[]>([]);
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
@@ -263,6 +243,13 @@ export default function App() {
   // increasing past 24:00 instead of wrapping and scrambling every queue.
   const operationalDayStartMs = testPlaySession ? startOfLocalDay(testPlaySession.startMs) : realDayStartMs;
   const realTimeSec = Math.floor((operationalTime.getTime() - operationalDayStartMs) / 1000);
+
+  // 普段は cafeore-pos と同じ DB の注文で動かす。実データテスト中（終了後の実績表示も含め、リセットするまで）は
+  // DB からの取り込みを止め、テストの注文だけで盤面を動かす。
+  const posActive = !testPlaySession;
+  const { orders: posOrders, status: posStatus } = usePosOrders(posActive, POS_API_BASE_URL);
+  const baristasRef = useRef(baristas);
+  baristasRef.current = baristas;
 
   const findLiveTicket = (key: string) => {
     for (const bay of baristas) {
@@ -312,21 +299,37 @@ export default function App() {
     };
   }, []);
 
-  // Mock the register sending one complete order at a time.
+  // cafeore-pos の注文を取り込む。届いた一覧のうち、当日の未提供・未準備で新しく届いた注文を未割当へ足し、
+  // POS 側で準備完了・提供済み・削除になった注文は、まだ割り当てていない分だけ未割当から外す。
+  // biome-ignore lint/correctness/useExhaustiveDependencies: posIngestEpoch はリセット後に取り込み直すための合図
   useEffect(() => {
-    if (testPlaySession) return;
-    const incoming = window.setInterval(() => {
-      const group = MOCK_ORDER_GROUPS[mockOrderCursor.current];
-      if (!group) return;
-      const incomingOrders = group.map((order) => ({ ...order }));
-      if (undoSnapshotRef.current) {
-        arrivalsAfterUndoSnapshotRef.current.push(...incomingOrders);
-      }
-      setUnassignedOrders((prev) => [...prev, ...incomingOrders]);
-      mockOrderCursor.current += 1;
-    }, 4000);
-    return () => window.clearInterval(incoming);
-  }, [testPlaySession]);
+    if (!posActive || !posOrders) return;
+    const dayStartMs = startOfLocalDay(Date.now());
+    const pending = posOrders.filter(
+      (order) => isPendingPosOrder(order) && new Date(order.created_at).getTime() >= dayStartMs
+    );
+    const pendingIds = new Set(pending.map((order) => order.id));
+    const ingested = posIngestedOrderIds.current;
+    const incoming = pending
+      .filter((order) => !ingested.has(order.id))
+      .sort((a, b) => a.order_id - b.order_id)
+      .flatMap((order) => {
+        ingested.add(order.id);
+        return posOrderToDripUnits(order, baristasRef.current);
+      });
+    const withdrawnPrefixes = [...ingested].filter((id) => !pendingIds.has(id)).map((id) => posOrderTicketPrefix(id));
+    const isWithdrawn = (order: UnassignedOrder) =>
+      withdrawnPrefixes.some((prefix) => (order.ticketUid || '').startsWith(prefix));
+
+    if (incoming.length > 0 && undoSnapshotRef.current) {
+      arrivalsAfterUndoSnapshotRef.current.push(...incoming);
+    }
+    setUnassignedOrders((prev) => {
+      const remaining = withdrawnPrefixes.length > 0 ? prev.filter((order) => !isWithdrawn(order)) : prev;
+      if (incoming.length === 0 && remaining.length === prev.length) return prev;
+      return [...remaining, ...incoming];
+    });
+  }, [posActive, posOrders, posIngestEpoch]);
 
   useEffect(() => {
     if (testPlayStatus !== 'active' || !isRunning) return;
@@ -862,7 +865,8 @@ export default function App() {
     setBaristas(makeCleanBaristas());
     setBeans(INITIAL_BEANS);
     setUnassignedOrders([]);
-    mockOrderCursor.current = 0;
+    posIngestedOrderIds.current.clear();
+    setPosIngestEpoch((epoch) => epoch + 1);
     undoSnapshotRef.current = null;
     arrivalsAfterUndoSnapshotRef.current = [];
     setUndoLabel(null);
@@ -1001,6 +1005,7 @@ export default function App() {
           }
           onOpenTestPlay={() => setTestSetupOpen(true)}
           onEndTestPlay={handleEndTestPlay}
+          posStatus={posStatus}
         />
 
         {/* Dynamic Tab Body */}
