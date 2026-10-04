@@ -301,7 +301,20 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
                   const start = dragStart.current;
                   if (!start || Math.hypot(event.clientX - start.x, event.clientY - start.y) < 12) return;
-                  if (openPadUid !== orderUid(order)) setOpenPadUid(orderUid(order));
+                  // On a closed sidebar card vertical movement belongs to scrolling, not to a drag.
+                  const isClosedSidebarCard = isSidebar && openPadUid !== orderUid(order);
+                  if (
+                    isClosedSidebarCard &&
+                    !dragVisual &&
+                    Math.abs(event.clientY - start.y) > Math.abs(event.clientX - start.x)
+                  ) {
+                    return;
+                  }
+                  if (openPadUid !== orderUid(order)) {
+                    // Same as pressing a card in the strip: switching cards drops the old selection.
+                    if (openPadUid) onClearSelection?.();
+                    setOpenPadUid(orderUid(order));
+                  }
                   const bayId = bayAtPoint(event.clientX, event.clientY);
                   setHoveredBay(bayId);
                   setDragVisual({ uid: orderUid(order), x: event.clientX - start.x, y: event.clientY - start.y });
@@ -324,8 +337,11 @@ export const UnassignedOrdersPanel: React.FC<UnassignedOrdersPanelProps> = ({
                   dragStart.current = null;
                   setDragVisual(null);
                   setHoveredBay(null);
-                  // The browser took the gesture as a scroll: put the pads back as they were.
-                  setOpenPadUid(padBeforePress.current);
+                  // The browser took the gesture as a scroll. The sidebar left the previous pad and
+                  // selection alone, so restore it; the strip already cleared both on press.
+                  setOpenPadUid(
+                    isSidebar || padBeforePress.current === orderUid(order) ? padBeforePress.current : null
+                  );
                 }}
                 style={{
                   ...(isSidebar ? { gridColumn, gridRow } : {}),

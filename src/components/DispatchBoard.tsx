@@ -88,6 +88,30 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   // has settled near NOW so a scroll that merely passes NOW is not captured.
   const followSettleTimerRef = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(followSettleTimerRef.current), []);
+  // ±5分 starts a smooth scroll that begins slowly; don't mistake its first frames near NOW for a stop.
+  const pagingUntilRef = useRef(0);
+  const scheduleFollowCheck = (leftAtSchedule: number) => {
+    followSettleTimerRef.current = window.setTimeout(() => {
+      if (performance.now() < pagingUntilRef.current) {
+        scheduleFollowCheck(leftAtSchedule);
+        return;
+      }
+      const settledLeft = scrollContainerRef.current?.scrollLeft;
+      if (
+        settledLeft !== undefined &&
+        Math.abs(settledLeft - leftAtSchedule) < 1 &&
+        Math.abs(settledLeft - followLeftRef.current) <= FOLLOW_TOLERANCE_PX
+      ) {
+        setIsFollowingNow(true);
+      }
+    }, 150);
+  };
+  // While browsing, NOW keeps moving away from a still view; re-check the banner each tick.
+  useEffect(() => {
+    if (isFollowingNow || !scrollContainerRef.current) return;
+    setIsScrolledToPast(scrollContainerRef.current.scrollLeft < nowX - 600);
+  }, [nowX, isFollowingNow]);
+
   const handleScroll = () => {
     if (!scrollContainerRef.current) return;
     const currentLeft = scrollContainerRef.current.scrollLeft;
@@ -98,12 +122,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
       setIsFollowingNow(false);
       return;
     }
-    followSettleTimerRef.current = window.setTimeout(() => {
-      const settledLeft = scrollContainerRef.current?.scrollLeft;
-      if (settledLeft !== undefined && Math.abs(settledLeft - followLeftRef.current) <= FOLLOW_TOLERANCE_PX) {
-        setIsFollowingNow(true);
-      }
-    }, 150);
+    scheduleFollowCheck(currentLeft);
   };
 
   // Run each header command once. ±5分 pages from the current view; 現在 returns to NOW,
@@ -116,7 +135,10 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
     if (!container) return;
     const pagePx = 300 * PIXELS_PER_SEC;
     // Stop following first so the next clock tick does not cut the smooth scroll short.
-    if (timelineCommand.direction !== 'now') setIsFollowingNow(false);
+    if (timelineCommand.direction !== 'now') {
+      setIsFollowingNow(false);
+      pagingUntilRef.current = performance.now() + 1000;
+    }
     const left =
       timelineCommand.direction === 'now'
         ? followLeftRef.current
