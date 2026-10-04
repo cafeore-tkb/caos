@@ -11,38 +11,18 @@ trap cleanup EXIT
 cd "$repo_root"
 source_branch="${PUBLISH_SOURCE_BRANCH:-$(git branch --show-current)}"
 
-case "$source_branch" in
-  main)
-    base_path="/digital-master-sheet-pages/"
-    relative_target="."
-    ;;
-  astalum-dev)
-    base_path="/digital-master-sheet-pages/astalum-dev/"
-    relative_target="astalum-dev"
-    ;;
-  *)
-    echo "Unsupported publish branch: ${source_branch:-detached HEAD}" >&2
-    echo "Publish from main or astalum-dev, or set PUBLISH_SOURCE_BRANCH explicitly." >&2
-    exit 1
-    ;;
-esac
+if [[ "$source_branch" != "main" ]]; then
+  echo "Unsupported publish branch: ${source_branch:-detached HEAD}" >&2
+  echo "Publish from main, or set PUBLISH_SOURCE_BRANCH=main explicitly." >&2
+  exit 1
+fi
 
-VITE_BASE_PATH="$base_path" npm run build
+VITE_BASE_PATH="/digital-master-sheet-pages/" npm run build
 
 git clone --depth 1 https://github.com/cafeore-tkb/digital-master-sheet-pages.git "$publish_dir"
+rm -rf "$publish_dir/site"
 mkdir -p "$publish_dir/site"
-
-if [[ "$relative_target" == "." ]]; then
-  # Replace only the production files. The astalum-dev preview must survive a
-  # production publish so both variants remain available at the same time.
-  find "$publish_dir/site" -mindepth 1 -maxdepth 1 ! -name astalum-dev -exec rm -rf {} +
-  cp -R "$repo_root/dist/." "$publish_dir/site/"
-else
-  target_dir="$publish_dir/site/$relative_target"
-  rm -rf "$target_dir"
-  mkdir -p "$target_dir"
-  cp -R "$repo_root/dist/." "$target_dir/"
-fi
+cp -R "$repo_root/dist/." "$publish_dir/site/"
 
 git -C "$publish_dir" add -A site
 
