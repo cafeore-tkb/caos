@@ -1,14 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  CheckCircle2,
-  ChevronRight,
-  CircleDot,
-  ClipboardList,
-  Link2,
-} from 'lucide-react';
-import { Barista, BeanCode, OrderTicket, UnassignedOrder } from '../types';
+import { CheckCircle2, ChevronRight, CircleDot, ClipboardList, Link2 } from 'lucide-react';
+import type React from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { Barista, BeanCode, OrderTicket, UnassignedOrder } from '../types';
 
-interface HumanCenteredControlViewProps {
+export interface ControlViewBProps {
   baristas: Barista[];
   unassignedOrders: UnassignedOrder[];
   simTimeSec: number;
@@ -43,8 +38,7 @@ const getRemainingSeconds = (barista: Barista, simTimeSec: number) => {
   return Math.round(current.totalDurationSec * barista.coefficient);
 };
 
-
-export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> = ({
+export const ControlViewB: React.FC<ControlViewBProps> = ({
   baristas,
   unassignedOrders,
   simTimeSec,
@@ -83,10 +77,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
     onAssignToBay(order, bayId);
     setOpenPadUid(null);
   };
-  const sortedBaristas = useMemo(
-    () => [...baristas].sort((a, b) => a.bayNumber - b.bayNumber),
-    [baristas]
-  );
+  const sortedBaristas = useMemo(() => [...baristas].sort((a, b) => a.bayNumber - b.bayNumber), [baristas]);
 
   const orderGroups = useMemo<OrderGroup[]>(() => {
     const groups = new Map<string, UnassignedOrder[]>();
@@ -137,7 +128,6 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
               <h2 className="text-[15px] font-black text-slate-900 tracking-wide">6人のドリッパー</h2>
             </div>
           </div>
-
         </div>
 
         {selectedOrderId && (
@@ -166,9 +156,7 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
             const next = barista.queue[1];
             const remainingSeconds = getRemainingSeconds(barista, simTimeSec);
             const isImminent = current && remainingSeconds <= 30;
-            const isLinked = Boolean(
-              selectedOrderId && barista.queue.some((ticket) => ticket.id === selectedOrderId)
-            );
+            const isLinked = Boolean(selectedOrderId && barista.queue.some((ticket) => ticket.id === selectedOrderId));
 
             return (
               <article
@@ -199,29 +187,49 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                     current?.isRebrew
                       ? 'bg-red-50 border-red-400 text-slate-950 hover:bg-red-100'
                       : current
-                      ? isImminent
-                        ? 'bg-red-50 border-red-300 hover:bg-red-100'
-                        : 'bg-slate-950 border-slate-950 text-white hover:bg-slate-800'
-                      : 'bg-slate-50 border-dashed border-slate-300 text-slate-400'
+                        ? isImminent
+                          ? 'bg-red-50 border-red-300 hover:bg-red-100'
+                          : 'bg-slate-950 border-slate-950 text-white hover:bg-slate-800'
+                        : 'bg-slate-50 border-dashed border-slate-300 text-slate-400'
                   }`}
                 >
-                  <div className={`text-[9px] font-black tracking-[0.16em] ${current?.isRebrew || isImminent ? 'text-red-600' : 'text-slate-400'}`}>
+                  <div
+                    className={`text-[9px] font-black tracking-[0.16em] ${current?.isRebrew || isImminent ? 'text-red-600' : 'text-slate-400'}`}
+                  >
                     NOW
                   </div>
                   {current ? (
                     <>
-                      <div className={`mt-1 flex items-start justify-between gap-1 ${current.isRebrew || isImminent ? 'text-slate-950' : 'text-white'}`}>
+                      <div
+                        className={`mt-1 flex items-start justify-between gap-1 ${current.isRebrew || isImminent ? 'text-slate-950' : 'text-white'}`}
+                      >
                         <div className="min-w-0">
                           <div className="text-[15px] leading-tight font-black truncate">{current.beanName}</div>
-                          {current.isRebrew && <div className="mt-1 inline-flex rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">入れ直し中</div>}
+                          {current.isRebrew && (
+                            <div className="mt-1 inline-flex rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
+                              入れ直し中
+                            </div>
+                          )}
                           <div className="mt-0.5 flex items-center gap-1 text-[10px] font-bold opacity-85">
-                            <span className="rounded bg-white px-1.5 py-0.5 text-[14px] leading-none font-mono text-slate-950 opacity-100">{current.cupCount}杯</span>
-                            {current.totalItemsInOrder && current.totalItemsInOrder > 1 && <span>{current.itemIndex}/{current.totalItemsInOrder}・計{current.totalOrderCups}杯</span>}
+                            <span className="rounded bg-white px-1.5 py-0.5 text-[14px] leading-none font-mono text-slate-950 opacity-100">
+                              {current.cupCount}杯
+                            </span>
+                            {current.totalItemsInOrder && current.totalItemsInOrder > 1 && (
+                              <span>
+                                {current.itemIndex}/{current.totalItemsInOrder}・計{current.totalOrderCups}杯
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <span className={`font-mono text-[21px] leading-none font-black shrink-0 ${current.isRebrew ? 'text-red-700' : ''}`}>{current.id}</span>
+                        <span
+                          className={`font-mono text-[21px] leading-none font-black shrink-0 ${current.isRebrew ? 'text-red-700' : ''}`}
+                        >
+                          {current.id}
+                        </span>
                       </div>
-                      <div className={`mt-1.5 font-mono text-[30px] leading-none font-black tracking-tight ${current.isRebrew || isImminent ? 'text-red-600' : 'text-white'}`}>
+                      <div
+                        className={`mt-1.5 font-mono text-[30px] leading-none font-black tracking-tight ${current.isRebrew || isImminent ? 'text-red-600' : 'text-white'}`}
+                      >
                         {remainingSeconds === 0 ? '継続中' : formatRemaining(remainingSeconds)}
                       </div>
                     </>
@@ -242,7 +250,17 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                       className="w-full mt-1 text-left flex items-center justify-between gap-1 hover:text-blue-700 touch-manipulation"
                     >
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1"><span className="text-[12px] font-black truncate">{next.beanName}</span><span className="rounded bg-slate-950 px-1.5 py-0.5 text-[14px] leading-none font-mono font-black text-white">{next.cupCount}杯</span>{next.totalItemsInOrder && next.totalItemsInOrder > 1 && <span className="text-[10px] font-mono font-black">{next.itemIndex}/{next.totalItemsInOrder}・計{next.totalOrderCups}杯</span>}</div>
+                        <div className="flex items-center gap-1">
+                          <span className="text-[12px] font-black truncate">{next.beanName}</span>
+                          <span className="rounded bg-slate-950 px-1.5 py-0.5 text-[14px] leading-none font-mono font-black text-white">
+                            {next.cupCount}杯
+                          </span>
+                          {next.totalItemsInOrder && next.totalItemsInOrder > 1 && (
+                            <span className="text-[10px] font-mono font-black">
+                              {next.itemIndex}/{next.totalItemsInOrder}・計{next.totalOrderCups}杯
+                            </span>
+                          )}
+                        </div>
                         <div className="font-mono text-[15px] font-black text-slate-700">{next.id}</div>
                       </div>
                       <ChevronRight className="w-4 h-4 shrink-0 text-slate-400" />
@@ -315,7 +333,9 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
               return (
                 <article
                   key={group.id}
-                  data-b-order-uid={orderUid(group.items.find((item) => orderUid(item) === openPadUid) || group.items[0])}
+                  data-b-order-uid={orderUid(
+                    group.items.find((item) => orderUid(item) === openPadUid) || group.items[0]
+                  )}
                   onClick={() => {
                     openAssignmentPad(group.items[0]);
                   }}
@@ -323,8 +343,8 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                     isSelected
                       ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-400 shadow-sm'
                       : matchesHeaderFilter
-                      ? 'bg-sky-50 border-sky-400'
-                      : 'bg-white border-slate-300 hover:border-slate-500 hover:shadow-sm'
+                        ? 'bg-sky-50 border-sky-400'
+                        : 'bg-white border-slate-300 hover:border-slate-500 hover:shadow-sm'
                   }`}
                 >
                   {(() => {
@@ -332,16 +352,40 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                     if (!openOrder) return null;
                     return (
                       <>
-                        <div className="absolute -top-[38px] left-0 right-0 z-50 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl" aria-label={`${openOrder.id}の割当先 1から3`}>
+                        <div
+                          className="absolute -top-[38px] left-0 right-0 z-50 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+                          aria-label={`${openOrder.id}の割当先 1から3`}
+                        >
                           {[1, 2, 3].map((bayId) => (
-                            <button key={bayId} type="button" onClick={(event) => { event.stopPropagation(); assignToBay(openOrder, bayId); }} disabled={Boolean(openOrder.preferredBaristaId && openOrder.preferredBaristaId !== bayId)} className={`rounded-md border text-[17px] font-mono font-black touch-manipulation disabled:border-slate-700 disabled:bg-slate-700 disabled:text-slate-500 ${openOrder.preferredBaristaId === bayId ? 'border-violet-300 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-950'}`}>
+                            <button
+                              key={bayId}
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                assignToBay(openOrder, bayId);
+                              }}
+                              disabled={Boolean(openOrder.preferredBaristaId && openOrder.preferredBaristaId !== bayId)}
+                              className={`rounded-md border text-[17px] font-mono font-black touch-manipulation disabled:border-slate-700 disabled:bg-slate-700 disabled:text-slate-500 ${openOrder.preferredBaristaId === bayId ? 'border-violet-300 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-950'}`}
+                            >
                               {bayId}
                             </button>
                           ))}
                         </div>
-                        <div className="absolute -bottom-[38px] left-0 right-0 z-50 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl" aria-label={`${openOrder.id}の割当先 4から6`}>
+                        <div
+                          className="absolute -bottom-[38px] left-0 right-0 z-50 grid h-[34px] grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+                          aria-label={`${openOrder.id}の割当先 4から6`}
+                        >
                           {[4, 5, 6].map((bayId) => (
-                            <button key={bayId} type="button" onClick={(event) => { event.stopPropagation(); assignToBay(openOrder, bayId); }} disabled={Boolean(openOrder.preferredBaristaId && openOrder.preferredBaristaId !== bayId)} className={`rounded-md border text-[17px] font-mono font-black touch-manipulation disabled:border-slate-700 disabled:bg-slate-700 disabled:text-slate-500 ${openOrder.preferredBaristaId === bayId ? 'border-violet-300 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-950'}`}>
+                            <button
+                              key={bayId}
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                assignToBay(openOrder, bayId);
+                              }}
+                              disabled={Boolean(openOrder.preferredBaristaId && openOrder.preferredBaristaId !== bayId)}
+                              className={`rounded-md border text-[17px] font-mono font-black touch-manipulation disabled:border-slate-700 disabled:bg-slate-700 disabled:text-slate-500 ${openOrder.preferredBaristaId === bayId ? 'border-violet-300 bg-violet-600 text-white' : 'border-slate-300 bg-white text-slate-950'}`}
+                            >
                               {bayId}
                             </button>
                           ))}
@@ -351,18 +395,28 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                   })()}
                   <div className="flex items-start justify-between gap-2 pb-1.5 border-b border-slate-200">
                     <div className="flex items-center gap-2">
-                      <span className={`w-7 h-7 rounded-md flex items-center justify-center font-mono text-[14px] font-black ${
-                        isSelected ? 'bg-blue-700 text-white' : 'bg-slate-900 text-white'
-                      }`}>
+                      <span
+                        className={`w-7 h-7 rounded-md flex items-center justify-center font-mono text-[14px] font-black ${
+                          isSelected ? 'bg-blue-700 text-white' : 'bg-slate-900 text-white'
+                        }`}
+                      >
                         {index + 1}
                       </span>
                       <div>
-                        <div className={`font-mono text-[24px] leading-none font-black ${isSelected ? 'text-blue-800' : group.items[0].preferredBaristaId ? 'text-violet-700' : group.items.some((item) => item.totalItemsInOrder && item.totalItemsInOrder > 1) ? 'text-slate-950' : 'text-slate-600'}`}>{group.id}</div>
+                        <div
+                          className={`font-mono text-[24px] leading-none font-black ${isSelected ? 'text-blue-800' : group.items[0].preferredBaristaId ? 'text-violet-700' : group.items.some((item) => item.totalItemsInOrder && item.totalItemsInOrder > 1) ? 'text-slate-950' : 'text-slate-600'}`}
+                        >
+                          {group.id}
+                        </div>
                         {group.items[0].preferredBaristaId && (
-                          <div className="mt-1 inline-flex rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">指名 {group.items[0].preferredBaristaId}</div>
+                          <div className="mt-1 inline-flex rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">
+                            指名 {group.items[0].preferredBaristaId}
+                          </div>
                         )}
                         {group.items[0].totalOrderCups && (
-                          <div className="mt-0.5 text-[11px] font-bold text-slate-500">計 {group.items[0].totalOrderCups}杯</div>
+                          <div className="mt-0.5 text-[11px] font-bold text-slate-500">
+                            計 {group.items[0].totalOrderCups}杯
+                          </div>
                         )}
                       </div>
                     </div>
@@ -381,11 +435,25 @@ export const HumanCenteredControlView: React.FC<HumanCenteredControlViewProps> =
                       >
                         <div className="flex items-center justify-between gap-1">
                           <span className="text-[13px] font-black text-slate-900 truncate">{item.beanName}</span>
-                          {item.isRebrew && <span className="rounded bg-red-600 px-1 py-0.5 text-[9px] font-black text-white">入れ直し</span>}
-                          <span className="rounded bg-slate-950 px-1.5 py-0.5 font-mono text-[14px] leading-none font-black text-white shrink-0">{item.cupCount}杯</span>
-                          {item.totalItemsInOrder && item.totalItemsInOrder > 1 && <span className="text-[10px] font-mono font-black text-slate-600 shrink-0">{item.itemIndex}/{item.totalItemsInOrder}・計{item.totalOrderCups}杯</span>}
+                          {item.isRebrew && (
+                            <span className="rounded bg-red-600 px-1 py-0.5 text-[9px] font-black text-white">
+                              入れ直し
+                            </span>
+                          )}
+                          <span className="rounded bg-slate-950 px-1.5 py-0.5 font-mono text-[14px] leading-none font-black text-white shrink-0">
+                            {item.cupCount}杯
+                          </span>
+                          {item.totalItemsInOrder && item.totalItemsInOrder > 1 && (
+                            <span className="text-[10px] font-mono font-black text-slate-600 shrink-0">
+                              {item.itemIndex}/{item.totalItemsInOrder}・計{item.totalOrderCups}杯
+                            </span>
+                          )}
                         </div>
-                        {item.preferredBaristaId && <div className="mt-1 text-[10px] font-black text-violet-700">指名 {item.preferredBaristaId}</div>}
+                        {item.preferredBaristaId && (
+                          <div className="mt-1 text-[10px] font-black text-violet-700">
+                            指名 {item.preferredBaristaId}
+                          </div>
+                        )}
                       </button>
                     ))}
                   </div>

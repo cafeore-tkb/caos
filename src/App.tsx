@@ -1,38 +1,31 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AssignSlotModal } from './components/AssignSlotModal';
 import {
+  AuxiliaryContent,
+  AuxiliarySheet,
+  type AuxiliaryTab,
+  StandaloneAuxiliaryPanel,
+} from './components/AuxiliaryPanel';
+import { type ControlViewMode, ControlWorkspace } from './components/ControlWorkspace';
+import { type RebrewDecision, RebrewPanel } from './components/RebrewPanel';
+import { TestPlaySetup } from './components/TestPlaySetup';
+import { TicketDetailModal } from './components/TicketDetailModal';
+import { type NavTab, TopHeader } from './components/TopHeader';
+import { BEAN_NAME_MAP, INITIAL_BARISTAS, INITIAL_BEANS, INITIAL_LEARNING_LOGS } from './data/initialData';
+import type {
+  Barista,
   BeanCode,
   BeanItem,
-  Barista,
-  UnassignedOrder,
-  OrderTicket,
-  LearningEngineLog,
   HistoricalDataset,
   HistoricalOrder,
+  LearningEngineLog,
+  OrderTicket,
   TestPlaySession,
+  UnassignedOrder,
 } from './types';
-import {
-  INITIAL_BARISTAS,
-  INITIAL_LEARNING_LOGS,
-  INITIAL_BEANS,
-  BEAN_NAME_MAP,
-} from './data/initialData';
-import { TopHeader, NavTab } from './components/TopHeader';
-import { DispatchBoard } from './components/DispatchBoard';
-import { UnassignedOrdersPanel } from './components/UnassignedOrdersPanel';
-import { TicketDetailModal } from './components/TicketDetailModal';
-import { AssignSlotModal } from './components/AssignSlotModal';
-import { BaysOverviewView } from './components/BaysOverviewView';
-import { BeanQueueView } from './components/BeanQueueView';
-import { AiConfigView } from './components/AiConfigView';
-import { AnalyticsView } from './components/AnalyticsView';
-import { HumanCenteredControlView } from './components/HumanCenteredControlView';
-import { TestPlaySetup } from './components/TestPlaySetup';
-import { RebrewDecision, RebrewPanel } from './components/RebrewPanel';
 import { soundManager } from './utils/audio';
-import { ExternalLink, X } from 'lucide-react';
+import { arrangeQueue, orderNumber, reanchorQueueInOrder, splitIntoDripUnits } from './utils/orderQueue';
 
-type ControlViewMode = 'current' | 'new';
-type AuxiliaryTab = Exclude<NavTab, 'control'>;
 type UndoSnapshot = {
   baristas: Barista[];
   beans: BeanItem[];
@@ -53,7 +46,7 @@ const PANEL_SNAPSHOT_KEY = 'caos-panel-snapshot-v1';
 const readPanelSnapshot = (): PanelSnapshot | null => {
   try {
     const value = window.localStorage.getItem(PANEL_SNAPSHOT_KEY);
-    return value ? JSON.parse(value) as PanelSnapshot : null;
+    return value ? (JSON.parse(value) as PanelSnapshot) : null;
   } catch {
     return null;
   }
@@ -62,11 +55,46 @@ const readPanelSnapshot = (): PanelSnapshot | null => {
 type ShiftMember = { name: string; canHandleSpecial: boolean };
 
 const SHIFT_ROSTERS: ShiftMember[][] = [
-  [{ name: '鈴木', canHandleSpecial: true }, { name: '山口', canHandleSpecial: true }, { name: '小林', canHandleSpecial: false }, { name: '松本', canHandleSpecial: false }, { name: '井上', canHandleSpecial: false }, { name: '木村', canHandleSpecial: false }],
-  [{ name: '林', canHandleSpecial: true }, { name: '中西', canHandleSpecial: true }, { name: '近藤', canHandleSpecial: true }, { name: '斎藤', canHandleSpecial: false }, { name: '清水', canHandleSpecial: false }, { name: '山本', canHandleSpecial: false }],
-  [{ name: '森', canHandleSpecial: true }, { name: '橋本', canHandleSpecial: false }, { name: '阿部', canHandleSpecial: false }, { name: '石川', canHandleSpecial: false }, { name: '山下', canHandleSpecial: false }, { name: '藤田', canHandleSpecial: false }],
-  [{ name: '沼田', canHandleSpecial: true }, { name: '佐藤', canHandleSpecial: true }, { name: '三田', canHandleSpecial: true }, { name: '前田', canHandleSpecial: false }, { name: '岡田', canHandleSpecial: false }, { name: '石井', canHandleSpecial: false }],
-  [{ name: '瀬邉', canHandleSpecial: true }, { name: '菅原', canHandleSpecial: true }, { name: '長谷川', canHandleSpecial: false }, { name: '村上', canHandleSpecial: false }, { name: '坂本', canHandleSpecial: false }, { name: '青木', canHandleSpecial: false }],
+  [
+    { name: '鈴木', canHandleSpecial: true },
+    { name: '山口', canHandleSpecial: true },
+    { name: '小林', canHandleSpecial: false },
+    { name: '松本', canHandleSpecial: false },
+    { name: '井上', canHandleSpecial: false },
+    { name: '木村', canHandleSpecial: false },
+  ],
+  [
+    { name: '林', canHandleSpecial: true },
+    { name: '中西', canHandleSpecial: true },
+    { name: '近藤', canHandleSpecial: true },
+    { name: '斎藤', canHandleSpecial: false },
+    { name: '清水', canHandleSpecial: false },
+    { name: '山本', canHandleSpecial: false },
+  ],
+  [
+    { name: '森', canHandleSpecial: true },
+    { name: '橋本', canHandleSpecial: false },
+    { name: '阿部', canHandleSpecial: false },
+    { name: '石川', canHandleSpecial: false },
+    { name: '山下', canHandleSpecial: false },
+    { name: '藤田', canHandleSpecial: false },
+  ],
+  [
+    { name: '沼田', canHandleSpecial: true },
+    { name: '佐藤', canHandleSpecial: true },
+    { name: '三田', canHandleSpecial: true },
+    { name: '前田', canHandleSpecial: false },
+    { name: '岡田', canHandleSpecial: false },
+    { name: '石井', canHandleSpecial: false },
+  ],
+  [
+    { name: '瀬邉', canHandleSpecial: true },
+    { name: '菅原', canHandleSpecial: true },
+    { name: '長谷川', canHandleSpecial: false },
+    { name: '村上', canHandleSpecial: false },
+    { name: '坂本', canHandleSpecial: false },
+    { name: '青木', canHandleSpecial: false },
+  ],
 ];
 
 const placeShiftMembers = (members: ShiftMember[]) => {
@@ -82,99 +110,15 @@ const placeShiftMembers = (members: ShiftMember[]) => {
   return placed as ShiftMember[];
 };
 
-const makeCleanBaristas = (): Barista[] => INITIAL_BARISTAS.map((barista) => ({
-  ...barista,
-  status: 'standby',
-  remainingStr: '00:00 待機中',
-  activeTicketId: undefined,
-  queue: [],
-  pastTickets: [],
-}));
-
-const orderNumber = (id: string) => Number(id.match(/\d+/)?.[0]) || Number.MAX_SAFE_INTEGER;
-const queueOrder = (a: OrderTicket, b: OrderTicket) =>
-  orderNumber(a.id) - orderNumber(b.id) ||
-  (a.itemIndex || 0) - (b.itemIndex || 0) ||
-  (a.ticketUid || '').localeCompare(b.ticketUid || '');
-
-const arrangeQueue = (
-  queue: OrderTicket[],
-  coefficient: number,
-  nowSec: number,
-  activateFirst = false
-) => {
-  const existingActive = !activateFirst ? queue.find((ticket) => ticket.status === 'brewing') : undefined;
-  const scheduled = queue
-    .filter((ticket) => ticket !== existingActive)
-    .map((ticket) => ({ ...ticket, status: 'scheduled' as const }))
-    .sort(queueOrder);
-  const ordered = existingActive ? [existingActive, ...scheduled] : scheduled;
-  if (ordered.length === 0) return ordered;
-
-  const shouldActivateFirst = activateFirst || !existingActive;
-  const first = shouldActivateFirst
-    ? {
-        ...ordered[0],
-        status: 'brewing' as const,
-        startTimeSec: nowSec,
-        timeRemainingSec: Math.round(ordered[0].totalDurationSec * coefficient),
-      }
-    : existingActive!;
-  const result: OrderTicket[] = [first];
-  const firstEnd = first.status === 'brewing'
-    ? Math.max(nowSec, (first.startTimeSec ?? nowSec) + first.totalDurationSec)
-    : (first.startTimeSec ?? nowSec + 10) + first.totalDurationSec;
-  let cursor = firstEnd;
-
-  for (const ticket of ordered.slice(1)) {
-    const startTimeSec = cursor + 15;
-    result.push({ ...ticket, status: 'scheduled', startTimeSec, timeRemainingSec: undefined });
-    cursor = startTimeSec + ticket.totalDurationSec;
-  }
-  return result;
-};
-
-const reanchorQueueInOrder = (queue: OrderTicket[], coefficient: number, nowSec: number) => {
-  if (queue.length === 0) return queue;
-  const firstWasBrewing = queue[0].status === 'brewing';
-  const first: OrderTicket = firstWasBrewing
-    ? { ...queue[0] }
-    : { ...queue[0], status: 'brewing', startTimeSec: nowSec, timeRemainingSec: Math.round(queue[0].totalDurationSec * coefficient) };
-  const result = [first];
-  let cursor = Math.max(nowSec, (first.startTimeSec ?? nowSec) + first.totalDurationSec);
-  queue.slice(1).forEach((ticket) => {
-    const startTimeSec = cursor + 15;
-    result.push({ ...ticket, status: 'scheduled', startTimeSec, timeRemainingSec: undefined });
-    cursor = startTimeSec + ticket.totalDurationSec;
-  });
-  return result;
-};
-const splitIntoDripUnits = (orders: UnassignedOrder[]) => {
-  const totalOrderCups = orders.reduce((sum, order) => sum + order.cupCount, 0);
-  const units = orders.flatMap((order) => {
-    const parts: UnassignedOrder[] = [];
-    let remaining = order.cupCount;
-    let part = 1;
-    while (remaining > 0) {
-      const cups = Math.min(2, remaining);
-      parts.push({
-        ...order,
-        ticketUid: `${order.ticketUid || order.id.replace('#', '')}-part${part}`,
-        cupCount: cups,
-        badgeTag: `${cups}杯 ${order.badgeTag.replace(/^\d+杯\s*/, '')}`,
-      });
-      remaining -= cups;
-      part += 1;
-    }
-    return parts;
-  });
-  return units.map((unit, index) => ({
-    ...unit,
-    itemIndex: index + 1,
-    totalItemsInOrder: units.length,
-    totalOrderCups,
+const makeCleanBaristas = (): Barista[] =>
+  INITIAL_BARISTAS.map((barista) => ({
+    ...barista,
+    status: 'standby',
+    remainingStr: '00:00 待機中',
+    activeTicketId: undefined,
+    queue: [],
+    pastTickets: [],
   }));
-};
 
 const MOCK_MENU: BeanCode[] = ['CHAMP', 'ORE', 'KEN', 'TNZ', 'BRA', 'ICE', 'MILK', 'CHAMP', 'ORE', 'SP'];
 const MOCK_ORDER_GROUPS: UnassignedOrder[][] = Array.from({ length: 120 }, (_, index) => {
@@ -183,19 +127,21 @@ const MOCK_ORDER_GROUPS: UnassignedOrder[][] = Array.from({ length: 120 }, (_, i
   const beanCode = MOCK_MENU[index % MOCK_MENU.length];
   const cupCount = number % 11 === 0 ? 4 : number % 7 === 0 ? 3 : number % 3 === 0 ? 2 : 1;
   const preferredBaristaId = beanCode === 'SP' ? 2 : number % 17 === 0 ? 6 : undefined;
-  return splitIntoDripUnits([{
-    id,
-    ticketUid: `${number.toString().padStart(3, '0')}-1`,
-    beanCode,
-    beanName: BEAN_NAME_MAP[beanCode],
-    cupCount,
-    badgeTag: `${cupCount}杯`,
-    predictedTimeStr: cupCount > 2 ? '3分30秒' : '2分20秒',
-    recommendedBaristas: preferredBaristaId ? `ドリッパー ${preferredBaristaId}` : '全ドリッパー',
-    recommendedBayIds: preferredBaristaId ? [preferredBaristaId] : [1, 2, 3, 4, 5, 6],
-    preferredBaristaId,
-    cardColor: beanCode === 'ICE' ? 'cyan' : beanCode === 'SP' ? 'emerald' : beanCode === 'KEN' ? 'peach' : 'blue',
-  }]);
+  return splitIntoDripUnits([
+    {
+      id,
+      ticketUid: `${number.toString().padStart(3, '0')}-1`,
+      beanCode,
+      beanName: BEAN_NAME_MAP[beanCode],
+      cupCount,
+      badgeTag: `${cupCount}杯`,
+      predictedTimeStr: cupCount > 2 ? '3分30秒' : '2分20秒',
+      recommendedBaristas: preferredBaristaId ? `ドリッパー ${preferredBaristaId}` : '全ドリッパー',
+      recommendedBayIds: preferredBaristaId ? [preferredBaristaId] : [1, 2, 3, 4, 5, 6],
+      preferredBaristaId,
+      cardColor: beanCode === 'ICE' ? 'cyan' : beanCode === 'SP' ? 'emerald' : beanCode === 'KEN' ? 'peach' : 'blue',
+    },
+  ]);
 });
 
 const historicalBeanCode = (name: string, type: string): BeanCode => {
@@ -211,7 +157,9 @@ const historicalBeanCode = (name: string, type: string): BeanCode => {
 
 const historicalOrderToDripUnits = (order: HistoricalOrder): UnassignedOrder[] => {
   // Plain iced milk is served without dripping, so it never enters CaOS's drip queue.
-  const drinks = order.items.filter((item) => item.type !== 'others' && item.type !== 'milk' && !item.name.includes('アイスミルク'));
+  const drinks = order.items.filter(
+    (item) => item.type !== 'others' && item.type !== 'milk' && !item.name.includes('アイスミルク')
+  );
   const grouped = new Map<BeanCode, { names: string[]; count: number }>();
   drinks.forEach((item) => {
     const code = historicalBeanCode(item.name, item.type);
@@ -221,18 +169,21 @@ const historicalOrderToDripUnits = (order: HistoricalOrder): UnassignedOrder[] =
     grouped.set(code, current);
   });
   const id = `#${order.orderId.toString().padStart(3, '0')}`;
-  const source = Array.from(grouped, ([beanCode, group], index): UnassignedOrder => ({
-    id,
-    ticketUid: `history-${order.orderId}-${beanCode}-${index}`,
-    beanCode,
-    beanName: group.names.join('・'),
-    cupCount: group.count,
-    badgeTag: `${group.count}杯`,
-    predictedTimeStr: group.count > 1 ? '3分15秒' : '2分15秒',
-    recommendedBaristas: '全ドリッパー',
-    recommendedBayIds: [1, 2, 3, 4, 5, 6],
-    cardColor: beanCode === 'ICE' ? 'cyan' : beanCode === 'SP' ? 'emerald' : beanCode === 'KEN' ? 'peach' : 'blue',
-  }));
+  const source = Array.from(
+    grouped,
+    ([beanCode, group], index): UnassignedOrder => ({
+      id,
+      ticketUid: `history-${order.orderId}-${beanCode}-${index}`,
+      beanCode,
+      beanName: group.names.join('・'),
+      cupCount: group.count,
+      badgeTag: `${group.count}杯`,
+      predictedTimeStr: group.count > 1 ? '3分15秒' : '2分15秒',
+      recommendedBaristas: '全ドリッパー',
+      recommendedBayIds: [1, 2, 3, 4, 5, 6],
+      cardColor: beanCode === 'ICE' ? 'cyan' : beanCode === 'SP' ? 'emerald' : beanCode === 'KEN' ? 'peach' : 'blue',
+    })
+  );
   return splitIntoDripUnits(source);
 };
 
@@ -257,37 +208,49 @@ export default function App() {
   const [undoLabel, setUndoLabel] = useState<string | null>(null);
   const [shiftRosterIndex, setShiftRosterIndex] = useState(0);
   const lastAutomaticShiftHour = useRef(new Date().getHours());
-  const [learningLogs, setLearningLogs] = useState<LearningEngineLog[]>(() => standaloneSnapshot?.learningLogs || INITIAL_LEARNING_LOGS);
+  const [learningLogs, setLearningLogs] = useState<LearningEngineLog[]>(
+    () => standaloneSnapshot?.learningLogs || INITIAL_LEARNING_LOGS
+  );
 
   // Filters & Toggles
-  const [selectedQueueBean, setSelectedQueueBean] = useState<BeanCode | null>(null);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
 
   // Modals
   const [selectedTicket, setSelectedTicket] = useState<OrderTicket | null>(null);
-  const [assignSlotData, setAssignSlotData] = useState<{ bayId: number | null; order: UnassignedOrder | null } | null>(null);
+  const [assignSlotData, setAssignSlotData] = useState<{ bayId: number | null; order: UnassignedOrder | null } | null>(
+    null
+  );
   const [rebrewSource, setRebrewSource] = useState<{ ticket: OrderTicket; bayId: number } | null>(null);
 
-  // Simulation Clock (starts at 08:04:15 -> 29055 seconds)
-  const [simTimeSec, setSimTimeSec] = useState<number>(8 * 3600 + 4 * 60 + 15);
   const [isRunning, setIsRunning] = useState<boolean>(true);
   const [simSpeed, setSimSpeed] = useState<number>(1);
-  const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(null);
+  const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(
+    null
+  );
   const [historicalOrders, setHistoricalOrders] = useState<HistoricalOrder[]>([]);
   const [testDataLoading, setTestDataLoading] = useState(true);
   const [testSetupOpen, setTestSetupOpen] = useState(false);
-  const [testPlaySession, setTestPlaySession] = useState<TestPlaySession | null>(() => standaloneSnapshot?.testPlaySession || null);
+  const [testPlaySession, setTestPlaySession] = useState<TestPlaySession | null>(
+    () => standaloneSnapshot?.testPlaySession || null
+  );
   const historicalOrderCursor = useRef(0);
 
   // Linked multi-item order selection (e.g. #152 has items in Bay 1 and Bay 2)
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [realTime, setRealTime] = useState(() => new Date());
+  const testPlayStatus = testPlaySession?.status;
+  const testPlayCurrentMs = testPlaySession?.currentMs;
+  const testPlayEndMs = testPlaySession?.endMs;
+  const testPlayOrders = testPlaySession?.orders;
   const operationalTime = testPlaySession ? new Date(testPlaySession.currentMs) : realTime;
-  const realTimeSec = operationalTime.getHours() * 3600 + operationalTime.getMinutes() * 60 + operationalTime.getSeconds();
+  const realTimeSec =
+    operationalTime.getHours() * 3600 + operationalTime.getMinutes() * 60 + operationalTime.getSeconds();
 
-  const sortedUnassignedOrders = [...unassignedOrders].sort((a, b) =>
-    Number(Boolean(b.isRebrew)) - Number(Boolean(a.isRebrew)) ||
-    orderNumber(a.id) - orderNumber(b.id) || (a.itemIndex || 0) - (b.itemIndex || 0)
+  const sortedUnassignedOrders = [...unassignedOrders].sort(
+    (a, b) =>
+      Number(Boolean(b.isRebrew)) - Number(Boolean(a.isRebrew)) ||
+      orderNumber(a.id) - orderNumber(b.id) ||
+      (a.itemIndex || 0) - (b.itemIndex || 0)
   );
 
   useEffect(() => {
@@ -309,7 +272,9 @@ export default function App() {
       .finally(() => {
         if (!cancelled) setTestDataLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Mock the register sending one complete order at a time.
@@ -329,37 +294,45 @@ export default function App() {
   }, [testPlaySession]);
 
   useEffect(() => {
-    if (!testPlaySession || testPlaySession.status !== 'active' || !isRunning) return;
+    if (testPlayStatus !== 'active' || !isRunning) return;
     // One test-play tick advances one second of historical time. The shared
     // speed control changes the tick frequency so the clock, timeline, order
     // arrivals, and brewing countdown all stay on the same multiplier.
     const timer = window.setInterval(() => {
-      setTestPlaySession((session) => session ? {
-        ...session,
-        currentMs: Math.min(session.endMs, session.currentMs + 1_000),
-      } : session);
+      setTestPlaySession((session) =>
+        session
+          ? {
+              ...session,
+              currentMs: Math.min(session.endMs, session.currentMs + 1_000),
+            }
+          : session
+      );
     }, 1000 / simSpeed);
     return () => window.clearInterval(timer);
-  }, [testPlaySession?.status, isRunning, simSpeed]);
+  }, [testPlayStatus, isRunning, simSpeed]);
 
   useEffect(() => {
-    if (testPlaySession?.status === 'active' && testPlaySession.currentMs >= testPlaySession.endMs) {
+    if (
+      testPlayStatus === 'active' &&
+      testPlayCurrentMs !== undefined &&
+      testPlayEndMs !== undefined &&
+      testPlayCurrentMs >= testPlayEndMs
+    ) {
       setIsRunning(false);
     }
-  }, [testPlaySession?.currentMs, testPlaySession?.endMs, testPlaySession?.status]);
+  }, [testPlayCurrentMs, testPlayEndMs, testPlayStatus]);
 
   useEffect(() => {
-    if (!testPlaySession || testPlaySession.status !== 'active') return;
-    const sorted = testPlaySession.orders;
+    if (testPlayStatus !== 'active' || testPlayCurrentMs === undefined || !testPlayOrders) return;
     const incoming: UnassignedOrder[] = [];
-    while (historicalOrderCursor.current < sorted.length) {
-      const order = sorted[historicalOrderCursor.current];
-      if (new Date(order.createdAt).getTime() > testPlaySession.currentMs) break;
+    while (historicalOrderCursor.current < testPlayOrders.length) {
+      const order = testPlayOrders[historicalOrderCursor.current];
+      if (new Date(order.createdAt).getTime() > testPlayCurrentMs) break;
       incoming.push(...historicalOrderToDripUnits(order));
       historicalOrderCursor.current += 1;
     }
     if (incoming.length > 0) setUnassignedOrders((prev) => [...prev, ...incoming]);
-  }, [testPlaySession?.currentMs, testPlaySession?.status]);
+  }, [testPlayCurrentMs, testPlayOrders, testPlayStatus]);
 
   const captureUndo = (label: string) => {
     undoSnapshotRef.current = { baristas, beans, unassignedOrders, shiftRosterIndex, label };
@@ -379,7 +352,6 @@ export default function App() {
     setUnassignedOrders([...snapshot.unassignedOrders, ...arrivals]);
     setShiftRosterIndex(snapshot.shiftRosterIndex);
     setSelectedOrderId(null);
-    setSelectedQueueBean(null);
     setRebrewSource(null);
     setSelectedTicket(null);
     undoSnapshotRef.current = null;
@@ -391,16 +363,19 @@ export default function App() {
   const handleToggleOrderSelection = (orderId: string) => {
     if (!orderId) {
       setSelectedOrderId(null);
-      setSelectedQueueBean(null);
       return;
     }
     if (selectedOrderId === orderId) {
       setSelectedOrderId(null);
-      setSelectedQueueBean(null);
       return;
     }
-    setSelectedQueueBean(null);
     setSelectedOrderId(orderId);
+  };
+
+  const handleToggleSound = () => {
+    const nextSoundEnabled = !soundEnabled;
+    soundManager.enabled = nextSoundEnabled;
+    setSoundEnabled(nextSoundEnabled);
   };
 
   // Format digital clock time HH:mm:ss
@@ -417,8 +392,6 @@ export default function App() {
     const elapsedStep = 1;
 
     const interval = setInterval(() => {
-      setSimTimeSec((prev) => prev + elapsedStep);
-
       // Decrement remaining seconds on active tickets
       setBaristas((prevBaristas) =>
         prevBaristas.map((barista) => {
@@ -449,7 +422,7 @@ export default function App() {
     }, 1000 / simSpeed);
 
     return () => clearInterval(interval);
-  }, [isRunning, simSpeed, testPlaySession?.status]);
+  }, [isRunning, simSpeed]);
 
   // Advance / complete a bay's active order
   const handleAdvanceBay = (bayId: number) => {
@@ -478,17 +451,19 @@ export default function App() {
         deltaSec < -15
           ? `最速補正 ${targetBarista.coefficient.toFixed(2)}`
           : deltaSec < 0
-          ? `係数 ${targetBarista.coefficient.toFixed(2)} 維持`
-          : `係数 ${targetBarista.coefficient.toFixed(2)} 連動`,
+            ? `係数 ${targetBarista.coefficient.toFixed(2)} 維持`
+            : `係数 ${targetBarista.coefficient.toFixed(2)} 連動`,
       timestamp: formatTimeStr(realTimeSec),
     };
 
     setLearningLogs((prevLogs) => [newLog, ...prevLogs.filter((l) => l.id !== newLog.id).slice(0, 4)]);
-    setBeans((prev) => prev.map((bean) =>
-      bean.code === completedTicket.beanCode
-        ? { ...bean, stockGrams: Math.max(0, bean.stockGrams - completedTicket.cupCount * 14) }
-        : bean
-    ));
+    setBeans((prev) =>
+      prev.map((bean) =>
+        bean.code === completedTicket.beanCode
+          ? { ...bean, stockGrams: Math.max(0, bean.stockGrams - completedTicket.cupCount * 14) }
+          : bean
+      )
+    );
 
     setBaristas((prev) =>
       prev.map((b) => {
@@ -520,9 +495,7 @@ export default function App() {
   const handleAssignOrderToBay = (orderUidOrId: string, targetBayId: number) => {
     soundManager.playDispatch();
 
-    const orderToAssign = unassignedOrders.find(
-      (o) => o.ticketUid === orderUidOrId || o.id === orderUidOrId
-    );
+    const orderToAssign = unassignedOrders.find((o) => o.ticketUid === orderUidOrId || o.id === orderUidOrId);
     if (!orderToAssign) return;
     if (orderToAssign.preferredBaristaId && orderToAssign.preferredBaristaId !== targetBayId) return;
     captureUndo(`${orderToAssign.id}の割当`);
@@ -536,9 +509,10 @@ export default function App() {
     const targetBay = baristas.find((b) => b.id === targetBayId);
     const lastTicket = targetBay?.queue[targetBay.queue.length - 1];
     const duration = orderToAssign.cupCount > 1 ? 195 : 135;
-    const computedStartSec = lastTicket && lastTicket.startTimeSec && lastTicket.totalDurationSec
-      ? lastTicket.startTimeSec + lastTicket.totalDurationSec + 15
-      : realTimeSec + 10;
+    const computedStartSec =
+      lastTicket?.startTimeSec && lastTicket.totalDurationSec
+        ? lastTicket.startTimeSec + lastTicket.totalDurationSec + 15
+        : realTimeSec + 10;
 
     // Convert to OrderTicket
     const newTicket: OrderTicket = {
@@ -555,7 +529,15 @@ export default function App() {
       beanCode: orderToAssign.beanCode,
       beanName: orderToAssign.beanName,
       cupCount: orderToAssign.cupCount,
-      tag: orderToAssign.badgeTag.includes('HOT') ? 'HOT' : orderToAssign.badgeTag.includes('ICE') ? 'ICE' : orderToAssign.badgeTag.includes('BATCH') ? 'BATCH' : orderToAssign.badgeTag.includes('SP') ? '★SP' : undefined,
+      tag: orderToAssign.badgeTag.includes('HOT')
+        ? 'HOT'
+        : orderToAssign.badgeTag.includes('ICE')
+          ? 'ICE'
+          : orderToAssign.badgeTag.includes('BATCH')
+            ? 'BATCH'
+            : orderToAssign.badgeTag.includes('SP')
+              ? '★SP'
+              : undefined,
       status: 'scheduled',
       scheduledTimeStr: `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`,
       startTimeSec: computedStartSec,
@@ -594,7 +576,6 @@ export default function App() {
       }));
     });
     setSelectedOrderId(null);
-    setSelectedQueueBean(null);
     soundManager.playDispatch();
   };
 
@@ -607,31 +588,37 @@ export default function App() {
       setUndoLabel(null);
     }
     const roster = placeShiftMembers(SHIFT_ROSTERS[shiftRosterIndex % SHIFT_ROSTERS.length]);
-    setBaristas((prev) => [...prev]
-      .sort((a, b) => a.bayNumber - b.bayNumber)
-      .map((barista, index) => {
-        const member = roster[index];
-        return {
-          ...barista,
-          name: member.name,
-          canHandleSpecial: member.canHandleSpecial || undefined,
-          coefficient: member.canHandleSpecial ? 0.97 : 1.05,
-          coefficientColor: member.canHandleSpecial ? 'green' : 'orange',
-        };
-      }));
+    setBaristas((prev) =>
+      [...prev]
+        .sort((a, b) => a.bayNumber - b.bayNumber)
+        .map((barista, index) => {
+          const member = roster[index];
+          return {
+            ...barista,
+            name: member.name,
+            canHandleSpecial: member.canHandleSpecial || undefined,
+            coefficient: member.canHandleSpecial ? 0.97 : 1.05,
+            coefficientColor: member.canHandleSpecial ? 'green' : 'orange',
+          };
+        })
+    );
     setShiftRosterIndex((index) => (index + 1) % SHIFT_ROSTERS.length);
     setSelectedTicket(null);
     setSelectedOrderId(null);
-    setSelectedQueueBean(null);
     soundManager.playDispatch();
   };
 
+  const currentHour = realTime.getHours();
+
+  // The shift should run only when the wall-clock hour changes. Including
+  // changeShift would retrigger this effect on every render because it closes
+  // over the current operational state.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: currentHour is the intentional trigger
   useEffect(() => {
-    const hour = realTime.getHours();
-    if (hour === lastAutomaticShiftHour.current) return;
-    lastAutomaticShiftHour.current = hour;
+    if (currentHour === lastAutomaticShiftHour.current) return;
+    lastAutomaticShiftHour.current = currentHour;
     changeShift(false);
-  }, [realTime.getHours()]);
+  }, [currentHour]);
 
   const nextShiftHour = (realTime.getHours() + 1) % 24;
   const nextShiftLabel = `${nextShiftHour.toString().padStart(2, '0')}:00`;
@@ -640,36 +627,40 @@ export default function App() {
     if (ticket.status !== 'scheduled') return;
     captureUndo(`${ticket.id}を未割当に戻す`);
     const key = ticketKey(ticket);
-    setBaristas((prev) => prev.map((bay) => ({
-      ...bay,
-      queue: arrangeQueue(
-        bay.queue.filter((item) => ticketKey(item) !== key),
-        bay.coefficient,
-        realTimeSec
-      ),
-    })));
-    setUnassignedOrders((prev) => [{
-      id: ticket.id,
-      ticketUid: ticket.ticketUid,
-      itemIndex: ticket.itemIndex,
-      totalItemsInOrder: ticket.totalItemsInOrder,
-      totalOrderCups: ticket.totalOrderCups,
-      orderNotes: ticket.orderNotes,
-      sourceOrderIds: ticket.sourceOrderIds,
-      beanCode: ticket.beanCode,
-      beanName: ticket.beanName,
-      cupCount: ticket.cupCount,
-      badgeTag: `${ticket.cupCount}杯 ${ticket.tag || 'HOT'}`,
-      predictedTimeStr: ticket.scheduledTimeStr || '2:15',
-      recommendedBaristas: ticket.preferredBaristaId ? `ドリッパー ${ticket.preferredBaristaId}` : '全ドリッパー',
-      recommendedBayIds: ticket.preferredBaristaId ? [ticket.preferredBaristaId] : [1, 2, 3, 4, 5, 6],
-      preferredBaristaId: ticket.preferredBaristaId,
-      isRebrew: ticket.isRebrew,
-      rebrewOfTicketUid: ticket.rebrewOfTicketUid,
-      cardColor: ticket.beanCode === 'ICE' ? 'cyan' : ticket.beanCode === 'SP' ? 'emerald' : 'blue',
-    }, ...prev]);
+    setBaristas((prev) =>
+      prev.map((bay) => ({
+        ...bay,
+        queue: arrangeQueue(
+          bay.queue.filter((item) => ticketKey(item) !== key),
+          bay.coefficient,
+          realTimeSec
+        ),
+      }))
+    );
+    setUnassignedOrders((prev) => [
+      {
+        id: ticket.id,
+        ticketUid: ticket.ticketUid,
+        itemIndex: ticket.itemIndex,
+        totalItemsInOrder: ticket.totalItemsInOrder,
+        totalOrderCups: ticket.totalOrderCups,
+        orderNotes: ticket.orderNotes,
+        sourceOrderIds: ticket.sourceOrderIds,
+        beanCode: ticket.beanCode,
+        beanName: ticket.beanName,
+        cupCount: ticket.cupCount,
+        badgeTag: `${ticket.cupCount}杯 ${ticket.tag || 'HOT'}`,
+        predictedTimeStr: ticket.scheduledTimeStr || '2:15',
+        recommendedBaristas: ticket.preferredBaristaId ? `ドリッパー ${ticket.preferredBaristaId}` : '全ドリッパー',
+        recommendedBayIds: ticket.preferredBaristaId ? [ticket.preferredBaristaId] : [1, 2, 3, 4, 5, 6],
+        preferredBaristaId: ticket.preferredBaristaId,
+        isRebrew: ticket.isRebrew,
+        rebrewOfTicketUid: ticket.rebrewOfTicketUid,
+        cardColor: ticket.beanCode === 'ICE' ? 'cyan' : ticket.beanCode === 'SP' ? 'emerald' : 'blue',
+      },
+      ...prev,
+    ]);
     setSelectedOrderId(null);
-    setSelectedQueueBean(null);
     soundManager.playDispatch();
   };
 
@@ -697,36 +688,45 @@ export default function App() {
     };
 
     if (decision.interruptCurrent && ticket.status === 'brewing') {
-      setBeans((prev) => prev.map((bean) => bean.code === ticket.beanCode
-        ? { ...bean, stockGrams: Math.max(0, bean.stockGrams - ticket.cupCount * 14) }
-        : bean));
+      setBeans((prev) =>
+        prev.map((bean) =>
+          bean.code === ticket.beanCode
+            ? { ...bean, stockGrams: Math.max(0, bean.stockGrams - ticket.cupCount * 14) }
+            : bean
+        )
+      );
     }
 
     if (decision.targetBayId === null) {
-      setUnassignedOrders((prev) => [{
-        id: newTicket.id,
-        ticketUid: newTicket.ticketUid,
-        itemIndex: newTicket.itemIndex,
-        totalItemsInOrder: newTicket.totalItemsInOrder,
-        totalOrderCups: newTicket.totalOrderCups,
-        orderNotes: newTicket.orderNotes,
-        sourceOrderIds: newTicket.sourceOrderIds,
-        beanCode: newTicket.beanCode,
-        beanName: newTicket.beanName,
-        cupCount: newTicket.cupCount,
-        badgeTag: `${newTicket.cupCount}杯 入れ直し`,
-        predictedTimeStr: newTicket.scheduledTimeStr || '2:15',
-        recommendedBaristas: newTicket.beanCode === 'SP' ? 'SP対応ドリッパー' : '全ドリッパー',
-        recommendedBayIds: baristas.filter((barista) => newTicket.beanCode !== 'SP' || barista.canHandleSpecial).map((barista) => barista.id),
-        preferredBaristaId: newTicket.preferredBaristaId,
-        cardColor: newTicket.beanCode === 'SP' ? 'emerald' : 'blue',
-        isRebrew: true,
-        rebrewOfTicketUid: originalKey,
-      }, ...prev]);
+      setUnassignedOrders((prev) => [
+        {
+          id: newTicket.id,
+          ticketUid: newTicket.ticketUid,
+          itemIndex: newTicket.itemIndex,
+          totalItemsInOrder: newTicket.totalItemsInOrder,
+          totalOrderCups: newTicket.totalOrderCups,
+          orderNotes: newTicket.orderNotes,
+          sourceOrderIds: newTicket.sourceOrderIds,
+          beanCode: newTicket.beanCode,
+          beanName: newTicket.beanName,
+          cupCount: newTicket.cupCount,
+          badgeTag: `${newTicket.cupCount}杯 入れ直し`,
+          predictedTimeStr: newTicket.scheduledTimeStr || '2:15',
+          recommendedBaristas: newTicket.beanCode === 'SP' ? 'SP対応ドリッパー' : '全ドリッパー',
+          recommendedBayIds: baristas
+            .filter((barista) => newTicket.beanCode !== 'SP' || barista.canHandleSpecial)
+            .map((barista) => barista.id),
+          preferredBaristaId: newTicket.preferredBaristaId,
+          cardColor: newTicket.beanCode === 'SP' ? 'emerald' : 'blue',
+          isRebrew: true,
+          rebrewOfTicketUid: originalKey,
+        },
+        ...prev,
+      ]);
     }
 
     setBaristas((prev) => {
-      let updated = prev.map((barista) => {
+      let updated: Barista[] = prev.map((barista): Barista => {
         if (barista.id !== sourceBayId || !decision.interruptCurrent || ticket.status !== 'brewing') return barista;
         const sourceIndex = barista.queue.findIndex((item) => ticketKey(item) === originalKey);
         if (sourceIndex < 0) return barista;
@@ -749,10 +749,11 @@ export default function App() {
       });
 
       if (decision.targetBayId !== null) {
-        updated = updated.map((barista) => {
+        updated = updated.map((barista): Barista => {
           if (barista.id !== decision.targetBayId) return barista;
           const queue = [...barista.queue];
-          const canReplaceInterruptedNow = decision.interruptCurrent && ticket.status === 'brewing' && barista.id === sourceBayId;
+          const canReplaceInterruptedNow =
+            decision.interruptCurrent && ticket.status === 'brewing' && barista.id === sourceBayId;
           const minimumIndex = queue.length > 0 && !canReplaceInterruptedNow ? 1 : 0;
           const insertion = Math.max(minimumIndex, Math.min(decision.insertIndex ?? queue.length, queue.length));
           queue.splice(insertion, 0, newTicket);
@@ -774,20 +775,25 @@ export default function App() {
     soundManager.playDispatch();
   };
 
-  // Directly assign an unassigned order to its recommended bay
-  const handleDirectAssign = (order: UnassignedOrder) => {
-    const recommendedBay = order.preferredBaristaId || order.recommendedBayIds[0] || 1;
-    handleAssignOrderToBay(order.id, recommendedBay);
-  };
-
   const handleMergeUnassignedOrders = (firstUid: string, secondUid: string) => {
     const first = unassignedOrders.find((order) => (order.ticketUid || order.id) === firstUid);
     const second = unassignedOrders.find((order) => (order.ticketUid || order.id) === secondUid);
-    if (!first || !second || first.isRebrew || second.isRebrew || first.cupCount !== 1 || second.cupCount !== 1 || first.beanCode !== second.beanCode) return;
+    if (
+      !first ||
+      !second ||
+      first.isRebrew ||
+      second.isRebrew ||
+      first.cupCount !== 1 ||
+      second.cupCount !== 1 ||
+      first.beanCode !== second.beanCode
+    )
+      return;
     if (first.preferredBaristaId !== second.preferredBaristaId) return;
     captureUndo(`${first.id}と${second.id}の統合`);
     setUnassignedOrders((prev) => {
-      const sourceOrderIds = Array.from(new Set([...(first.sourceOrderIds || [first.id]), ...(second.sourceOrderIds || [second.id])])).sort((a, b) => orderNumber(a) - orderNumber(b));
+      const sourceOrderIds = Array.from(
+        new Set([...(first.sourceOrderIds || [first.id]), ...(second.sourceOrderIds || [second.id])])
+      ).sort((a, b) => orderNumber(a) - orderNumber(b));
       const merged: UnassignedOrder = {
         ...first,
         id: sourceOrderIds.join('+'),
@@ -797,22 +803,24 @@ export default function App() {
         badgeTag: `2杯 統合`,
         orderNotes: `${sourceOrderIds.join(' + ')} 同時ドリップ`,
       };
-      return [...prev.filter((order) => {
-        const uid = order.ticketUid || order.id;
-        return uid !== firstUid && uid !== secondUid;
-      }), merged];
+      return [
+        ...prev.filter((order) => {
+          const uid = order.ticketUid || order.id;
+          return uid !== firstUid && uid !== secondUid;
+        }),
+        merged,
+      ];
     });
     setSelectedOrderId(null);
-    setSelectedQueueBean(null);
   };
 
   // Manual trigger for AI recalibration
-  const handleTriggerRecalibration = () => {
+  const _handleTriggerRecalibration = () => {
     soundManager.playDispatch();
     setBaristas((prev) =>
       prev.map((b) => {
-        const drift = (Math.random() * 0.04 - 0.02);
-        const newCoef = Math.max(0.85, Math.min(1.20, Number((b.coefficient + drift).toFixed(2))));
+        const drift = Math.random() * 0.04 - 0.02;
+        const newCoef = Math.max(0.85, Math.min(1.2, Number((b.coefficient + drift).toFixed(2))));
         return {
           ...b,
           coefficient: newCoef,
@@ -827,10 +835,13 @@ export default function App() {
     setBeans(INITIAL_BEANS);
     setUnassignedOrders([]);
     mockOrderCursor.current = 0;
+    undoSnapshotRef.current = null;
+    arrivalsAfterUndoSnapshotRef.current = [];
+    setUndoLabel(null);
     setLearningLogs(INITIAL_LEARNING_LOGS);
-    setSimTimeSec(8 * 3600 + 4 * 60 + 15);
     setSelectedOrderId(null);
-    setSelectedQueueBean(null);
+    setSelectedTicket(null);
+    setAssignSlotData(null);
     setRebrewSource(null);
     setShiftRosterIndex(0);
     setTestPlaySession(null);
@@ -852,9 +863,12 @@ export default function App() {
     setUnassignedOrders([]);
     setLearningLogs(INITIAL_LEARNING_LOGS);
     setSelectedOrderId(null);
-    setSelectedQueueBean(null);
     undoSnapshotRef.current = null;
+    arrivalsAfterUndoSnapshotRef.current = [];
     setUndoLabel(null);
+    setSelectedTicket(null);
+    setAssignSlotData(null);
+    setRebrewSource(null);
     historicalOrderCursor.current = 0;
     setTestPlaySession({ status: 'active', startMs, endMs, currentMs: startMs, durationMinutes, orders });
     setIsRunning(true);
@@ -863,7 +877,7 @@ export default function App() {
   };
 
   const handleEndTestPlay = () => {
-    setTestPlaySession((session) => session ? { ...session, status: 'finished' } : session);
+    setTestPlaySession((session) => (session ? { ...session, status: 'finished' } : session));
     setIsRunning(false);
     setActiveTab('analytics');
   };
@@ -872,10 +886,7 @@ export default function App() {
   const unassignedCardCups = unassignedOrders.reduce((acc, cur) => acc + cur.cupCount, 0);
   const totalUnassignedDisplay = unassignedCardCups;
 
-  const currentBayQueueCups = baristas.reduce(
-    (acc, b) => acc + b.queue.reduce((qAcc, t) => qAcc + t.cupCount, 0),
-    0
-  );
+  const currentBayQueueCups = baristas.reduce((acc, b) => acc + b.queue.reduce((qAcc, t) => qAcc + t.cupCount, 0), 0);
   const totalWaitingCupsDisplay = currentBayQueueCups;
   const nextAvailable = [...baristas]
     .map((barista) => ({
@@ -886,12 +897,12 @@ export default function App() {
     .sort((a, b) => a.seconds - b.seconds || a.bayNumber - b.bayNumber)
     .slice(0, 3);
 
-  const auxiliaryTitle = (tab: AuxiliaryTab) =>
-    tab === 'bays' ? 'ドリッパー / 補正設定' : tab === 'beans' ? '豆キュー' : '実績';
-
   const openAuxiliaryTab = (tab: AuxiliaryTab) => {
     try {
-      window.localStorage.setItem(PANEL_SNAPSHOT_KEY, JSON.stringify({ baristas, beans, learningLogs, testPlaySession } satisfies PanelSnapshot));
+      window.localStorage.setItem(
+        PANEL_SNAPSHOT_KEY,
+        JSON.stringify({ baristas, beans, learningLogs, testPlaySession } satisfies PanelSnapshot)
+      );
     } catch {
       // Opening the panel still works with its default state if storage is unavailable.
     }
@@ -901,49 +912,31 @@ export default function App() {
   };
 
   const renderAuxiliaryView = (tab: AuxiliaryTab) => (
-    <>
-      {tab === 'bays' && (
-        <div className="space-y-5">
-          <BaysOverviewView baristas={baristas} nextShiftLabel={nextShiftLabel} onChangeShift={() => changeShift(true)} />
-          <div className="border-t border-slate-300 pt-4">
-            <AiConfigView
-              baristas={baristas}
-              logs={learningLogs}
-              onUpdateCoefficient={(bayId, newCoef) => setBaristas((prev) => prev.map((b) => (b.id === bayId ? { ...b, coefficient: newCoef } : b)))}
-              onResetLearning={handleResetData}
-            />
-          </div>
-        </div>
-      )}
-      {tab === 'beans' && (
-        <BeanQueueView
-          beans={beans}
-          onUpdateBean={(updated) => setBeans((prev) => prev.map((b) => (b.code === updated.code ? updated : b)))}
-          onAddBean={(newBean) => setBeans((prev) => [newBean, ...prev])}
-          onDeleteBean={(code) => setBeans((prev) => prev.filter((b) => b.code !== code))}
-        />
-      )}
-      {tab === 'analytics' && (
-        <AnalyticsView
-          baristas={baristas}
-          salesOrders={testPlaySession?.orders.filter((order) => new Date(order.createdAt).getTime() <= testPlaySession.currentMs) || []}
-          periodStartMs={testPlaySession?.startMs}
-          periodEndMs={testPlaySession ? Math.min(testPlaySession.currentMs, testPlaySession.endMs) : undefined}
-        />
-      )}
-    </>
+    <AuxiliaryContent
+      tab={tab}
+      baristas={baristas}
+      beans={beans}
+      learningLogs={learningLogs}
+      salesOrders={
+        testPlaySession?.orders.filter((order) => new Date(order.createdAt).getTime() <= testPlaySession.currentMs) ||
+        []
+      }
+      periodStartMs={testPlaySession?.startMs}
+      periodEndMs={testPlaySession ? Math.min(testPlaySession.currentMs, testPlaySession.endMs) : undefined}
+      nextShiftLabel={nextShiftLabel}
+      onChangeShift={() => changeShift(true)}
+      onUpdateCoefficient={(bayId, coefficient) =>
+        setBaristas((prev) => prev.map((barista) => (barista.id === bayId ? { ...barista, coefficient } : barista)))
+      }
+      onResetLearning={handleResetData}
+      onUpdateBean={(updated) => setBeans((prev) => prev.map((bean) => (bean.code === updated.code ? updated : bean)))}
+      onAddBean={(newBean) => setBeans((prev) => [newBean, ...prev])}
+    />
   );
 
   if (standaloneTab) {
     return (
-      <div className="h-screen overflow-hidden bg-slate-100 text-slate-950 font-sans">
-        <header className="h-14 border-b border-slate-300 bg-white px-5 flex items-center">
-          <h1 className="text-[18px] font-black">{auxiliaryTitle(standaloneTab)}</h1>
-        </header>
-        <main className="h-[calc(100vh-56px)] overflow-y-auto p-4">
-          <div className="mx-auto max-w-[900px]">{renderAuxiliaryView(standaloneTab)}</div>
-        </main>
-      </div>
+      <StandaloneAuxiliaryPanel tab={standaloneTab}>{renderAuxiliaryView(standaloneTab)}</StandaloneAuxiliaryPanel>
     );
   }
 
@@ -961,7 +954,7 @@ export default function App() {
           unassignedCups={totalUnassignedDisplay}
           totalWaitingCups={totalWaitingCupsDisplay}
           soundEnabled={soundEnabled}
-          onToggleSound={() => setSoundEnabled(!soundEnabled)}
+          onToggleSound={handleToggleSound}
           isRunning={isRunning}
           onTogglePlay={() => setIsRunning(!isRunning)}
           simSpeed={simSpeed}
@@ -973,108 +966,64 @@ export default function App() {
           undoLabel={undoLabel}
           onUndo={handleUndo}
           testPlaying={testPlaySession?.status === 'active'}
-          testProgressLabel={testPlaySession ? `${Math.max(0, Math.ceil((testPlaySession.endMs - testPlaySession.currentMs) / 60_000))}分` : null}
+          testProgressLabel={
+            testPlaySession
+              ? `${Math.max(0, Math.ceil((testPlaySession.endMs - testPlaySession.currentMs) / 60_000))}分`
+              : null
+          }
           onOpenTestPlay={() => setTestSetupOpen(true)}
           onEndTestPlay={handleEndTestPlay}
         />
 
         {/* Dynamic Tab Body */}
         <main className="flex-1 p-2 flex flex-col gap-2 overflow-hidden">
-              {controlViewMode === 'current' ? (
-                <div className="h-full min-h-0 flex flex-col gap-2">
-                  {/* Master 6-Bay Dispatch Board (Top 2/3) */}
-                  <DispatchBoard
-                    baristas={baristas}
-                    highlightFilter={null}
-                    selectedOrderId={selectedOrderId}
-                    onSelectOrder={handleToggleOrderSelection}
-                    onAdvanceBay={handleAdvanceBay}
-                    onOpenTicketDetail={(ticket) => setSelectedTicket(ticket)}
-                    actionTicketKey={selectedTicket ? ticketKey(selectedTicket) : null}
-                    onMoveTicket={handleMoveScheduledTicket}
-                    onReturnToUnassigned={handleReturnScheduledTicket}
-                    onCloseTicketAction={() => setSelectedTicket(null)}
-                    onRequestRebrew={(ticket, bayId) => {
-                      setSelectedTicket(null);
-                      setRebrewSource({ ticket, bayId });
-                    }}
-                    onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
-                    simTimeSec={realTimeSec}
-                    timelineCommand={timelineCommand}
-                  />
-
-                  {/* Bottom Section: touch-friendly unassigned queue */}
-                  <div className="h-[196px] min-h-0 overflow-visible relative z-[70]">
-                    <UnassignedOrdersPanel
-                      orders={sortedUnassignedOrders}
-                      nextAvailable={nextAvailable}
-                      selectedOrderId={selectedOrderId}
-                      onSelectOrder={handleToggleOrderSelection}
-                      onSelectQueueOrder={(order) => {
-                        setSelectedOrderId(order.id);
-                        setSelectedQueueBean(order.beanCode);
-                      }}
-                      onClearSelection={() => {
-                        setSelectedOrderId(null);
-                        setSelectedQueueBean(null);
-                      }}
-                      onAssignToBay={(order, bayId) => handleAssignOrderToBay(order.ticketUid || order.id, bayId)}
-                      onMergeOrders={handleMergeUnassignedOrders}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <HumanCenteredControlView
-                  baristas={baristas}
-                  unassignedOrders={sortedUnassignedOrders}
-                  simTimeSec={realTimeSec}
-                  selectedOrderId={selectedOrderId}
-                  highlightFilter={null}
-                  onSelectOrder={handleToggleOrderSelection}
-                  onSelectQueueOrder={(order) => {
-                    setSelectedOrderId(order.id);
-                    setSelectedQueueBean(order.beanCode);
-                  }}
-                  onAdvanceBay={handleAdvanceBay}
-                  onOpenTicketDetail={(ticket) => setSelectedTicket(ticket)}
-                  onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
-                  onAssignToBay={(order, bayId) => handleAssignOrderToBay(order.ticketUid || order.id, bayId)}
-                  onRequestRebrew={(ticket, bayId) => setRebrewSource({ ticket, bayId })}
-                />
-              )}
+          <ControlWorkspace
+            mode={controlViewMode}
+            baristas={baristas}
+            unassignedOrders={sortedUnassignedOrders}
+            nextAvailable={nextAvailable}
+            selectedOrderId={selectedOrderId}
+            actionTicketKey={selectedTicket ? ticketKey(selectedTicket) : null}
+            currentTimeSec={realTimeSec}
+            timelineCommand={timelineCommand}
+            onSelectOrder={handleToggleOrderSelection}
+            onAdvanceBay={handleAdvanceBay}
+            onOpenTicketDetail={setSelectedTicket}
+            onMoveTicket={handleMoveScheduledTicket}
+            onReturnToUnassigned={handleReturnScheduledTicket}
+            onCloseTicketAction={() => setSelectedTicket(null)}
+            onRequestRebrew={(ticket, bayId) => {
+              setSelectedTicket(null);
+              setRebrewSource({ ticket, bayId });
+            }}
+            onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
+            onAssignToBay={(order, bayId) => handleAssignOrderToBay(order.ticketUid || order.id, bayId)}
+            onMergeOrders={handleMergeUnassignedOrders}
+          />
         </main>
 
         {activeTab !== 'control' && (
-          <aside className="context-sheet absolute top-[56px] right-0 bottom-0 z-40 w-[min(440px,44vw)] min-w-[360px] bg-white border-l border-slate-300 shadow-2xl flex flex-col">
-            <div className="h-[52px] px-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-              <h2 className="text-[16px] font-black text-slate-950">
-                {auxiliaryTitle(activeTab)}
-              </h2>
-              <div className="flex items-center gap-1">
-                <button type="button" onClick={() => openAuxiliaryTab(activeTab)} className="w-11 h-11 rounded-full hover:bg-slate-200 flex items-center justify-center touch-manipulation" aria-label={`${auxiliaryTitle(activeTab)}を新しいブラウザタブで開く`} title="新しいタブで開く">
-                  <ExternalLink className="w-5 h-5" />
-                </button>
-                <button type="button" onClick={() => setActiveTab('control')} className="w-11 h-11 rounded-full hover:bg-slate-200 flex items-center justify-center" aria-label="補助パネルを閉じる">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            <div className="flex-1 min-h-0 overflow-y-auto p-3">
-              {renderAuxiliaryView(activeTab)}
-            </div>
-          </aside>
+          <AuxiliarySheet
+            tab={activeTab}
+            onOpenInNewTab={() => openAuxiliaryTab(activeTab)}
+            onClose={() => setActiveTab('control')}
+          >
+            {renderAuxiliaryView(activeTab)}
+          </AuxiliarySheet>
         )}
       </div>
 
       {/* Ticket Detail Recipe Modal */}
-      {selectedTicket && controlViewMode === 'new' && (
+      {selectedTicket && controlViewMode !== 'current' && (
         <TicketDetailModal
           ticket={selectedTicket}
-          currentBayId={baristas.find((bay) => bay.queue.some((ticket) => ticketKey(ticket) === ticketKey(selectedTicket)))?.id || null}
+          currentBayId={
+            baristas.find((bay) => bay.queue.some((ticket) => ticketKey(ticket) === ticketKey(selectedTicket)))?.id ||
+            null
+          }
           onClose={() => {
             setSelectedTicket(null);
             setSelectedOrderId(null);
-            setSelectedQueueBean(null);
           }}
           onMoveTicket={handleMoveScheduledTicket}
           onReturnToUnassigned={handleReturnScheduledTicket}
@@ -1111,7 +1060,6 @@ export default function App() {
           onStart={handleStartTestPlay}
         />
       )}
-
     </div>
   );
 }

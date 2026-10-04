@@ -1,6 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Sparkles, X, RotateCcw } from 'lucide-react';
-import { Barista, BeanCode, OrderTicket } from '../types';
+import { RotateCcw, Sparkles, X } from 'lucide-react';
+import type React from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { Barista, BeanCode, OrderTicket } from '../types';
 import { BayLaneRow } from './BayLaneRow';
 
 interface DispatchBoardProps {
@@ -49,7 +50,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   const [hasInitializedScroll, setHasInitializedScroll] = useState(false);
   const [isPastView, setIsPastView] = useState(false);
 
-  const formatClock = (seconds: number) => {
+  const _formatClock = (seconds: number) => {
     const normalized = ((seconds % 86400) + 86400) % 86400;
     const hours = Math.floor(normalized / 3600);
     const minutes = Math.floor((normalized % 3600) / 60);
@@ -74,34 +75,20 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
     setIsPastView(currentLeft < nowX - 600);
   };
 
-  // Quick jump navigation
-  const scrollToSeconds = (sec: number) => {
-    if (!scrollContainerRef.current) return;
-    const targetX = (sec - timelineStartSec) * PIXELS_PER_SEC;
-    scrollContainerRef.current.scrollTo({
+  useEffect(() => {
+    if (!timelineCommand) return;
+    const targetSec =
+      timelineCommand.direction === 'back'
+        ? simTimeSec - 300
+        : timelineCommand.direction === 'forward'
+          ? simTimeSec + 300
+          : simTimeSec;
+    const targetX = (targetSec - timelineStartSec) * PIXELS_PER_SEC;
+    scrollContainerRef.current?.scrollTo({
       left: Math.max(0, targetX - 380),
       behavior: 'smooth',
     });
-  };
-
-  const scrollToNow = () => {
-    scrollToSeconds(simTimeSec);
-  };
-
-  const scrollRewind5Min = () => {
-    scrollToSeconds(simTimeSec - 300);
-  };
-
-  const scrollForward5Min = () => {
-    scrollToSeconds(simTimeSec + 300);
-  };
-
-  useEffect(() => {
-    if (!timelineCommand) return;
-    if (timelineCommand.direction === 'back') scrollRewind5Min();
-    else if (timelineCommand.direction === 'forward') scrollForward5Min();
-    else scrollToNow();
-  }, [timelineCommand]);
+  }, [timelineCommand, simTimeSec, timelineStartSec]);
 
   // Generate timeline markers every 1 minute, with major labels every 5 minutes
   const timeMarkers = [];
@@ -192,10 +179,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
             </div>
 
             {/* Scrollable Ruler Track with Ticks & Labels */}
-            <div
-              className="relative h-full"
-              style={{ width: `${timelineWidthPx}px` }}
-            >
+            <div className="relative h-full" style={{ width: `${timelineWidthPx}px` }}>
               {timeMarkers.map((marker) => (
                 <div
                   key={marker.sec}
@@ -204,61 +188,68 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
                 >
                   <div
                     className={`h-[7px] ${
-                      marker.isHour ? 'bg-slate-700 h-[12px] w-[2px]' : marker.isMajor ? 'bg-slate-400 h-[10px] w-[1px]' : 'bg-slate-300 w-[1px]'
+                      marker.isHour
+                        ? 'bg-slate-700 h-[12px] w-[2px]'
+                        : marker.isMajor
+                          ? 'bg-slate-400 h-[10px] w-[1px]'
+                          : 'bg-slate-300 w-[1px]'
                     }`}
                   />
                   {marker.isMajor ? (
-                    <span className="font-bold text-slate-800 -translate-x-1/2 text-[11px]">
-                      {marker.timeStr}
-                    </span>
+                    <span className="font-bold text-slate-800 -translate-x-1/2 text-[11px]">{marker.timeStr}</span>
                   ) : (
-                    <span className="text-slate-400 -translate-x-1/2 text-[9px]">
-                      {marker.minuteStr}
-                    </span>
+                    <span className="text-slate-400 -translate-x-1/2 text-[9px]">{marker.minuteStr}</span>
                   )}
                   <div
                     className={`h-[7px] ${
-                      marker.isHour ? 'bg-slate-700 h-[12px] w-[2px]' : marker.isMajor ? 'bg-slate-400 h-[10px] w-[1px]' : 'bg-slate-300 w-[1px]'
+                      marker.isHour
+                        ? 'bg-slate-700 h-[12px] w-[2px]'
+                        : marker.isMajor
+                          ? 'bg-slate-400 h-[10px] w-[1px]'
+                          : 'bg-slate-300 w-[1px]'
                     }`}
                   />
                 </div>
               ))}
-
             </div>
           </div>
 
           {/* 3B. Synchronized Bay Rows Container */}
           <div className="relative divide-y divide-[#e2e8f0]">
-            {[...baristas].sort((a, b) => a.bayNumber - b.bayNumber).map((barista) => (
-              <BayLaneRow
-                key={barista.id}
-                barista={barista}
-                highlightFilter={highlightFilter}
-                selectedOrderId={selectedOrderId}
-                onSelectOrder={onSelectOrder}
-                onAdvanceBay={onAdvanceBay}
-                onOpenTicketDetail={onOpenTicketDetail}
-                actionTicketKey={actionTicketKey}
-                onMoveTicket={onMoveTicket}
-                onReturnToUnassigned={onReturnToUnassigned}
-                onCloseTicketAction={onCloseTicketAction}
-                onRequestRebrew={onRequestRebrew}
-                onOpenEmptySlot={onOpenEmptySlot}
-                timelineStartSec={timelineStartSec}
-                pixelsPerSec={PIXELS_PER_SEC}
-                timelineWidthPx={timelineWidthPx}
-                simTimeSec={simTimeSec}
+            {[...baristas]
+              .sort((a, b) => a.bayNumber - b.bayNumber)
+              .map((barista) => (
+                <BayLaneRow
+                  key={barista.id}
+                  barista={barista}
+                  highlightFilter={highlightFilter}
+                  selectedOrderId={selectedOrderId}
+                  onSelectOrder={onSelectOrder}
+                  onAdvanceBay={onAdvanceBay}
+                  onOpenTicketDetail={onOpenTicketDetail}
+                  actionTicketKey={actionTicketKey}
+                  onMoveTicket={onMoveTicket}
+                  onReturnToUnassigned={onReturnToUnassigned}
+                  onCloseTicketAction={onCloseTicketAction}
+                  onRequestRebrew={onRequestRebrew}
+                  onOpenEmptySlot={onOpenEmptySlot}
+                  timelineStartSec={timelineStartSec}
+                  pixelsPerSec={PIXELS_PER_SEC}
+                  timelineWidthPx={timelineWidthPx}
+                  simTimeSec={simTimeSec}
+                />
+              ))}
+          </div>
+          {timeMarkers
+            .filter((marker) => marker.isHour)
+            .map((marker) => (
+              <div
+                key={`hour-line-${marker.sec}`}
+                className="absolute top-[30px] bottom-0 z-20 w-[2px] bg-slate-500/70 pointer-events-none"
+                style={{ left: `${STICKY_LEFT_WIDTH + marker.left}px` }}
+                aria-hidden="true"
               />
             ))}
-          </div>
-          {timeMarkers.filter((marker) => marker.isHour).map((marker) => (
-            <div
-              key={`hour-line-${marker.sec}`}
-              className="absolute top-[30px] bottom-0 z-20 w-[2px] bg-slate-500/70 pointer-events-none"
-              style={{ left: `${STICKY_LEFT_WIDTH + marker.left}px` }}
-              aria-hidden="true"
-            />
-          ))}
         </div>
         <div
           className="absolute bottom-0 z-40 w-[2px] bg-red-500 pointer-events-none"
