@@ -9,9 +9,11 @@
     "publish:pages": "bash scripts/publish-pages.sh",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "biome check . && tsc --noEmit",
+    "lint": "biome check . && tsc --noEmit && tsc --noEmit -p worker",
     "lint:fix": "biome check --write .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "test:worker": "cd worker && vitest run",
+    "dev:worker": "wrangler dev"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -28,6 +30,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",
+    "@cloudflare/vitest-pool-workers": "^0.22.0",
+    "@cloudflare/workers-types": "^5.20261005.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
@@ -35,7 +39,9 @@
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.147.0"
   },
   "packageManager": "pnpm@10.13.1+sha512.37ebf1a5c7a30d5fabe0c5df44ee8da4c965ca0c5af3dbab28c3a1681b70a256218d05c81c9c0dcf767ef6b8551eb5b960042b9ed4300c59242336377e01cfad"
 }

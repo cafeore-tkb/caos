@@ -66,6 +66,22 @@
 - 開発サーバー（`npm run dev`）では Vite の中継（`/cafeore-pos-api`）を通して本番APIにつなぎます。ローカルのAPIを使うときは `VITE_CAFEORE_API_BASE_URL=http://localhost:8080` を指定します。
 - 公開版はブラウザから本番APIへ直接つなぐため、APIの `FRONTEND_ORIGINS`（infraリポジトリの `gcp/cloud_run.tf`）に `https://cafeore-tkb.github.io` が入っている必要があります。入っていないとWebSocketの接続が403で拒否され、DBアイコンの点が黄色（再接続中）のままになります。
 
+## 盤面のサーバー（worker/）
+
+割当・次へ・統合などを複数の iPad で共有するための、CaOS 専用のサーバーです（Cloudflare Workers ＋ Durable Object）。まだ画面にはつないでおらず、デプロイもしていません（画面とのつなぎ込みと Cloudflare への配信は、続く PR で行います）。
+
+- **盤面：** 営業日（日本時間）ごとに Durable Object を 1 つ持ち、抽出カード（1 回のドリップ＝1 枚）を SQLite に保存します。1 つの盤面への処理は 1 件ずつ順番に動くので、同時に操作しても消えません。
+- **ルール：** `worker/board/logic.ts`。割当・戻す・次へ・統合・入れ直し・1つ戻すと、POS の注文からカードを作る・消す・抽出終了にする処理です。
+- **通信：** 画面は `/api/board?day=YYYY-MM-DD` に WebSocket を 1 本つなぎます。つないだ直後に全カード（`snapshot`）、そのあとは変わったカードだけ（`drips`、版 `v` つき）が届きます。形は `worker/board/types.ts`。
+- **POS の注文：** 画面が POS の WebSocket で受け取った注文を、そのまま盤面に送ります（`orders`）。何度同じものを送っても結果は同じです。
+- **POS への準備完了：** 「次へ」で注文のカードが全部終わると、盤面が POS の `PATCH /api/orders/:id/ready` を呼びます。この API は押すたびに準備完了と未完了が入れ替わるので、先に `GET /api/orders/:id` で今の状態を確かめ、違うときだけ切り替えます。失敗したら送り待ちに残し、間を空けて送り直します。
+- 盤面の WebSocket は、同じ origin（と `ALLOWED_ORIGINS`）からしかつなげません。
+
+```bash
+npm run test:worker   # 盤面のテスト（Workers のランタイムの中で動く）
+npm run dev:worker    # wrangler dev（先に npm run build で dist を作る）
+```
+
 ## 実データ・テストプレイ
 
 - ヘッダーの「実データテスト」から、2025年の実注文を使ったテストプレイを開始できます。
