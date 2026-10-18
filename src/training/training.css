@@ -1,4 +1,5 @@
 .training-home {
+  height: 100dvh;
   min-height: 100dvh;
   background: #f1f4f2;
   color: #172b27;
@@ -512,6 +513,7 @@
 }
 @media (max-width: 900px) {
   .training-home {
+    height: 100dvh;
     padding: 24px 16px;
   }
   .training-mode-grid {
@@ -628,4 +630,15 @@
   background: white;
   font-size: 11px;
   font-weight: 750;
+}
+
+/* The training clock adds one row above the upstream board on short screens. */
+@media (max-height: 850px) {
+  .training-game [data-current-timeline-row],
+  .training-game [data-current-timeline-track] {
+    height: 64px;
+  }
+  .training-game [data-current-timeline-row] [data-lane-phase] {
+    height: 54px;
+  }
 }

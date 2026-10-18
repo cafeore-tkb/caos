@@ -1,35 +1,45 @@
-import type React from 'react';
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type React from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 // スクロールバー（components/ScrollArea）の状態。つまみの長さと位置を枠（target）のスクロールに合わせ、
 // つまみか溝を指・マウスで引くと枠をスクロールする（溝を押すと、つまみの真ん中がそこへ来る）。
 // 枠の中にスクロールしても動かない列（sticky）があるときは、その幅（fixed）を見えている幅と中身の幅の両方から引いて、つまみの長さを決める。
 
-export type ScrollAxis = 'x' | 'y';
+export type ScrollAxis = "x" | "y";
 
 export const AXES = {
   x: {
-    position: 'scrollLeft',
-    view: 'clientWidth',
-    content: 'scrollWidth',
-    client: 'clientX',
-    start: 'left',
-    length: 'width',
+    position: "scrollLeft",
+    view: "clientWidth",
+    content: "scrollWidth",
+    client: "clientX",
+    start: "left",
+    length: "width",
   },
   y: {
-    position: 'scrollTop',
-    view: 'clientHeight',
-    content: 'scrollHeight',
-    client: 'clientY',
-    start: 'top',
-    length: 'height',
+    position: "scrollTop",
+    view: "clientHeight",
+    content: "scrollHeight",
+    client: "clientY",
+    start: "top",
+    length: "height",
   },
 } as const;
 
 /** つまみ。size は見えている割合（1 ならスクロールしない）、ratio はスクロールした割合 */
 type Thumb = { size: number; ratio: number };
 
-const readThumb = (element: HTMLElement, axis: ScrollAxis, fixed: number): Thumb => {
+const readThumb = (
+  element: HTMLElement,
+  axis: ScrollAxis,
+  fixed: number,
+): Thumb => {
   const keys = AXES[axis];
   const view = element[keys.view] - fixed;
   const content = element[keys.content] - fixed;
@@ -43,7 +53,11 @@ const readThumb = (element: HTMLElement, axis: ScrollAxis, fixed: number): Thumb
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
-export const useScrollBar = (target: React.RefObject<HTMLElement>, axis: ScrollAxis, fixed = 0) => {
+export const useScrollBar = (
+  target: React.RefObject<HTMLElement | null>,
+  axis: ScrollAxis,
+  fixed = 0,
+) => {
   const thumbRef = useRef<HTMLDivElement>(null);
   const [thumb, setThumb] = useState<Thumb>({ size: 1, ratio: 0 });
   const dragTo = useRef<((event: React.PointerEvent) => void) | null>(null);
@@ -51,18 +65,20 @@ export const useScrollBar = (target: React.RefObject<HTMLElement>, axis: ScrollA
   const sync = useCallback(() => {
     if (!target.current) return;
     const next = readThumb(target.current, axis, fixed);
-    setThumb((prev) => (prev.size === next.size && prev.ratio === next.ratio ? prev : next));
+    setThumb((prev) =>
+      prev.size === next.size && prev.ratio === next.ratio ? prev : next,
+    );
   }, [target, axis, fixed]);
   // The content changes with the parent's renders, so measure after each one.
   useLayoutEffect(sync);
   useEffect(() => {
     const element = target.current;
     if (!element) return;
-    element.addEventListener('scroll', sync, { passive: true });
+    element.addEventListener("scroll", sync, { passive: true });
     const observer = new ResizeObserver(sync);
     observer.observe(element);
     return () => {
-      element.removeEventListener('scroll', sync);
+      element.removeEventListener("scroll", sync);
       observer.disconnect();
     };
   }, [target, sync]);
@@ -71,19 +87,22 @@ export const useScrollBar = (target: React.RefObject<HTMLElement>, axis: ScrollA
   const press = (event: React.PointerEvent<HTMLElement>) => {
     const element = target.current;
     if (!element || !thumbRef.current) return;
-    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     const keys = AXES[axis];
     const track = event.currentTarget.getBoundingClientRect();
     const thumbRect = thumbRef.current.getBoundingClientRect();
     const thumbLength = thumbRect[keys.length];
     const travel = track[keys.length] - thumbLength;
     if (travel <= 0) return;
-    const along = (pointer: React.PointerEvent) => pointer[keys.client] - track[keys.start];
+    const along = (pointer: React.PointerEvent) =>
+      pointer[keys.client] - track[keys.start];
     // Grabbing the thumb keeps the finger where it took hold; pressing the track centres it there.
     const held = along(event) - (thumbRect[keys.start] - track[keys.start]);
     const grip = held >= 0 && held <= thumbLength ? held : thumbLength / 2;
     dragTo.current = (pointer) => {
-      element[keys.position] = clamp01((along(pointer) - grip) / travel) * (element[keys.content] - element[keys.view]);
+      element[keys.position] =
+        clamp01((along(pointer) - grip) / travel) *
+        (element[keys.content] - element[keys.view]);
     };
     event.currentTarget.setPointerCapture(event.pointerId);
     dragTo.current(event);

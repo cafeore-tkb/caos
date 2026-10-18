@@ -12,9 +12,12 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@cafeore/common": ["./src/current-caos/common/index.ts"]
     },
     "allowImportingTsExtensions": true,
-    "noEmit": true
-  }
+    "noEmit": true,
+    "strictNullChecks": true
+  },
+  "exclude": ["node_modules", "dist", "src/current-caos/common"]
 }

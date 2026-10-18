@@ -15,21 +15,15 @@ export const canMergeDripUnits = (first: UnassignedOrder, second: UnassignedOrde
 
 export const orderNumber = (id: string) => Number(id.match(/\d+/)?.[0]) || Number.MAX_SAFE_INTEGER;
 
-const compareQueueOrder = (a: OrderTicket, b: OrderTicket) =>
-  orderNumber(a.id) - orderNumber(b.id) ||
-  (a.itemIndex || 0) - (b.itemIndex || 0) ||
-  (a.ticketUid || '').localeCompare(b.ticketUid || '');
-
 export const arrangeQueue = (queue: OrderTicket[], coefficient: number, nowSec: number, activateFirst = false) => {
   const existingActive = !activateFirst ? queue.find((ticket) => ticket.status === 'brewing') : undefined;
   const scheduled = queue
     .filter((ticket) => ticket !== existingActive)
-    .map((ticket) => ({ ...ticket, status: 'scheduled' as const }))
-    .sort(compareQueueOrder);
+    .map((ticket) => ({ ...ticket, status: 'scheduled' as const }));
   const ordered = existingActive ? [existingActive, ...scheduled] : scheduled;
   if (ordered.length === 0) return ordered;
 
-  const shouldActivateFirst = activateFirst || !existingActive;
+  const shouldActivateFirst = activateFirst;
   const first = shouldActivateFirst
     ? {
         ...ordered[0],
@@ -37,7 +31,7 @@ export const arrangeQueue = (queue: OrderTicket[], coefficient: number, nowSec: 
         startTimeSec: nowSec,
         timeRemainingSec: Math.round(ordered[0].totalDurationSec * coefficient),
       }
-    : existingActive;
+    : (existingActive ?? ordered[0]);
   if (!first) return [];
   const result: OrderTicket[] = [first];
   const firstEnd =
@@ -113,3 +107,112 @@ export const splitIntoDripUnits = (orders: UnassignedOrder[]) => {
     totalOrderCups,
   }));
 };
+
+/** Latest CaOS placement: front, queue front, or before/after a card. */
+export function insertTicket(
+  queue: OrderTicket[],
+  ticket: OrderTicket,
+  place: import('../current-caos/common').CaosPlace | undefined,
+  nowSec: number
+) {
+  const movedCurrent = queue.find((card) => ticketKey(card) === ticketKey(ticket))?.status === 'brewing';
+  const rest = queue.filter((card) => ticketKey(card) !== ticketKey(ticket));
+  let index = rest.length;
+  if (place === 'front') index = 0;
+  else if (place === 'queueFront')
+    index = Math.min(queue.some((card) => card.status === 'brewing') ? 1 : 0, rest.length);
+  else if (place) {
+    const key = 'beforeKey' in place ? place.beforeKey : place.afterKey;
+    const found = rest.findIndex((card) => ticketKey(card) === key);
+    if (found >= 0) index = found + ('afterKey' in place ? 1 : 0);
+  }
+  if (queue.findIndex((card) => ticketKey(card) === ticketKey(ticket)) === index) return queue;
+  const starts = rest.length === 0 || (index === 0 && rest.some((card) => card.status === 'brewing'));
+  const ordered = rest.map((card) =>
+    starts && card.status === 'brewing'
+      ? { ...card, status: 'scheduled' as const, startTimeSec: undefined, timeRemainingSec: undefined }
+      : card
+  );
+  if (movedCurrent && index > 0 && ordered[0]) {
+    ordered[0] = {
+      ...ordered[0],
+      status: 'brewing',
+      startTimeSec: nowSec,
+      timeRemainingSec: ordered[0].totalDurationSec,
+    };
+  }
+  ordered.splice(index, 0, {
+    ...ticket,
+    status: starts ? 'brewing' : 'scheduled',
+    startTimeSec: starts ? nowSec : undefined,
+    timeRemainingSec: starts ? ticket.totalDurationSec : undefined,
+  });
+  return ordered;
+}
+
+export const sourceCupsOf = (card: OrderTicket | UnassignedOrder) =>
+  card.sourceCups ??
+  Array.from({ length: card.cupCount }, (_, index) => ({
+    id: card.trainingCupIds?.[index] ?? `${card.ticketUid ?? card.id}:${index}`,
+    orderId: card.sourceOrderIds?.[index] ?? card.id,
+    orderedAtSec: card.orderedAtSec,
+  }));
+
+export function mergeBoardCards(
+  bays: import('../types').Barista[],
+  orders: UnassignedOrder[],
+  firstKey: string,
+  secondKey: string
+) {
+  const find = (key: string) =>
+    orders.find((card) => (card.ticketUid ?? card.id) === key) ??
+    bays.flatMap((bay) => bay.queue).find((card) => ticketKey(card) === key);
+  let first = find(firstKey);
+  let second = find(secondKey);
+  if (first && 'status' in first && first.status === 'brewing') [first, second] = [second, first];
+  if (
+    !first ||
+    !second ||
+    first === second ||
+    first.cupCount !== 1 ||
+    second.cupCount !== 1 ||
+    first.beanName !== second.beanName ||
+    Boolean(first.isRebrew) !== Boolean(second.isRebrew) ||
+    (first.preferredBaristaId && second.preferredBaristaId && first.preferredBaristaId !== second.preferredBaristaId)
+  )
+    return null;
+  const targetBay = bays.find((bay) => bay.queue.some((card) => ticketKey(card) === (second.ticketUid ?? second.id)));
+  const nominee = first.preferredBaristaId ?? second.preferredBaristaId;
+  if (targetBay && nominee && nominee !== targetBay.id) return null;
+  const sourceOrderIds = [
+    ...new Set([...(first.sourceOrderIds ?? [first.id]), ...(second.sourceOrderIds ?? [second.id])]),
+  ].sort((a, b) => orderNumber(a) - orderNumber(b));
+  const merged = {
+    ...second,
+    id: sourceOrderIds.join('+'),
+    cupCount: 2,
+    preferredBaristaId: nominee,
+    sourceOrderIds,
+    trainingCupIds: [...(second.trainingCupIds ?? []), ...(first.trainingCupIds ?? [])],
+    sourceCups: [...sourceCupsOf(second), ...sourceCupsOf(first)],
+    ...('totalDurationSec' in second ? { totalDurationSec: 360 } : { badgeTag: '2杯 統合' }),
+  };
+  const remove = (card: { ticketUid?: string; id: string }) =>
+    (card.ticketUid ?? card.id) !== (first.ticketUid ?? first.id);
+  return {
+    bays: bays.map((bay) => ({
+      ...bay,
+      queue: bay.queue
+        .filter(remove)
+        .map((card) => (ticketKey(card) === (second.ticketUid ?? second.id) ? (merged as OrderTicket) : card)),
+    })),
+    orders: orders
+      .filter(remove)
+      .map((card) =>
+        (card.ticketUid ?? card.id) === (second.ticketUid ?? second.id) ? (merged as UnassignedOrder) : card
+      ),
+    merged,
+    targetBay,
+    joinedIds: first.trainingCupIds ?? [],
+  };
+}

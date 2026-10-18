@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { createElement } from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { CONTROL_VIEWS, ControlWorkspace } from '../components/ControlWorkspace';
-import { canMergeDripUnits } from '../utils/orderQueue';
+import { convertBoard } from '../current-caos/bridge/convertBoard';
+import { CONTROL_VIEWS } from '../utils/controlViews';
+import { arrangeQueue, canMergeDripUnits, insertTicket } from '../utils/orderQueue';
 import {
   allowedBay,
   type GameMode,
@@ -16,6 +15,11 @@ import {
   startGame,
 } from './engine';
 import { itemPrice, needsBrew, seniorOnly, TRAINING_MASTER } from './master';
+
+const required = <T>(value: T | null | undefined): T => {
+  assert.ok(value !== null && value !== undefined);
+  return value;
+};
 
 const load = (mode: GameMode) =>
   parseScenario(JSON.parse(readFileSync(new URL(`../../public/training/${mode}.json`, import.meta.url), 'utf8')));
@@ -63,7 +67,7 @@ test('all three synthetic scenarios use the supplied master and allow a competen
     assert.ok(score.done / score.total >= 0.9, `${mode}: at least 90 percent of cups are finished`);
     assert.ok(score.score >= 80, `${mode}: ${score.score}`);
     assert.equal(score.passed, true);
-    assert.ok(scenario.orders.at(-1).atSec <= scenario.durationSec - 240);
+    assert.ok((scenario.orders.at(-1)?.atSec ?? Infinity) <= scenario.durationSec - 390);
   }
 });
 test('idle, early finish and unarrived orders cannot inflate the score', () => {
@@ -76,6 +80,7 @@ test('idle, early finish and unarrived orders cannot inflate the score', () => {
 });
 test('finishing immediately yields at most 45 points even if every cup is clicked through', () => {
   let state = assign(startGame(single()));
+  state = gameReducer(state, { type: 'tick', seconds: 60 });
   state = gameReducer(state, { type: 'complete', bayId: 1 });
   const score = scoreGame(state);
   assert.equal(score.score, 45);
@@ -84,7 +89,7 @@ test('finishing immediately yields at most 45 points even if every cup is clicke
 });
 test('proper brewing, ready state and finish preserve the full score', () => {
   let state = assign(startGame(single()));
-  state = gameReducer(state, { type: 'tick', seconds: 135 });
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
   assert.equal(state.bays[0].queue[0].timeRemainingSec, 0);
   assert.equal(scoreGame(state).done, 0, 'completion requires operator action');
   state = gameReducer(state, { type: 'complete', bayId: 1 });
@@ -106,7 +111,7 @@ test('senior and nomination violations are blocked and cap a nominal 98 at 79', 
   assert.equal(state.violations, 1);
   assert.equal(state.unassigned.length, 1);
   state = assign(state, 1);
-  state = gameReducer(state, { type: 'tick', seconds: 165 });
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
   state = gameReducer(state, { type: 'complete', bayId: 1 });
   assert.equal(scoreGame(state).score, 79);
   const data = single();
@@ -114,11 +119,11 @@ test('senior and nomination violations are blocked and cap a nominal 98 at 79', 
   assert.equal(assign(startGame(data), 2).violations, 1);
 });
 test('late service and unsynchronized order lose their own categories', () => {
-  let state = assign(startGame(single('余音ブレンド', 3)));
-  state = gameReducer(state, { type: 'tick', seconds: 365 });
+  let state = assign(startGame({ ...single('余音ブレンド', 3), mode: 'middle', durationSec: 1200 }));
+  state = gameReducer(state, { type: 'tick', seconds: 500 });
   state = gameReducer(state, { type: 'complete', bayId: 1 });
   state = assign(state, 2);
-  state = gameReducer(state, { type: 'tick', seconds: 135 });
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
   state = gameReducer(state, { type: 'complete', bayId: 2 });
   const score = scoreGame(state);
   assert.equal(score.categories[1].points, 0);
@@ -130,11 +135,11 @@ test('same-item merge preserves cup identity and scores both original orders', (
   data.orders.push({ ...data.orders[0], orderId: 2 });
   let state = startGame(data);
   const [first, second] = state.unassigned;
-  state = gameReducer(state, { type: 'merge', first: first.ticketUid, second: second.ticketUid });
+  state = gameReducer(state, { type: 'merge', first: required(first.ticketUid), second: required(second.ticketUid) });
   assert.equal(state.unassigned.length, 1);
-  assert.equal(state.unassigned[0].trainingCupIds.length, 2);
+  assert.equal(state.unassigned[0].trainingCupIds?.length, 2);
   state = assign(state);
-  state = gameReducer(state, { type: 'tick', seconds: 195 });
+  state = gameReducer(state, { type: 'tick', seconds: 360 });
   state = gameReducer(state, { type: 'complete', bayId: 1 });
   assert.equal(scoreGame(state).score, 100);
   assert.equal(scoreGame(state).done, 2);
@@ -145,17 +150,20 @@ test('two different limited beans cannot merge despite sharing SP code', () => {
   const state = startGame(data);
   const [first, second] = state.unassigned;
   assert.equal(canMergeDripUnits(first, second), false);
-  assert.equal(gameReducer(state, { type: 'merge', first: first.ticketUid, second: second.ticketUid }), state);
+  assert.equal(
+    gameReducer(state, { type: 'merge', first: required(first.ticketUid), second: required(second.ticketUid) }),
+    state
+  );
 });
 test('moving a brewing card restarts it, and returning a card does not lose a cup', () => {
   let state = assign(startGame(single()));
   state = gameReducer(state, { type: 'tick', seconds: 100 });
-  const key = state.bays[0].queue[0].ticketUid;
+  const key = required(state.bays[0].queue[0].ticketUid);
   state = gameReducer(state, { type: 'move', key, bayId: 2 });
-  assert.equal(state.bays[1].queue[0].timeRemainingSec, 135);
+  assert.equal(state.bays[1].queue[0].timeRemainingSec, 300);
   state = gameReducer(state, { type: 'return', key });
   assert.equal(state.unassigned.length, 1);
-  assert.equal(state.unassigned[0].trainingCupIds.length, 1);
+  assert.equal(state.unassigned[0].trainingCupIds?.length, 1);
   assert.equal(scoreGame(state).done, 0);
 });
 test('splitting 5 cups yields 2+2+1 and preserves total and distinct cup ids', () => {
@@ -198,40 +206,153 @@ test('parser rejects malformed, conflicting and unknown input; sorts out-of-orde
   assert.equal(parseScenario(reversed).orders[0].orderId, 2);
 });
 
-// Render both adopted views over the same in-progress state. Rendering must not
-// change the board/score, and neither deprecated choice can be selected.
-test('A and C are the only adopted views and render the same active order without changing scoring', () => {
+test('A and C are the only adopted views and share the same current card projection', () => {
   const state = assign(startGame(single()), 2);
   const before = JSON.stringify(state);
   assert.deepEqual(Object.values(CONTROL_VIEWS), ['A', 'C']);
   const noop = () => {};
-  for (const mode of Object.keys(CONTROL_VIEWS) as (keyof typeof CONTROL_VIEWS)[]) {
-    const html = renderToStaticMarkup(
-      createElement(ControlWorkspace, {
-        mode,
-        baristas: state.bays,
-        unassignedOrders: state.unassigned,
-        nextAvailable: [],
-        selectedOrderId: null,
-        actionTicketKey: null,
-        currentTimeSec: state.nowSec,
-        timelineCommand: null,
-        onSelectOrder: noop,
-        onAdvanceBay: noop,
-        onOpenTicketDetail: noop,
-        onMoveTicket: noop,
-        onReturnToUnassigned: noop,
-        onCloseTicketAction: noop,
-        onRequestRebrew: noop,
-        onOpenEmptySlot: noop,
-        onAssignToBay: noop,
-        onMergeOrders: noop,
-      })
-    );
-    assert.ok(html.includes('#001'));
-    assert.ok(html.includes('よいん'));
-    assert.ok(html.includes('2番 次へ'));
-    assert.equal(JSON.stringify(state), before);
-    assert.equal(scoreGame(state).done, 0);
-  }
+  const props = {
+    baristas: state.bays,
+    unassignedOrders: state.unassigned,
+    nextAvailable: [],
+    selectedOrderId: null,
+    actionTicketKey: null,
+    currentTimeSec: state.nowSec,
+    clockOriginMs: Date.UTC(2026, 9, 19, 1),
+    timelineCommand: null,
+    onSelectOrder: noop,
+    onAdvanceBay: noop,
+    onOpenTicketDetail: noop,
+    onMoveTicket: noop,
+    onReturnToUnassigned: noop,
+    onCloseTicketAction: noop,
+    onRequestRebrew: noop,
+    onOpenEmptySlot: noop,
+    onAssignToBay: noop,
+    onMergeOrders: noop,
+  };
+  const projection = convertBoard(props);
+  assert.equal(projection.lanes[1].brewing?.cups[0].item.abbr, 'よいん');
+  assert.equal(projection.lanes[1].brewing?.orderNo, 1);
+  assert.equal(JSON.stringify(state), before);
+  assert.equal(scoreGame(state).done, 0);
+});
+
+test('unstart pauses brewing until explicitly started; completion advances the next card', () => {
+  let state = assign(startGame(single('余音ブレンド', 3)));
+  state = assign(state);
+  state = gameReducer(state, { type: 'unstart', bayId: 1 });
+  assert.equal(state.bays[0].queue[0].status, 'scheduled');
+  state = gameReducer(state, { type: 'tick', seconds: 20 });
+  assert.equal(state.bays[0].queue[0].status, 'scheduled');
+  state = gameReducer(state, { type: 'start', bayId: 1 });
+  state = gameReducer(state, { type: 'tick', seconds: 360 });
+  state = gameReducer(state, { type: 'complete', bayId: 1 });
+  assert.equal(state.bays[0].queue[0].status, 'brewing');
+  assert.equal(state.bays[0].queue[0].timeRemainingSec, 300);
+});
+
+test('merging an unassigned cup into a running batch retains identity and checks late-joined quality', () => {
+  const data = single();
+  data.orders.push({ ...data.orders[0], orderId: 2 });
+  let state = assign(startGame(data));
+  const key = required(state.bays[0].queue[0].ticketUid);
+  state = gameReducer(state, { type: 'tick', seconds: 90 });
+  state = gameReducer(state, { type: 'merge', first: required(state.unassigned[0].ticketUid), second: key });
+  assert.equal(state.bays[0].queue[0].cupCount, 2);
+  assert.equal(state.unassigned.length, 0);
+  state = gameReducer(state, { type: 'tick', seconds: 270 });
+  state = gameReducer(state, { type: 'complete', bayId: 1 });
+  assert.equal(scoreGame(state).done, 2);
+  assert.equal(scoreGame(state).quality, 1, 'late-added cup cannot inherit earlier brewing time');
+});
+
+test('splitting a combined card preserves cup ids and original order numbers', () => {
+  const data = single();
+  data.orders.push({ ...data.orders[0], orderId: 2 });
+  let state = startGame(data);
+  state = gameReducer(state, {
+    type: 'merge',
+    first: required(state.unassigned[0].ticketUid),
+    second: required(state.unassigned[1].ticketUid),
+  });
+  const card = state.unassigned[0];
+  state = gameReducer(state, { type: 'split', key: required(card.ticketUid), cupId: required(card.trainingCupIds)[0] });
+  assert.deepEqual(state.unassigned.map((entry) => entry.id).sort(), ['#001', '#002']);
+  assert.equal(new Set(state.unassigned.flatMap((entry) => entry.trainingCupIds)).size, 2);
+});
+
+test('placement preserves manual queue order, keeps the current brew, and follows main when moving it down', () => {
+  let state = startGame(single('余音ブレンド', 5));
+  state = assign(assign(assign(state)));
+  const queue = state.bays[0].queue;
+  const moved = insertTicket(queue, queue[2], 'queueFront', 45);
+  assert.deepEqual(
+    moved.map((card) => card.ticketUid),
+    [queue[0].ticketUid, queue[2].ticketUid, queue[1].ticketUid]
+  );
+  assert.equal(moved[0].startTimeSec, 0);
+  assert.deepEqual(
+    arrangeQueue(moved, 1, 45).map((card) => card.ticketUid),
+    moved.map((card) => card.ticketUid),
+    'reanchoring does not undo a manual placement'
+  );
+  const lowered = insertTicket(queue, queue[0], 'queueFront', 45);
+  assert.equal(lowered[0].ticketUid, queue[1].ticketUid);
+  assert.equal(lowered[0].status, 'brewing');
+  assert.equal(lowered[0].startTimeSec, 45);
+  assert.equal(lowered[1].status, 'scheduled');
+  assert.equal(insertTicket(queue, queue[0], 'front', 45), queue, 'same place does not reset a brew');
+});
+
+test('merged visual cups retain their original order and arrival time even when order ids are sorted', () => {
+  const data = single();
+  data.orders.push({ ...data.orders[0], orderId: 2, atSec: 30 });
+  let state = gameReducer(startGame(data), { type: 'tick', seconds: 30 });
+  state = gameReducer(state, {
+    type: 'merge',
+    first: required(state.unassigned[0].ticketUid),
+    second: required(state.unassigned[1].ticketUid),
+  });
+  const card = state.unassigned[0];
+  assert.deepEqual(card.sourceOrderIds, ['#001', '#002']);
+  assert.deepEqual(
+    card.sourceCups?.map((cup) => [cup.id, cup.orderId, cup.orderedAtSec]),
+    [
+      ['2:0:0', '#002', 30],
+      ['1:0:0', '#001', 0],
+    ]
+  );
+  state = gameReducer(state, { type: 'split', key: required(card.ticketUid), cupId: required(card.trainingCupIds)[0] });
+  assert.deepEqual(state.unassigned.map((entry) => entry.sourceCups?.[0].orderId).sort(), ['#001', '#002']);
+});
+
+test('remaking a completed cup clears its credit and cannot award a third cup for a two-cup order', () => {
+  let state = assign(startGame({ ...single('余音ブレンド', 2), mode: 'middle', durationSec: 1200 }));
+  state = gameReducer(state, { type: 'tick', seconds: 360 });
+  state = gameReducer(state, { type: 'complete', bayId: 1 });
+  const key = required(state.bays[0].pastTickets?.[0].ticketUid);
+  state = gameReducer(state, { type: 'rebrew', key, cupCount: 1, bayId: null, interrupt: false, reason: 'こぼれ' });
+  assert.equal(scoreGame(state).done, 1);
+  assert.equal(state.unassigned[0].sourceCups?.length, 1);
+  state = assign(state, 2);
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
+  state = gameReducer(state, { type: 'complete', bayId: 2 });
+  assert.equal(scoreGame(state).done, 2);
+  assert.equal(scoreGame(state).quality, 2);
+  assert.equal(scoreGame(state).total, 2);
+});
+
+test('continuing the original brew after a remake never credits the remade cup early', () => {
+  let state = assign(startGame(single()));
+  const key = required(state.bays[0].queue[0].ticketUid);
+  state = gameReducer(state, { type: 'tick', seconds: 60 });
+  state = gameReducer(state, { type: 'rebrew', key, cupCount: 1, bayId: 2, interrupt: false, reason: '異物混入' });
+  state = gameReducer(state, { type: 'tick', seconds: 240 });
+  state = gameReducer(state, { type: 'complete', bayId: 1 });
+  assert.equal(scoreGame(state).done, 0);
+  state = gameReducer(state, { type: 'tick', seconds: 60 });
+  state = gameReducer(state, { type: 'complete', bayId: 2 });
+  assert.equal(scoreGame(state).done, 1);
+  assert.equal(scoreGame(state).score, 100);
 });

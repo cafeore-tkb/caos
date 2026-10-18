@@ -12,6 +12,7 @@ export default defineConfig(() => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
+        '@cafeore/common': path.resolve(__dirname, 'src/current-caos/common/index.ts'),
       },
     },
     server: {
