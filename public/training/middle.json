@@ -13,49 +13,51 @@
           "name": "余音ブレンド",
           "quantity": 1
         }
-      ]
+      ],
+      "comments": ["同じ注文の商品は、そろえてお渡しします。"]
     },
     {
       "orderId": 2,
-      "atSec": 70,
+      "atSec": 65,
       "items": [
         {
-          "name": "アイスコーヒー",
-          "quantity": 2
+          "name": "キリマン",
+          "quantity": 2,
+          "nominee": 4
         },
         {
-          "name": "チロソ",
+          "name": "ケニア",
           "quantity": 1
         }
       ]
     },
     {
       "orderId": 3,
-      "atSec": 141,
+      "atSec": 130,
       "items": [
         {
-          "name": "キリマン",
-          "quantity": 1,
-          "nominee": 3
+          "name": "アロマナティーボ",
+          "quantity": 1
         }
       ]
     },
     {
       "orderId": 4,
-      "atSec": 212,
+      "atSec": 196,
       "items": [
         {
-          "name": "チロソ",
+          "name": "ケニア",
           "quantity": 3
         }
-      ]
+      ],
+      "comments": ["複数杯の注文です。なるべく一緒に仕上げてください。"]
     },
     {
       "orderId": 5,
-      "atSec": 283,
+      "atSec": 261,
       "items": [
         {
-          "name": "アロマナティーボ",
+          "name": "アイスオレ",
           "quantity": 2
         },
         {
@@ -66,14 +68,15 @@
     },
     {
       "orderId": 6,
-      "atSec": 354,
+      "atSec": 327,
       "items": [
         {
-          "name": "余音ブレンド",
-          "quantity": 1
+          "name": "ケニア",
+          "quantity": 1,
+          "nominee": 2
         },
         {
-          "name": "ブラジル",
+          "name": "アイスコーヒー",
           "quantity": 1
         },
         {
@@ -84,20 +87,21 @@
     },
     {
       "orderId": 7,
-      "atSec": 425,
+      "atSec": 392,
       "items": [
         {
           "name": "アイスコーヒー",
           "quantity": 1
         }
-      ]
+      ],
+      "comments": ["お客様は席でお待ちです。準備ができたら注文番号でお呼びください。"]
     },
     {
       "orderId": 8,
-      "atSec": 496,
+      "atSec": 458,
       "items": [
         {
-          "name": "キリマン",
+          "name": "チロソ",
           "quantity": 2
         },
         {
@@ -108,45 +112,46 @@
     },
     {
       "orderId": 9,
-      "atSec": 567,
+      "atSec": 523,
       "items": [
         {
-          "name": "ケニア",
-          "quantity": 3,
-          "nominee": 3
+          "name": "アイスコーヒー",
+          "quantity": 3
         }
       ]
     },
     {
       "orderId": 10,
-      "atSec": 638,
+      "atSec": 589,
       "items": [
         {
-          "name": "アロマナティーボ",
-          "quantity": 1
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1,
+          "nominee": 5
         },
         {
           "name": "余音ブレンド",
           "quantity": 1
         }
-      ]
+      ],
+      "comments": ["5番の方への指名です。少し待てる旨はお伝え済みです。"]
     },
     {
       "orderId": 11,
-      "atSec": 709,
+      "atSec": 654,
       "items": [
         {
-          "name": "余音ブレンド",
+          "name": "アロマナティーボ",
           "quantity": 2
         }
       ]
     },
     {
       "orderId": 12,
-      "atSec": 780,
+      "atSec": 720,
       "items": [
         {
-          "name": "アイスコーヒー",
+          "name": "余音ブレンド",
           "quantity": 1
         },
         {

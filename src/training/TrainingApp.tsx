@@ -2,6 +2,7 @@ import { ArrowLeft, Check, Download, FileJson, Flag, Gamepad2, Pause, Play, Rota
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { CONTROL_VIEWS, type ControlViewMode, ControlWorkspace } from '../components/ControlWorkspace';
 import type { OrderTicket } from '../types';
+import { trainingComments } from './comments';
 import {
   type GameMode,
   type GameState,
@@ -12,9 +13,10 @@ import {
   scoreGame,
   startGame,
 } from './engine';
-import { itemAbbr, needsBrew } from './master';
+import { itemAbbr, needsBrew, seniorOnly } from './master';
 import './training.css';
 
+const TRAINING_CLOCK_ORIGIN = Date.UTC(2026, 9, 19, 1);
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 const scenarioUrl = (mode: GameMode) => `${import.meta.env.BASE_URL}training/${mode}.json`;
 type HistoryEntry = { mode: GameMode; score: number; at: string };
@@ -147,6 +149,13 @@ export default function TrainingApp() {
                   : 'データを読み込めません'}
             </div>
             {scenario && (
+              <p className="training-data-mix">
+                指名 {scenario.orders.filter((order) => order.items.some((item) => item.nominee)).length}件 · 上級生限定{' '}
+                {scenario.orders.filter((order) => order.items.some((item) => seniorOnly(item.name))).length}件 ·
+                コメント {scenario.orders.filter((order) => order.comments?.length).length}件
+              </p>
+            )}
+            {scenario && (
               <details>
                 <summary>注文の内容を見る</summary>
                 <ol className="training-order-preview">
@@ -163,6 +172,11 @@ export default function TrainingApp() {
                           )
                           .join(' / ')}
                       </span>
+                      {order.comments?.map((comment) => (
+                        <small className="training-preview-comment" key={comment}>
+                          💬 {comment}
+                        </small>
+                      ))}
                     </li>
                   ))}
                 </ol>
@@ -223,7 +237,7 @@ export default function TrainingApp() {
             未割当の注文を選択 → 担当者へ割当 →
             空の列では自動で抽出開始。残り時間を見てカードの✓で完了します。A・Cはいつでも切り替えできます。
             <br />
-            同じ商品の1杯同士は、指名条件が矛盾しなければ統合できます。限定豆は上級生の1・6番へ。
+            同じ商品の1杯同士は、指名条件が矛盾しなければ統合できます。限定豆は上級生の1・6番へ。コメントは吹き出し・未提供タブから確認できます。
           </p>
           <button
             type="button"
@@ -485,7 +499,8 @@ function GameSession({
           baristas={state.bays}
           unassignedOrders={state.unassigned}
           currentTimeSec={state.nowSec}
-          clockOriginMs={Date.UTC(2026, 9, 19, 1)}
+          clockOriginMs={TRAINING_CLOCK_ORIGIN}
+          orderComments={trainingComments(state, TRAINING_CLOCK_ORIGIN)}
           onUnstartBay={(bayId) => dispatch({ type: 'unstart', bayId })}
           onSplitCup={(key, cupId) => dispatch({ type: 'split', key, cupId })}
           selectedOrderId={selected}

@@ -2,8 +2,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { convertBoard } from '../current-caos/bridge/convertBoard';
+import { selectedComments } from '../current-caos/logic/cards';
 import { CONTROL_VIEWS } from '../utils/controlViews';
 import { arrangeQueue, canMergeDripUnits, insertTicket } from '../utils/orderQueue';
+import { trainingComments } from './comments';
 import {
   allowedBay,
   type GameMode,
@@ -206,18 +208,16 @@ test('parser rejects malformed, conflicting and unknown input; sorts out-of-orde
   assert.equal(parseScenario(reversed).orders[0].orderId, 2);
 });
 
-test('A and C are the only adopted views and share the same current card projection', () => {
-  const state = assign(startGame(single()), 2);
-  const before = JSON.stringify(state);
-  assert.deepEqual(Object.values(CONTROL_VIEWS), ['A', 'C']);
+function project(state: GameState) {
   const noop = () => {};
-  const props = {
+  return convertBoard({
     baristas: state.bays,
     unassignedOrders: state.unassigned,
     nextAvailable: [],
     selectedOrderId: null,
     actionTicketKey: null,
     currentTimeSec: state.nowSec,
+    orderComments: trainingComments(state, Date.UTC(2026, 9, 19, 1)),
     clockOriginMs: Date.UTC(2026, 9, 19, 1),
     timelineCommand: null,
     onSelectOrder: noop,
@@ -230,8 +230,14 @@ test('A and C are the only adopted views and share the same current card project
     onOpenEmptySlot: noop,
     onAssignToBay: noop,
     onMergeOrders: noop,
-  };
-  const projection = convertBoard(props);
+  });
+}
+
+test('A and C are the only adopted views and share the same current card projection', () => {
+  const state = assign(startGame(single()), 2);
+  const before = JSON.stringify(state);
+  assert.deepEqual(Object.values(CONTROL_VIEWS), ['A', 'C']);
+  const projection = project(state);
   assert.equal(projection.lanes[1].brewing?.cups[0].item.abbr, 'よいん');
   assert.equal(projection.lanes[1].brewing?.orderNo, 1);
   assert.equal(JSON.stringify(state), before);
@@ -355,4 +361,71 @@ test('continuing the original brew after a remake never credits the remade cup e
   state = gameReducer(state, { type: 'complete', bayId: 2 });
   assert.equal(scoreGame(state).done, 1);
   assert.equal(scoreGame(state).score, 100);
+});
+
+test('all default scenarios mix nomination, limited coffee and comments at moderate frequencies', () => {
+  const nominees = new Set<number>();
+  for (const mode of Object.keys(MODES) as GameMode[]) {
+    const { orders } = load(mode);
+    const nominated = orders.filter((order) => order.items.some((item) => item.nominee));
+    const limited = orders.filter((order) => order.items.some((item) => seniorOnly(item.name)));
+    const commented = orders.filter((order) => order.comments?.length);
+    assert.ok(nominated.length / orders.length >= 0.2 && nominated.length / orders.length <= 0.35, mode);
+    assert.ok(limited.length / orders.length >= 0.15 && limited.length / orders.length <= 0.3, mode);
+    assert.ok(commented.length / orders.length >= 0.25 && commented.length / orders.length <= 0.4, mode);
+    for (const order of nominated) for (const item of order.items) if (item.nominee) nominees.add(item.nominee);
+  }
+  assert.ok(nominees.size >= 4, 'nominations exercise different lanes');
+});
+
+test('optional comments are validated, normalized and copied without breaking older JSON', () => {
+  const old = single();
+  assert.equal(old.orders[0].comments, undefined);
+  const input = single();
+  input.orders[0].comments = ['  複数杯は一緒にお願いします。  '];
+  const parsed = parseScenario(input);
+  assert.deepEqual(parsed.orders[0].comments, ['複数杯は一緒にお願いします。']);
+  input.orders[0].comments[0] = 'changed';
+  assert.equal(parsed.orders[0].comments?.[0], '複数杯は一緒にお願いします。');
+  for (const comments of [null, '文字列のみ', [''], ['   '], [1], ['a'.repeat(201)], ['1', '2', '3', '4']])
+    assert.throws(() => parseScenario({ ...single(), orders: [{ ...single().orders[0], comments }] }), /コメント/);
+});
+
+test('comments appear on arrival and retain original orders after merging, moving and splitting', () => {
+  const data = single();
+  data.orders[0].comments = ['一緒にお渡しします。'];
+  data.orders.push({ ...data.orders[0], orderId: 2, atSec: 30, comments: ['待機了承済みです。'] });
+  let state = startGame(data);
+  assert.deepEqual(
+    trainingComments(state, 0).map((comment) => comment.orderNo),
+    [1]
+  );
+  state = gameReducer(state, { type: 'tick', seconds: 30 });
+  assert.equal(trainingComments(state, 0)[1].createdAt.getTime(), 30000);
+  state = gameReducer(state, {
+    type: 'merge',
+    first: required(state.unassigned[0].ticketUid),
+    second: required(state.unassigned[1].ticketUid),
+  });
+  state = assign(state, 2);
+  let board = project(state);
+  assert.deepEqual(
+    selectedComments(board.cards, board.looks, '#001+#002').map((comment) => comment.text),
+    ['一緒にお渡しします。', '待機了承済みです。']
+  );
+  assert.deepEqual(
+    board.rows.map((row) => row.comments.map((comment) => comment.orderNo)),
+    [[1], [2]],
+    'unfinished rows do not duplicate merged comments'
+  );
+  const key = required(state.bays[1].queue[0].ticketUid);
+  state = gameReducer(state, { type: 'return', key });
+  state = gameReducer(state, { type: 'split', key, cupId: required(state.unassigned[0].trainingCupIds)[0] });
+  board = project(state);
+  for (const card of board.cards)
+    assert.deepEqual(
+      board.looks.get(card.key)?.comments?.map((comment) => comment.orderNo),
+      [card.orderNo]
+    );
+  assert.equal(scoreGame(state).total, 2);
 });
