@@ -29,7 +29,7 @@ for (const mode of Object.keys(MODES) as GameMode[]) {
     const atSec =
       mode === 'full'
         ? Math.floor(i / 2) * Math.floor((config.durationSec - 420) / Math.ceil(config.count / 2)) + (i % 2) * 8
-        : Math.floor((i * (config.durationSec - 300)) / (config.count - 1));
+        : Math.floor((i * (config.durationSec - 420)) / (config.count - 1));
     return { orderId: i + 1, atSec, items };
   });
   const scenario = parseScenario({

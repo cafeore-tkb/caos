@@ -29,6 +29,7 @@ function Root() {
 }
 
 import './index.css';
+import './current-caos/caos.css';
 
 const rootElement = document.getElementById('root');
 

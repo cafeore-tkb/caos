@@ -27,10 +27,12 @@ import type {
 import { soundManager } from './utils/audio';
 import {
   arrangeQueue,
-  canMergeDripUnits,
+  insertTicket,
+  mergeBoardCards,
   orderNumber,
   queueWaitSeconds,
   reanchorQueueInOrder,
+  sourceCupsOf,
   splitIntoDripUnits,
   ticketKey,
 } from './utils/orderQueue';
@@ -225,6 +227,7 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
   const [historicalOrders, setHistoricalOrders] = useState<HistoricalOrder[]>([]);
   const [testDataLoading, setTestDataLoading] = useState(true);
   const [testSetupOpen, setTestSetupOpen] = useState(false);
+  const [pastOpen, setPastOpen] = useState(false);
   const [testPlaySession, setTestPlaySession] = useState<TestPlaySession | null>(
     () => standaloneSnapshot?.testPlaySession || null
   );
@@ -468,6 +471,16 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
 
   // Advance / complete a bay's active order
   const handleAdvanceBay = (bayId: number) => {
+    const bayToStart = baristas.find((bay) => bay.id === bayId);
+    if (bayToStart?.queue[0]?.status === 'scheduled') {
+      captureUndo('抽出の開始');
+      setBaristas((prev) =>
+        prev.map((bay) =>
+          bay.id === bayId ? { ...bay, queue: arrangeQueue(bay.queue, bay.coefficient, realTimeSec, true) } : bay
+        )
+      );
+      return;
+    }
     soundManager.playComplete();
 
     const targetBarista = baristas.find((b) => b.id === bayId);
@@ -534,7 +547,11 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
   };
 
   // Assign order to a bay
-  const handleAssignOrderToBay = (orderUidOrId: string, targetBayId: number) => {
+  const handleAssignOrderToBay = (
+    orderUidOrId: string,
+    targetBayId: number,
+    place?: import('./current-caos/common').CaosPlace
+  ) => {
     soundManager.playDispatch();
 
     const orderToAssign = unassignedOrders.find((o) => o.ticketUid === orderUidOrId || o.id === orderUidOrId);
@@ -550,7 +567,7 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
     // Calculate dynamic start time based on target bay's queue
     const targetBay = baristas.find((b) => b.id === targetBayId);
     const lastTicket = targetBay?.queue[targetBay.queue.length - 1];
-    const duration = orderToAssign.cupCount > 1 ? 195 : 135;
+    const duration = orderToAssign.cupCount > 1 ? 360 : 300;
     const computedStartSec =
       lastTicket?.startTimeSec && lastTicket.totalDurationSec
         ? lastTicket.startTimeSec + lastTicket.totalDurationSec + 15
@@ -565,6 +582,8 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
       totalOrderCups: orderToAssign.totalOrderCups,
       orderNotes: orderToAssign.orderNotes,
       sourceOrderIds: orderToAssign.sourceOrderIds,
+      sourceCups: orderToAssign.sourceCups,
+      orderedAtSec: orderToAssign.orderedAtSec,
       preferredBaristaId: orderToAssign.preferredBaristaId,
       isRebrew: orderToAssign.isRebrew,
       rebrewOfTicketUid: orderToAssign.rebrewOfTicketUid,
@@ -592,27 +611,28 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
         if (b.id !== targetBayId) return b;
         return {
           ...b,
-          queue: arrangeQueue([...b.queue, newTicket], b.coefficient, realTimeSec),
+          queue: insertTicket(b.queue, newTicket, place, realTimeSec),
         };
       })
     );
   };
 
-  const handleMoveScheduledTicket = (ticket: OrderTicket, targetBayId: number) => {
-    if (ticket.status !== 'scheduled') return;
+  const handleMoveScheduledTicket = (
+    ticket: OrderTicket,
+    targetBayId: number,
+    place?: import('./current-caos/common').CaosPlace
+  ) => {
+    if (ticket.status !== 'scheduled' && ticket.status !== 'brewing') return;
     if (ticket.preferredBaristaId && ticket.preferredBaristaId !== targetBayId) return;
     captureUndo(`${ticket.id}の割当変更`);
     const key = ticketKey(ticket);
     setBaristas((prev) => {
       return prev.map((bay) => ({
         ...bay,
-        queue: arrangeQueue(
+        queue:
           bay.id === targetBayId
-            ? [...bay.queue.filter((item) => ticketKey(item) !== key), { ...ticket, status: 'scheduled' as const }]
+            ? insertTicket(bay.queue, ticket, place, realTimeSec)
             : bay.queue.filter((item) => ticketKey(item) !== key),
-          bay.coefficient,
-          realTimeSec
-        ),
       }));
     });
     setSelectedOrderId(null);
@@ -664,17 +684,13 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
   const nextShiftLabel = `${nextShiftHour.toString().padStart(2, '0')}:00`;
 
   const handleReturnScheduledTicket = (ticket: OrderTicket) => {
-    if (ticket.status !== 'scheduled') return;
+    if (ticket.status !== 'scheduled' && ticket.status !== 'brewing') return;
     captureUndo(`${ticket.id}を未割当に戻す`);
     const key = ticketKey(ticket);
     setBaristas((prev) =>
       prev.map((bay) => ({
         ...bay,
-        queue: arrangeQueue(
-          bay.queue.filter((item) => ticketKey(item) !== key),
-          bay.coefficient,
-          realTimeSec
-        ),
+        queue: bay.queue.filter((item) => ticketKey(item) !== key),
       }))
     );
     setUnassignedOrders((prev) => [
@@ -686,6 +702,8 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
         totalOrderCups: ticket.totalOrderCups,
         orderNotes: ticket.orderNotes,
         sourceOrderIds: ticket.sourceOrderIds,
+        sourceCups: ticket.sourceCups,
+        orderedAtSec: ticket.orderedAtSec,
         beanCode: ticket.beanCode,
         beanName: ticket.beanName,
         cupCount: ticket.cupCount,
@@ -710,7 +728,7 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
     const ticket = rebrewTicket;
     captureUndo(`${ticket.id}の入れ直し`);
     const originalKey = ticketKey(ticket);
-    const duration = decision.cupCount > 1 ? 195 : 135;
+    const duration = decision.cupCount > 1 ? 360 : 300;
     const rebrewUid = `rebrew-${originalKey}-${Date.now()}`;
     const newTicket: OrderTicket = {
       ...ticket,
@@ -817,31 +835,11 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
   };
 
   const handleMergeUnassignedOrders = (firstUid: string, secondUid: string) => {
-    const first = unassignedOrders.find((order) => (order.ticketUid || order.id) === firstUid);
-    const second = unassignedOrders.find((order) => (order.ticketUid || order.id) === secondUid);
-    if (!first || !second || !canMergeDripUnits(first, second)) return;
-    captureUndo(`${first.id}と${second.id}の統合`);
-    setUnassignedOrders((prev) => {
-      const sourceOrderIds = Array.from(
-        new Set([...(first.sourceOrderIds || [first.id]), ...(second.sourceOrderIds || [second.id])])
-      ).sort((a, b) => orderNumber(a) - orderNumber(b));
-      const merged: UnassignedOrder = {
-        ...first,
-        id: sourceOrderIds.join('+'),
-        ticketUid: `merged-${[firstUid, secondUid].sort().join('-')}`,
-        sourceOrderIds,
-        cupCount: 2,
-        badgeTag: `2杯 統合`,
-        orderNotes: `${sourceOrderIds.join(' + ')} 同時ドリップ`,
-      };
-      return [
-        ...prev.filter((order) => {
-          const uid = order.ticketUid || order.id;
-          return uid !== firstUid && uid !== secondUid;
-        }),
-        merged,
-      ];
-    });
+    const result = mergeBoardCards(baristas, unassignedOrders, firstUid, secondUid);
+    if (!result) return;
+    captureUndo('カードの統合');
+    setBaristas(result.bays);
+    setUnassignedOrders(result.orders);
     setSelectedOrderId(null);
   };
 
@@ -1006,12 +1004,53 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
           onOpenTestPlay={() => setTestSetupOpen(true)}
           onEndTestPlay={handleEndTestPlay}
           posStatus={posStatus}
+          onSearchOrder={(no) => {
+            const id = `#${String(no).padStart(3, '0')}`;
+            setSelectedOrderId(id);
+          }}
+          onOpenPastOrders={() => setPastOpen(true)}
         />
 
         {/* Dynamic Tab Body */}
         <main className="flex-1 p-2 flex flex-col gap-2 overflow-hidden">
           <ControlWorkspace
             mode={controlViewMode}
+            onOpenLane={() => setActiveTab('bays')}
+            onSplitCup={(key, _cupId) => {
+              const card = unassignedOrders.find((entry) => (entry.ticketUid ?? entry.id) === key);
+              if (card?.cupCount !== 2) return;
+              captureUndo('統合を分離');
+              const cups = sourceCupsOf(card);
+              setUnassignedOrders((prev) => [
+                ...prev.filter((entry) => entry !== card),
+                ...[0, 1].map((index) => ({
+                  ...card,
+                  id: cups[index].orderId,
+                  sourceCups: [cups[index]],
+                  sourceOrderIds: undefined,
+                  ticketUid: `${key}-split${index}-${Date.now()}`,
+                  cupCount: 1,
+                  badgeTag: '1杯',
+                })),
+              ]);
+            }}
+            onUnstartBay={(bayId) => {
+              captureUndo('未着手に戻す');
+              setBaristas((prev) =>
+                prev.map((bay) =>
+                  bay.id === bayId
+                    ? {
+                        ...bay,
+                        queue: bay.queue.map((ticket, index) =>
+                          index === 0
+                            ? { ...ticket, status: 'scheduled', startTimeSec: undefined, timeRemainingSec: undefined }
+                            : ticket
+                        ),
+                      }
+                    : bay
+                )
+              );
+            }}
             baristas={baristas}
             unassignedOrders={sortedUnassignedOrders}
             nextAvailable={nextAvailable}
@@ -1030,7 +1069,7 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
               setRebrewSource({ ticketKey: ticketKey(ticket), bayId });
             }}
             onOpenEmptySlot={(bayId) => setAssignSlotData({ bayId, order: null })}
-            onAssignToBay={(order, bayId) => handleAssignOrderToBay(order.ticketUid || order.id, bayId)}
+            onAssignToBay={(order, bayId, place) => handleAssignOrderToBay(order.ticketUid || order.id, bayId, place)}
             onMergeOrders={handleMergeUnassignedOrders}
           />
         </main>
@@ -1046,6 +1085,30 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
         )}
       </div>
 
+      {pastOpen && (
+        <aside className="absolute top-16 right-3 z-[120] max-h-[80vh] w-96 overflow-auto rounded-xl border border-slate-300 bg-white p-5 shadow-xl">
+          <button type="button" className="float-right min-h-11 px-3" onClick={() => setPastOpen(false)}>
+            閉じる
+          </button>
+          <h2 className="mb-4 font-black">過去の注文</h2>
+          {baristas
+            .flatMap((bay) => (bay.pastTickets ?? []).map((ticket) => ({ bay, ticket })))
+            .sort((a, b) => (b.ticket.endTimeSec ?? 0) - (a.ticket.endTimeSec ?? 0))
+            .map(({ bay, ticket }) => (
+              <button
+                type="button"
+                key={ticketKey(ticket)}
+                className="mb-2 flex min-h-12 w-full items-center gap-2 rounded border border-slate-200 p-2 text-left text-sm"
+                onClick={() => {
+                  setPastOpen(false);
+                  setRebrewSource({ ticketKey: ticketKey(ticket), bayId: bay.id });
+                }}
+              >
+                {ticket.id} {ticket.beanName} {ticket.cupCount}杯 / {bay.id}番
+              </button>
+            ))}
+        </aside>
+      )}
       {/* Ticket Detail Recipe Modal */}
       {selectedTicket && controlViewMode !== 'current' && (
         <TicketDetailModal

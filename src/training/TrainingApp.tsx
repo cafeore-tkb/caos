@@ -209,7 +209,7 @@ export default function TrainingApp() {
               <Trophy size={18} />
               80点の基準
             </h2>
-            <p>仕上げた杯数45点・6分以内の準備25点・抽出品質20点・同一注文の仕上がり10点。</p>
+            <p>仕上げた杯数45点・8分以内の準備25点・抽出品質20点・同一注文の仕上がり10点。</p>
             <p className="training-criteria">
               80点以上には、全注文の90%以上を完了、完了杯の95%以上で予定抽出時間の90%以上を確保、指名・上級生条件の違反ゼロが必要です。
             </p>
@@ -220,9 +220,10 @@ export default function TrainingApp() {
         </div>
         <footer className="training-start-row">
           <p>
-            未割当の注文を選択 → 担当者へ割当 → 残り時間を見て「次へ」。A・Cはいつでも切り替えできます。
+            未割当の注文を選択 → 担当者へ割当 →
+            空の列では自動で抽出開始。残り時間を見てカードの✓で完了します。A・Cはいつでも切り替えできます。
             <br />
-            同じ商品・同じ指名の1杯同士は統合できます。限定豆は上級生の1・6番へ。
+            同じ商品の1杯同士は、指名条件が矛盾しなければ統合できます。限定豆は上級生の1・6番へ。
           </p>
           <button
             type="button"
@@ -260,6 +261,10 @@ function GameSession({
   const [emptyBay, setEmptyBay] = useState<number | null>(null);
   const saved = useRef(false);
   const [exportError, setExportError] = useState('');
+  const [remakeReason, setRemakeReason] = useState('');
+  const [remakeCount, setRemakeCount] = useState('');
+  const [remakeTarget, setRemakeTarget] = useState('');
+  const [remakeInterrupt, setRemakeInterrupt] = useState('');
   useEffect(() => {
     if (state.status !== 'active' || state.paused || endOpen) return;
     let previous = performance.now();
@@ -284,7 +289,9 @@ function GameSession({
   }, [state, onFinish]);
   const result = scoreGame(state);
   const detail = detailKey
-    ? state.bays.flatMap((bay) => bay.queue).find((ticket) => ticket.ticketUid === detailKey)
+    ? state.bays
+        .flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])
+        .find((ticket) => ticket.ticketUid === detailKey)
     : null;
   const downloadResult = () => {
     try {
@@ -390,7 +397,13 @@ function GameSession({
         </div>
       </main>
     );
-  const openDetail = (ticket: OrderTicket) => setDetailKey(ticket.ticketUid ?? null);
+  const openDetail = (ticket: OrderTicket) => {
+    setRemakeReason('');
+    setRemakeCount('');
+    setRemakeTarget('');
+    setRemakeInterrupt('');
+    setDetailKey(ticket.ticketUid ?? null);
+  };
   return (
     <div className="training-game">
       <header className="training-game-header">
@@ -445,26 +458,14 @@ function GameSession({
         <div style={{ width: `${(100 * state.nowSec) / scenario.durationSec}%` }} />
       </div>
       {viewMode === 'current' && (
-        <div className="training-timeline-controls" role="group" aria-label="タイムラインの移動">
-          {(
-            [
-              ['back', '−5分'],
-              ['now', '現在'],
-              ['forward', '＋5分'],
-            ] as const
-          ).map(([direction, label]) => (
-            <button
-              type="button"
-              key={direction}
-              onClick={() => setTimelineCommand({ direction, id: performance.now() })}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="training-timeline-controls">
+          <button type="button" onClick={() => setTimelineCommand({ direction: 'now', id: performance.now() })}>
+            現在
+          </button>
         </div>
       )}
       <div className="training-game-hint">
-        <span>80点が合格の目安 · 限定豆は1・6番 · 抽出時間を守って「次へ」</span>
+        <span>80点が合格の目安 · 限定豆は1・6番 · ▶で開始・✓で完了</span>
         <span role="status">{state.notice || '未割当の注文カードを選んで、担当者へ割り当ててください'}</span>
       </div>
       <div className="training-board">
@@ -484,14 +485,26 @@ function GameSession({
           baristas={state.bays}
           unassignedOrders={state.unassigned}
           currentTimeSec={state.nowSec}
+          clockOriginMs={Date.UTC(2026, 9, 19, 1)}
+          onUnstartBay={(bayId) => dispatch({ type: 'unstart', bayId })}
+          onSplitCup={(key, cupId) => dispatch({ type: 'split', key, cupId })}
           selectedOrderId={selected}
           onSelectOrder={(id) => setSelected(id || null)}
-          onAdvanceBay={(bayId) => dispatch({ type: 'complete', bayId })}
+          onAdvanceBay={(bayId) =>
+            dispatch({
+              type: state.bays.find((bay) => bay.id === bayId)?.queue[0]?.status === 'brewing' ? 'complete' : 'start',
+              bayId,
+            })
+          }
           onOpenTicketDetail={openDetail}
           onOpenEmptySlot={(bayId) => setEmptyBay(bayId)}
-          onAssignToBay={(card, bayId) => dispatch({ type: 'assign', key: card.ticketUid ?? card.id, bayId })}
+          onAssignToBay={(card, bayId, place) =>
+            dispatch({ type: 'assign', key: card.ticketUid ?? card.id, bayId, place })
+          }
           onRequestRebrew={openDetail}
-          onMoveTicket={(card, bayId) => dispatch({ type: 'move', key: card.ticketUid ?? card.id, bayId })}
+          onMoveTicket={(card, bayId, place) =>
+            dispatch({ type: 'move', key: card.ticketUid ?? card.id, bayId, place })
+          }
           onReturnToUnassigned={(card) => dispatch({ type: 'return', key: card.ticketUid ?? card.id })}
           onMergeOrders={(first, second) => dispatch({ type: 'merge', first, second })}
         />
@@ -539,33 +552,131 @@ function GameSession({
           </h2>
           <p>
             {detail.cupCount}杯 ·{' '}
-            {detail.status === 'brewing' ? '抽出中。移動すると抽出時間をリセットします。' : '待機中'}
+            {detail.status === 'completed'
+              ? '完了済み'
+              : detail.status === 'brewing'
+                ? '抽出中。移動すると抽出時間をリセットします。'
+                : '待機中'}
           </p>
-          <h3>担当者を変更</h3>
-          <div className="training-bay-actions">
-            {state.bays.map((bay) => (
+          <details className="my-4 rounded border border-red-200 p-3">
+            <summary className="text-sm font-black text-red-800">緊急の入れ直し</summary>
+            <div className="mt-3 flex flex-col gap-2 text-xs">
+              <label>
+                理由
+                <select
+                  aria-label="入れ直しの理由"
+                  value={remakeReason}
+                  onChange={(event) => setRemakeReason(event.target.value)}
+                  className="mt-1 w-full rounded border p-2"
+                >
+                  <option value="">選択してください</option>
+                  {['こぼれ', '抽出ミス', '異物混入', 'その他'].map((reason) => (
+                    <option key={reason}>{reason}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                杯数
+                <select
+                  aria-label="入れ直しの杯数"
+                  value={remakeCount}
+                  onChange={(event) => setRemakeCount(event.target.value)}
+                  className="mt-1 w-full rounded border p-2"
+                >
+                  <option value="">選択してください</option>
+                  {Array.from({ length: detail.cupCount }, (_, index) => index + 1).map((count) => (
+                    <option key={count} value={count}>
+                      {count}杯
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                割当先
+                <select
+                  aria-label="入れ直しの割当先"
+                  value={remakeTarget}
+                  onChange={(event) => setRemakeTarget(event.target.value)}
+                  className="mt-1 w-full rounded border p-2"
+                >
+                  <option value="">選択してください</option>
+                  <option value="unassigned">未割当へ</option>
+                  {state.bays.map((bay) => (
+                    <option key={bay.id} value={bay.id}>
+                      {bay.id}番 {bay.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {detail.status === 'brewing' && (
+                <label>
+                  現在の抽出
+                  <select
+                    aria-label="現在の抽出の扱い"
+                    value={remakeInterrupt}
+                    onChange={(event) => setRemakeInterrupt(event.target.value)}
+                    className="mt-1 w-full rounded border p-2"
+                  >
+                    <option value="">選択してください</option>
+                    <option value="interrupt">中断する</option>
+                    <option value="continue">続ける</option>
+                  </select>
+                </label>
+              )}
               <button
                 type="button"
-                key={bay.id}
-                disabled={detail.preferredBaristaId !== undefined && detail.preferredBaristaId !== bay.id}
+                disabled={
+                  !remakeReason || !remakeCount || !remakeTarget || (detail.status === 'brewing' && !remakeInterrupt)
+                }
                 onClick={() => {
-                  dispatch({ type: 'move', key: detailKey, bayId: bay.id });
+                  dispatch({
+                    type: 'rebrew',
+                    key: detail.ticketUid ?? detail.id,
+                    cupCount: Number(remakeCount),
+                    bayId: remakeTarget === 'unassigned' ? null : Number(remakeTarget),
+                    interrupt: remakeInterrupt === 'interrupt',
+                    reason: remakeReason,
+                  });
+                  setDetailKey(null);
+                  setRemakeReason('');
+                  setRemakeCount('');
+                  setRemakeTarget('');
+                  setRemakeInterrupt('');
+                }}
+              >
+                この内容で入れ直す
+              </button>
+            </div>
+          </details>
+          {detail.status !== 'completed' && (
+            <>
+              <h3>担当者を変更</h3>
+              <div className="training-bay-actions">
+                {state.bays.map((bay) => (
+                  <button
+                    type="button"
+                    key={bay.id}
+                    disabled={detail.preferredBaristaId !== undefined && detail.preferredBaristaId !== bay.id}
+                    onClick={() => {
+                      dispatch({ type: 'move', key: detail.ticketUid ?? detail.id, bayId: bay.id });
+                      setDetailKey(null);
+                    }}
+                  >
+                    {bay.id}番{bay.canHandleSpecial ? ' ★' : ''}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  dispatch({ type: 'return', key: detail.ticketUid ?? detail.id });
                   setDetailKey(null);
                 }}
               >
-                {bay.id}番{bay.canHandleSpecial ? ' ★' : ''}
+                未割当に戻す
               </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              dispatch({ type: 'return', key: detailKey });
-              setDetailKey(null);
-            }}
-          >
-            未割当に戻す
-          </button>
+            </>
+          )}
           <p>★は上級生。限定豆は1・6番へ。条件違反の操作は受け付けず、記録に残ります。</p>
         </aside>
       )}

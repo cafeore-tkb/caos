@@ -1,10 +1,11 @@
 import type React from 'react';
+import { LegacyBoard } from '../current-caos/bridge/LegacyBoard';
+import type { CaosPlace } from '../current-caos/common';
 import type { Barista, OrderTicket, UnassignedOrder } from '../types';
-import { ControlViewA } from './ControlViewA';
-import { ControlViewC } from './ControlViewC';
 
-export const CONTROL_VIEWS = { current: 'A', c: 'C' } as const;
-export type ControlViewMode = keyof typeof CONTROL_VIEWS;
+import type { ControlViewMode } from '../utils/controlViews';
+
+export { CONTROL_VIEWS, type ControlViewMode } from '../utils/controlViews';
 export interface ControlViewProps {
   baristas: Barista[];
   unassignedOrders: UnassignedOrder[];
@@ -12,17 +13,22 @@ export interface ControlViewProps {
   selectedOrderId: string | null;
   actionTicketKey: string | null;
   currentTimeSec: number;
+  clockOriginMs?: number;
+  onUnstartBay?: (bayId: number) => void;
+  onSplitCup?: (key: string, cupId: string) => void;
+  onOpenLane?: (bayId: number) => void;
   timelineCommand: { direction: 'back' | 'now' | 'forward'; id: number } | null;
   onSelectOrder: (orderId: string) => void;
   onAdvanceBay: (bayId: number) => void;
   onOpenTicketDetail: (ticket: OrderTicket) => void;
-  onMoveTicket: (ticket: OrderTicket, targetBayId: number) => void;
+  onMoveTicket: (ticket: OrderTicket, targetBayId: number, place?: CaosPlace) => void;
   onReturnToUnassigned: (ticket: OrderTicket) => void;
   onCloseTicketAction: () => void;
   onRequestRebrew: (ticket: OrderTicket, bayId: number) => void;
   onOpenEmptySlot: (bayId: number) => void;
-  onAssignToBay: (order: UnassignedOrder, bayId: number) => void;
+  onAssignToBay: (order: UnassignedOrder, bayId: number, place?: CaosPlace) => void;
   onMergeOrders: (firstUid: string, secondUid: string) => void;
 }
-export const ControlWorkspace: React.FC<ControlViewProps & { mode: ControlViewMode }> = ({ mode, ...props }) =>
-  mode === 'c' ? <ControlViewC {...props} /> : <ControlViewA {...props} />;
+export const ControlWorkspace: React.FC<ControlViewProps & { mode: ControlViewMode }> = (props) => (
+  <LegacyBoard {...props} />
+);

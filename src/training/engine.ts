@@ -1,4 +1,6 @@
+import { type CaosPlace, caosBrewSec } from '../current-caos/common';
 import type { Barista, OrderTicket, UnassignedOrder } from '../types';
+import { insertTicket, mergeBoardCards } from '../utils/orderQueue';
 import { itemAbbr, itemCode, masterItem, needsBrew, seniorOnly } from './master';
 
 export type GameMode = 'fast' | 'middle' | 'full';
@@ -6,21 +8,21 @@ export const MODES = {
   fast: {
     label: 'ファスト',
     durationSec: 600,
-    count: 10,
+    count: 6,
     description: '基本の割当と完了。少量の注文で操作を身につける。',
     target: '基本操作',
   },
   middle: {
     label: 'ミドル',
     durationSec: 1200,
-    count: 24,
+    count: 12,
     description: 'アイス・限定豆・指名・複数杯を並行してさばく。',
     target: '並行判断',
   },
   full: {
     label: 'フル',
     durationSec: 1800,
-    count: 42,
+    count: 20,
     description: '注文の集中、分割、同時仕上げまで含めた店舗運営の総合練習。',
     target: '店舗運営',
   },
@@ -46,6 +48,7 @@ export interface CupResult {
   nominee?: number;
   completedSec?: number;
   brewRatio?: number;
+  joinedAtSec?: number;
 }
 export interface GameEvent {
   id: number;
@@ -70,9 +73,13 @@ export type GameAction =
   | { type: 'tick'; seconds: number }
   | { type: 'pause' }
   | { type: 'finish' }
-  | { type: 'assign'; key: string; bayId: number }
+  | { type: 'assign'; key: string; bayId: number; place?: CaosPlace }
   | { type: 'complete'; bayId: number }
-  | { type: 'move'; key: string; bayId: number }
+  | { type: 'start'; bayId: number }
+  | { type: 'unstart'; bayId: number }
+  | { type: 'split'; key: string; cupId: string }
+  | { type: 'rebrew'; key: string; cupCount: number; bayId: number | null; interrupt: boolean; reason: string }
+  | { type: 'move'; key: string; bayId: number; place?: CaosPlace }
   | { type: 'return'; key: string }
   | { type: 'merge'; first: string; second: string };
 
@@ -101,12 +108,12 @@ export function parseScenario(input: unknown): Scenario {
       seen.has(order.orderId) ||
       !Number.isInteger(order.atSec) ||
       order.atSec < 0 ||
-      order.atSec > value.durationSec - 240 ||
+      order.atSec > value.durationSec - 390 ||
       !Array.isArray(order.items) ||
       order.items.length < 1 ||
       order.items.length > 12
     )
-      throw new Error('注文番号・到着時刻が不正です（最後の4分は仕上げ時間です）');
+      throw new Error('注文番号・到着時刻が不正です（最後の6分30秒は仕上げ時間です）');
     seen.add(order.orderId);
     for (const item of order.items) {
       if (
@@ -146,10 +153,7 @@ export const freshBays = (): Barista[] =>
     pastTickets: [],
   }));
 const keyOf = (card: { ticketUid?: string; id: string }) => card.ticketUid ?? card.id;
-export const brewDuration = (name: string, cups: number) =>
-  (cups === 2 ? 195 : 135) +
-  (seniorOnly(name) ? 30 : 0) +
-  (itemCode(name) === 'ICE' || itemCode(name) === 'MILK' ? 15 : 0);
+export const brewDuration = (_name: string, cups: number) => caosBrewSec(cups);
 export const allowedBay = (card: { preferredBaristaId?: number; beanName: string }, bay: Barista) =>
   (!card.preferredBaristaId || card.preferredBaristaId === bay.id) &&
   (!seniorOnly(card.beanName) || bay.canHandleSpecial === true);
@@ -168,12 +172,18 @@ function arrive(state: GameState): GameState {
       for (let offset = 0; offset < item.quantity; offset += 2) {
         const count = Math.min(2, item.quantity - offset);
         units.push({
+          orderedAtSec: order.atSec,
           id: `#${String(order.orderId).padStart(3, '0')}`,
           ticketUid: `game-${order.orderId}-${itemIndex}-${offset}`,
           beanName: item.name,
           beanCode: itemCode(item.name),
           cupCount: count,
           trainingCupIds: Array.from({ length: count }, (_, i) => `${order.orderId}:${itemIndex}:${offset + i}`),
+          sourceCups: Array.from({ length: count }, (_, i) => ({
+            id: `${order.orderId}:${itemIndex}:${offset + i}`,
+            orderId: `#${String(order.orderId).padStart(3, '0')}`,
+            orderedAtSec: order.atSec,
+          })),
           preferredBaristaId: item.nominee,
           totalOrderCups: total,
           badgeTag: `${count}杯`,
@@ -228,19 +238,24 @@ const withEvent = (state: GameState, kind: string, message: string): GameState =
 });
 const rejected = (state: GameState, message: string) =>
   withEvent({ ...state, violations: state.violations + 1 }, 'rejected', message);
-function schedule(bay: Barista, nowSec: number): Barista {
+function schedule(bay: Barista, nowSec: number, startFirst = false): Barista {
   let cursor = nowSec;
   const queue = bay.queue.map((ticket, index) => {
-    const start = index === 0 ? (ticket.status === 'brewing' ? (ticket.startTimeSec ?? nowSec) : nowSec) : cursor;
+    const brewing = index === 0 && (startFirst || ticket.status === 'brewing');
+    const start = brewing
+      ? ticket.status === 'brewing'
+        ? (ticket.startTimeSec ?? nowSec)
+        : nowSec
+      : cursor + (index === 0 ? 10 : 15);
     cursor = Math.max(nowSec, start + ticket.totalDurationSec);
     return {
       ...ticket,
-      status: index === 0 ? ('brewing' as const) : ('scheduled' as const),
+      status: brewing ? ('brewing' as const) : ('scheduled' as const),
       startTimeSec: start,
-      timeRemainingSec: index === 0 ? Math.max(0, start + ticket.totalDurationSec - nowSec) : undefined,
+      timeRemainingSec: brewing ? Math.max(0, start + ticket.totalDurationSec - nowSec) : undefined,
     };
   });
-  return { ...bay, queue, status: queue.length ? 'brewing' : 'standby' };
+  return { ...bay, queue, status: queue.some((ticket) => ticket.status === 'brewing') ? 'brewing' : 'standby' };
 }
 const toUnassigned = (ticket: OrderTicket): UnassignedOrder => ({
   ...ticket,
@@ -280,21 +295,148 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         ...state,
         unassigned: state.unassigned.filter((card) => keyOf(card) !== action.key),
         bays: state.bays.map((entry) =>
-          entry.id === bay.id ? schedule({ ...entry, queue: [...entry.queue, ticket] }, state.nowSec) : entry
+          entry.id === bay.id
+            ? schedule({ ...entry, queue: insertTicket(entry.queue, ticket, action.place, state.nowSec) }, state.nowSec)
+            : entry
         ),
       },
       'assign',
       `${order.id} ${itemAbbr(order.beanName)} → ${bay.id}番`
     );
   }
+  if (action.type === 'start' || action.type === 'unstart') {
+    const bay = state.bays.find((entry) => entry.id === action.bayId);
+    const ticket = bay?.queue[0];
+    if (!ticket || !bay) return state;
+    if (action.type === 'start' && ticket.status === 'brewing') return state;
+    if (
+      action.type === 'unstart' &&
+      (ticket.status !== 'brewing' || state.nowSec - (ticket.startTimeSec ?? state.nowSec) >= 60)
+    )
+      return state;
+    const updated =
+      action.type === 'start'
+        ? schedule(bay, state.nowSec, true)
+        : schedule(
+            {
+              ...bay,
+              queue: bay.queue.map((card, index) =>
+                index === 0
+                  ? { ...card, status: 'scheduled', startTimeSec: undefined, timeRemainingSec: undefined }
+                  : card
+              ),
+            },
+            state.nowSec
+          );
+    return withEvent(
+      { ...state, bays: state.bays.map((entry) => (entry.id === bay.id ? updated : entry)) },
+      action.type,
+      `${ticket.id} ${action.type === 'start' ? '抽出を開始' : '未着手に戻す'}`
+    );
+  }
+  if (action.type === 'rebrew') {
+    const source = state.bays
+      .flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])
+      .find((card) => keyOf(card) === action.key);
+    if (
+      !source ||
+      !action.reason.trim() ||
+      !Number.isInteger(action.cupCount) ||
+      action.cupCount < 1 ||
+      action.cupCount > source.cupCount
+    )
+      return state;
+    const target = state.bays.find((bay) => bay.id === action.bayId);
+    if (action.bayId !== null && (!target || !allowedBay(source, target)))
+      return rejected(state, '指名・上級生のみの条件を確認してください');
+    const ids = (source.trainingCupIds ?? []).slice(0, action.cupCount);
+    if (ids.length !== action.cupCount) return state;
+    const cups = { ...state.cups };
+    for (const id of ids)
+      cups[id] = { ...cups[id], completedSec: undefined, brewRatio: undefined, joinedAtSec: undefined };
+    const remake: UnassignedOrder = {
+      ...toUnassigned(source),
+      ticketUid: `rebrew-${source.ticketUid}-${state.events.length}`,
+      trainingCupIds: ids,
+      sourceCups: source.sourceCups?.filter((cup) => ids.includes(cup.id)),
+      cupCount: action.cupCount,
+      isRebrew: true,
+      rebrewOfTicketUid: source.ticketUid,
+      orderedAtSec: state.nowSec,
+      badgeTag: `${action.cupCount}杯 入れ直し`,
+    };
+    const bays = state.bays.map((bay) => {
+      let queue = bay.queue.flatMap((card) =>
+        keyOf(card) !== action.key
+          ? [card]
+          : action.interrupt
+            ? []
+            : [{ ...card, trainingCupIds: (card.trainingCupIds ?? []).filter((id) => !ids.includes(id)) }]
+      );
+      if (bay.id === target?.id)
+        queue = insertTicket(
+          queue,
+          { ...remake, status: 'scheduled', totalDurationSec: brewDuration(remake.beanName, remake.cupCount) },
+          undefined,
+          state.nowSec
+        );
+      return schedule(
+        {
+          ...bay,
+          queue,
+          pastTickets: bay.pastTickets?.map((card) =>
+            keyOf(card) === action.key
+              ? {
+                  ...card,
+                  trainingCupIds: (card.trainingCupIds ?? []).filter((id) => !ids.includes(id)),
+                  isInterrupted: true,
+                }
+              : card
+          ),
+        },
+        state.nowSec
+      );
+    });
+    return withEvent(
+      { ...state, cups, bays, unassigned: target ? state.unassigned : [...state.unassigned, remake] },
+      'rebrew',
+      `${source.id} ${action.cupCount}杯 入れ直し：${action.reason}`
+    );
+  }
+  if (action.type === 'split') {
+    const card = state.unassigned.find((entry) => keyOf(entry) === action.key);
+    if (card?.cupCount !== 2 || !card.trainingCupIds?.includes(action.cupId)) return state;
+    const parts = card.trainingCupIds.map((id) => ({
+      ...card,
+      id: `#${String(state.cups[id].orderId).padStart(3, '0')}`,
+      ticketUid: `split-${id}`,
+      sourceOrderIds: undefined,
+      cupCount: 1,
+      trainingCupIds: [id],
+      sourceCups: card.sourceCups?.filter((cup) => cup.id === id),
+      badgeTag: '1杯',
+    }));
+    return withEvent(
+      { ...state, unassigned: [...state.unassigned.filter((entry) => entry !== card), ...parts] },
+      'split',
+      `${card.id}を1杯ずつに分離`
+    );
+  }
   if (action.type === 'complete') {
     const bay = state.bays.find((entry) => entry.id === action.bayId);
     const ticket = bay?.queue[0];
-    if (!bay || !ticket) return state;
+    if (!bay || !ticket || ticket.status !== 'brewing' || state.nowSec - (ticket.startTimeSec ?? state.nowSec) < 60)
+      return state;
     const ratio = (state.nowSec - (ticket.startTimeSec ?? state.nowSec)) / ticket.totalDurationSec;
     const cups = { ...state.cups };
     for (const id of ticket.trainingCupIds ?? [])
-      cups[id] = { ...cups[id], completedSec: state.nowSec, brewRatio: ratio };
+      cups[id] = {
+        ...cups[id],
+        completedSec: state.nowSec,
+        brewRatio:
+          (state.nowSec - Math.max(ticket.startTimeSec ?? state.nowSec, cups[id].joinedAtSec ?? 0)) /
+          ticket.totalDurationSec,
+      };
     return withEvent(
       {
         ...state,
@@ -310,7 +452,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                     { ...ticket, status: 'completed', completedAtSec: state.nowSec, endTimeSec: state.nowSec },
                   ],
                 },
-                state.nowSec
+                state.nowSec,
+                true
               )
             : entry
         ),
@@ -326,15 +469,20 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     if (action.type === 'move' && (!target || !allowedBay(ticket, target)))
       return rejected(state, '指名・上級生のみの条件を確認してください');
     const from = state.bays.find((bay) => bay.queue.includes(ticket));
-    if (target?.id === from?.id) return state;
+    if (target?.id === from?.id && action.type === 'move' && !action.place) return state;
     const bays = state.bays.map((bay) =>
       schedule(
         {
           ...bay,
-          queue: [
-            ...bay.queue.filter((card) => keyOf(card) !== action.key),
-            ...(bay.id === target?.id ? [{ ...ticket, status: 'scheduled' as const, startTimeSec: undefined }] : []),
-          ],
+          queue:
+            bay.id === target?.id
+              ? insertTicket(
+                  bay.queue,
+                  { ...ticket, status: 'scheduled', startTimeSec: undefined, timeRemainingSec: undefined },
+                  action.type === 'move' ? action.place : undefined,
+                  state.nowSec
+                )
+              : bay.queue.filter((card) => keyOf(card) !== action.key),
         },
         state.nowSec
       )
@@ -349,33 +497,17 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       `${ticket.id} ${target ? `${target.id}番へ移動` : '未割当に戻す'}${ticket.status === 'brewing' ? '（抽出時間をリセット）' : ''}`
     );
   }
-  const first = state.unassigned.find((card) => keyOf(card) === action.first);
-  const second = state.unassigned.find((card) => keyOf(card) === action.second);
-  if (
-    !first ||
-    !second ||
-    first === second ||
-    first.cupCount !== 1 ||
-    second.cupCount !== 1 ||
-    first.beanName !== second.beanName ||
-    first.preferredBaristaId !== second.preferredBaristaId
-  )
-    return state;
-  const sourceOrderIds = [
-    ...new Set([...(first.sourceOrderIds ?? [first.id]), ...(second.sourceOrderIds ?? [second.id])]),
-  ].sort();
-  const merged = {
-    ...first,
-    id: sourceOrderIds.join('+'),
-    ticketUid: `merge-${keyOf(first)}-${keyOf(second)}`,
-    cupCount: 2,
-    trainingCupIds: [...(first.trainingCupIds ?? []), ...(second.trainingCupIds ?? [])],
-    sourceOrderIds,
-  };
+  const result = mergeBoardCards(state.bays, state.unassigned, action.first, action.second);
+  if (!result) return state;
+  if (result.targetBay && !allowedBay(result.merged, result.targetBay))
+    return rejected(state, '指名・上級生のみの条件を確認してください');
+  const cups = { ...state.cups };
+  if ('status' in result.merged && result.merged.status === 'brewing')
+    for (const id of result.joinedIds) cups[id] = { ...cups[id], joinedAtSec: state.nowSec };
   return withEvent(
-    { ...state, unassigned: [...state.unassigned.filter((card) => card !== first && card !== second), merged] },
+    { ...state, cups, bays: result.bays.map((bay) => schedule(bay, state.nowSec)), unassigned: result.orders },
     'merge',
-    `${sourceOrderIds.join(' + ')}を2杯抽出に統合`
+    `${result.merged.id}を2杯抽出に統合`
   );
 }
 
@@ -384,7 +516,7 @@ export function scoreGame(state: GameState) {
   const total = cups.length;
   const done = cups.filter((cup) => cup.completedSec !== undefined);
   const good = done.filter((cup) => (cup.brewRatio ?? 0) >= 0.9);
-  const timely = good.filter((cup) => (cup.completedSec ?? 0) - cup.arrivedSec <= 360);
+  const timely = good.filter((cup) => (cup.completedSec ?? 0) - cup.arrivedSec <= 480);
   const groups = new Map<number, CupResult[]>();
   for (const cup of cups) groups.set(cup.orderId, [...(groups.get(cup.orderId) ?? []), cup]);
   const together = [...groups.values()].filter(
@@ -397,7 +529,7 @@ export function scoreGame(state: GameState) {
   const categories = [
     { label: '仕上げた杯数', points: 45 * ratio(done.length), max: 45, detail: `${done.length} / ${total}杯` },
     {
-      label: '6分以内の提供準備',
+      label: '8分以内の提供準備',
       points: 25 * ratio(timely.length),
       max: 25,
       detail: `${timely.length} / ${total}杯（品質を満たした杯のみ）`,
@@ -430,8 +562,8 @@ export function scoreGame(state: GameState) {
       ? '「次へ」を早く押しすぎています。残り時間を見て抽出品質を守りましょう。'
       : '完了した杯の抽出時間は適切でした。',
     timely.length < good.length
-      ? '6分を超えた杯があります。注文の古い順とレーンの空きを確認しましょう。'
-      : '品質を満たした杯はすべて6分以内に準備できました。',
+      ? '8分を超えた杯があります。注文の古い順とレーンの空きを確認しましょう。'
+      : '品質を満たした杯はすべて8分以内に準備できました。',
     together.length < groups.size
       ? '複数杯の注文は仕上がりの差を60秒以内に。統合と並行抽出を使いましょう。'
       : '同一注文の仕上がりがそろっています。',

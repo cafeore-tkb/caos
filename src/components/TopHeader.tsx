@@ -1,25 +1,21 @@
 import {
   BarChart3,
+  Bean,
   CalendarClock,
-  ChevronLeft,
-  ChevronRight,
-  Coffee,
   Database,
   Gamepad2,
-  LayoutGrid,
-  Pause,
-  Play,
-  RotateCcw,
+  History,
+  Search,
   Undo2,
   Volume2,
   VolumeX,
 } from 'lucide-react';
 import type React from 'react';
+import { useState } from 'react';
+import settingsIcon from '../current-caos/icons/change-dripper.svg';
 import type { PosConnectionStatus } from '../hooks/usePosOrders';
 import { CONTROL_VIEWS, type ControlViewMode } from './ControlWorkspace';
-
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
-
 interface TopHeaderProps {
   activeTab: NavTab;
   controlViewMode: ControlViewMode;
@@ -45,230 +41,184 @@ interface TopHeaderProps {
   onOpenTestPlay: () => void;
   onEndTestPlay: () => void;
   posStatus: PosConnectionStatus;
+  onSearchOrder?: (no: number) => void;
+  onOpenPastOrders?: () => void;
 }
-
-const POS_STATUS_LABEL: Record<PosConnectionStatus, string> = {
-  off: '実データテスト中は停止',
-  connecting: '接続中',
-  open: '接続済み',
-  reconnecting: '再接続中',
-};
-
-export const TopHeader: React.FC<TopHeaderProps> = ({
-  activeTab,
-  controlViewMode,
-  onSelectTab,
-  onSelectControlViewMode,
-  timeStr,
-  unassignedCups,
-  totalWaitingCups,
-  soundEnabled,
-  onToggleSound,
-  isRunning,
-  onTogglePlay,
-  simSpeed,
-  onChangeSpeed,
-  onResetData,
-  showTimelineControls,
-  onTimelineNavigate,
-  canUndo,
-  undoLabel,
-  onUndo,
-  testPlaying,
-  testProgressLabel,
-  onOpenTestPlay,
-  onEndTestPlay,
-  posStatus,
-}) => {
-  const navItems = [
-    { id: 'control' as const, label: 'CaOS', icon: null },
-    { id: 'bays' as const, label: 'ドリッパー', icon: LayoutGrid },
-    { id: 'beans' as const, label: '豆キュー', icon: Coffee },
-    { id: 'analytics' as const, label: '実績', icon: BarChart3 },
-  ];
-
+export const TopHeader: React.FC<TopHeaderProps> = (props) => {
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [digits, setDigits] = useState('');
+  const nav = [
+    { id: 'control', label: 'CaOS', icon: null },
+    { id: 'bays', label: 'ドリッパー', icon: null },
+    { id: 'beans', label: '豆残量確認', icon: Bean },
+    { id: 'analytics', label: '実績', icon: BarChart3 },
+  ] as const;
+  const cell =
+    'flex h-11 min-w-10 shrink-0 items-center justify-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-black';
   return (
-    <header className="min-h-[56px] overflow-x-auto bg-white border-b border-[#e2e8f0] px-2 flex items-center justify-between gap-2 shadow-xs select-none shrink-0">
-      {/* Left side: Clock and Top Metrics */}
-      <div className="flex min-w-0 items-center gap-2">
-        <nav
-          className="flex shrink-0 items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1"
-          aria-label="画面切替"
-        >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = activeTab === item.id;
-            return (
+    <>
+      <header className="relative z-[110] flex min-h-14 shrink-0 items-center justify-between gap-2 overflow-x-auto border-b border-slate-200 bg-white px-2 py-1">
+        <div className="flex shrink-0 items-center gap-2">
+          <nav
+            className="flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-100 p-1"
+            aria-label="画面切替"
+          >
+            {nav.map(({ id, label, icon: Icon }) => (
               <button
-                key={item.id}
-                id={`nav-tab-${item.id}`}
                 type="button"
-                onClick={() => onSelectTab(item.id)}
-                aria-pressed={active}
-                title={item.label}
-                className={`flex h-10 min-w-10 items-center justify-center gap-1 rounded-md px-2 text-[11px] font-black touch-manipulation ${active ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                key={id}
+                aria-label={label}
+                aria-pressed={props.activeTab === id}
+                onClick={() => props.onSelectTab(id)}
+                className={`${cell} ${props.activeTab === id ? '!border-slate-950 !bg-slate-950 !text-white' : 'text-slate-600'}`}
               >
-                {Icon && <Icon className="h-4 w-4" />}
-                <span className={item.id === 'control' ? '' : 'hidden 2xl:inline'}>{item.label}</span>
+                {id === 'control' ? (
+                  'CaOS'
+                ) : Icon ? (
+                  <Icon size={16} />
+                ) : (
+                  <span
+                    className="h-4 w-4 bg-current"
+                    style={{ maskImage: `url(${settingsIcon})`, maskSize: 'contain', maskRepeat: 'no-repeat' }}
+                  />
+                )}
               </button>
-            );
-          })}
-          {activeTab === 'control' && (
-            <div
-              className="ml-0.5 flex items-center gap-0.5 border-l border-slate-300 pl-1"
-              role="group"
-              aria-label="管制盤の表示切替"
-            >
+            ))}
+            <div className="ml-1 flex gap-1 border-l border-slate-300 pl-1" role="group" aria-label="管制盤の表示切替">
               {(Object.keys(CONTROL_VIEWS) as ControlViewMode[]).map((mode) => (
                 <button
-                  key={mode}
                   type="button"
-                  aria-pressed={controlViewMode === mode}
-                  onClick={() => onSelectControlViewMode(mode)}
-                  className={`h-10 min-w-9 rounded-md text-[12px] font-black touch-manipulation ${controlViewMode === mode ? 'bg-blue-700 text-white' : 'bg-white text-slate-600'}`}
+                  key={mode}
+                  aria-pressed={props.controlViewMode === mode}
+                  onClick={() => props.onSelectControlViewMode(mode)}
+                  className={`${cell} ${props.controlViewMode === mode ? '!border-blue-700 !bg-blue-700 !text-white' : 'text-slate-600'}`}
                 >
                   {CONTROL_VIEWS[mode]}
                 </button>
               ))}
             </div>
+          </nav>
+          <div className="min-w-0">
+            <div className="font-mono text-[27px] font-black leading-none">{props.timeStr}</div>
+            <div className="mt-1 max-w-52 truncate text-[10px] text-slate-500">
+              ↶ {props.undoLabel ?? '直前の操作なし'}
+            </div>
+          </div>
+          {props.showTimelineControls && (
+            <button
+              type="button"
+              aria-pressed
+              onClick={() => props.onTimelineNavigate('now')}
+              className="flex h-11 flex-col items-center justify-center rounded-md bg-red-500 px-3 text-[11px] font-black text-white"
+            >
+              <span className="h-2 w-2 rounded-full bg-white" />
+              現在
+            </button>
           )}
-        </nav>
-
-        {/* Large Digital Clock */}
-        <div className="flex items-center gap-2">
-          <div className="font-mono text-[28px] font-bold tracking-tight text-[#0f172a] leading-none">{timeStr}</div>
-          {/* Quick Sim Controls */}
-          <div className="flex items-center gap-1 bg-[#f1f5f9] p-1 rounded-md border border-[#e2e8f0]">
-            <button
-              id="sim-play-pause-btn"
-              onClick={onTogglePlay}
-              title={isRunning ? '一時停止' : 'タイマー再開'}
-              className="w-10 h-10 hover:bg-white text-slate-700 rounded-lg transition-colors text-xs flex items-center justify-center touch-manipulation"
-            >
-              {isRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-            </button>
-            <button
-              id="sim-speed-btn"
-              onClick={() => onChangeSpeed(simSpeed === 1 ? 2 : simSpeed === 2 ? 5 : simSpeed === 5 ? 10 : 1)}
-              title="シミュレーション速度切替"
-              className="min-w-10 h-10 px-1.5 hover:bg-white text-[11px] font-mono font-bold text-slate-700 rounded-lg transition-colors touch-manipulation"
-            >
-              {simSpeed}x
-            </button>
-            <button
-              id="sim-reset-btn"
-              onClick={onResetData}
-              title="初期状態にリセット"
-              className="w-10 h-10 hover:bg-white text-slate-600 rounded-lg transition-colors flex items-center justify-center touch-manipulation"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-            {showTimelineControls && (
-              <div className="ml-1 flex items-center gap-1 border-l border-slate-300 pl-1">
-                <button
-                  type="button"
-                  onClick={() => onTimelineNavigate('back')}
-                  title="5分前を表示"
-                  className="h-10 px-2 rounded-lg border border-slate-300 bg-white text-[12px] font-black text-slate-700 flex items-center gap-0.5 touch-manipulation"
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                  −5分
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onTimelineNavigate('now')}
-                  title="現在時刻へ戻る"
-                  className="h-10 px-3 rounded-lg bg-red-500 text-[12px] font-black text-white flex items-center gap-1 touch-manipulation"
-                >
-                  <span className="h-2 w-2 rounded-full bg-white" />
-                  現在
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onTimelineNavigate('forward')}
-                  title="5分先を表示"
-                  className="h-10 px-2 rounded-lg border border-slate-300 bg-white text-[12px] font-black text-slate-700 flex items-center gap-0.5 touch-manipulation"
-                >
-                  ＋5分
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            )}
-          </div>
         </div>
-
-        {/* Metric 1: 未割当オーダー (Unassigned Orders) */}
-        <div className="hidden xl:flex bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 items-baseline gap-1.5">
-          <span className="text-[12px] font-semibold text-[#475569]">未割当オーダー</span>
-          <div className="flex items-baseline font-mono">
-            <span className="text-[19px] font-extrabold text-[#ef4444] leading-none">{unassignedCups}</span>
-            <span className="text-[12px] font-bold text-[#475569] ml-1">杯</span>
-          </div>
+        <div className="flex shrink-0 items-center gap-1">
+          <button type="button" className={cell} aria-label="注文番号で探す" onClick={() => setSearchOpen(!searchOpen)}>
+            <Search size={16} />
+            番号
+          </button>
+          <output
+            aria-label={`cafeore-pos ${props.posStatus}`}
+            className={`${cell} ${props.posStatus === 'open' ? 'text-emerald-700' : 'text-amber-700'}`}
+          >
+            <Database size={16} />
+            <span
+              className={`h-2 w-2 rounded-full ${props.posStatus === 'open' ? 'bg-emerald-500' : 'bg-amber-400'}`}
+            />
+          </output>
+          <button
+            type="button"
+            onClick={props.testPlaying ? props.onEndTestPlay : props.onOpenTestPlay}
+            className={`${cell} !border-blue-300 !bg-blue-50 text-blue-900`}
+          >
+            <CalendarClock size={16} />
+            {props.testPlaying ? `終了 ${props.testProgressLabel ?? ''}` : 'テスト'}
+          </button>
+          <a href="#training" className={`${cell} !border-emerald-800 !bg-emerald-800 text-white`}>
+            <Gamepad2 size={16} />
+            ゲーム
+          </a>
+          <button
+            type="button"
+            aria-label={props.soundEnabled ? '通知音 ON' : '通知音 OFF'}
+            onClick={props.onToggleSound}
+            className={cell}
+          >
+            {props.soundEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+          </button>
+          <button
+            type="button"
+            className={cell}
+            onClick={props.onOpenPastOrders ?? (() => props.onSelectTab('analytics'))}
+          >
+            <History size={16} />
+            過去の注文
+          </button>
+          <button
+            type="button"
+            className={cell}
+            disabled={!props.canUndo}
+            aria-label="直前の操作を戻す"
+            onClick={props.onUndo}
+          >
+            <Undo2 size={16} />
+          </button>
         </div>
-
-        {/* Metric 2: 全ベイ待機杯数 (Total Queued Cups in Bays) */}
-        <div className="hidden xl:flex bg-[#eef5fc] border border-[#d3e5f8] rounded-md px-3 py-1.5 items-baseline gap-1.5">
-          <span className="text-[12px] font-semibold text-[#475569]">全ドリッパー待機杯数</span>
-          <div className="flex items-baseline font-mono">
-            <span className="text-[19px] font-extrabold text-[#0f172a] leading-none">{totalWaitingCups}</span>
-            <span className="text-[12px] font-bold text-[#475569] ml-1">杯</span>
-          </div>
+      </header>
+      {props.testPlaying && (
+        <div className="flex shrink-0 items-center gap-3 border-b border-blue-200 bg-blue-50 px-3 py-1 text-[12px] font-bold">
+          <span>テストの盤面</span>
+          <button type="button" className="min-h-9 rounded border bg-white px-3" onClick={props.onTogglePlay}>
+            {props.isRunning ? '一時停止' : '再開'}
+          </button>
+          <select
+            value={props.simSpeed}
+            aria-label="テスト再生速度"
+            onChange={(event) => props.onChangeSpeed(Number(event.target.value))}
+          >
+            {[1, 2, 5, 10].map((speed) => (
+              <option value={speed} key={speed}>
+                {speed}倍
+              </option>
+            ))}
+          </select>
+          <button type="button" onClick={props.onEndTestPlay}>
+            終了・実績
+          </button>
         </div>
-      </div>
-
-      {/* Right side: only persistent operational controls */}
-      <div className="flex items-center gap-2">
-        <a
-          href="#training"
-          className="flex min-h-11 items-center gap-1 rounded-lg bg-emerald-800 px-3 text-xs font-black text-white"
+      )}
+      {searchOpen && (
+        <form
+          className="absolute top-16 right-3 z-[150] flex items-center gap-2 rounded-xl border border-slate-300 bg-white p-4 shadow-xl"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (digits) props.onSearchOrder?.(Number(digits));
+            setSearchOpen(false);
+          }}
         >
-          <Gamepad2 className="h-4 w-4" />
-          ゲーム
-        </a>
-        <div
-          role="status"
-          aria-label={`cafeore-pos ${POS_STATUS_LABEL[posStatus]}`}
-          title={`cafeore-posの注文: ${POS_STATUS_LABEL[posStatus]}`}
-          className={`min-h-[44px] flex items-center gap-1 rounded-lg border px-2 text-xs font-black ${posStatus === 'open' ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : posStatus === 'off' ? 'border-slate-200 bg-slate-100 text-slate-400' : 'border-amber-300 bg-amber-50 text-amber-800'}`}
-        >
-          <Database className="h-4 w-4" />
-          <span
-            className={`h-2 w-2 rounded-full ${posStatus === 'open' ? 'bg-emerald-500' : posStatus === 'off' ? 'bg-slate-300' : 'bg-amber-400'}`}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={testPlaying ? onEndTestPlay : onOpenTestPlay}
-          className={`min-h-[44px] flex items-center gap-1.5 rounded-lg border px-3 text-xs font-black shadow-xs touch-manipulation ${testPlaying ? 'border-blue-700 bg-blue-700 text-white' : 'border-blue-300 bg-blue-50 text-blue-900 hover:bg-blue-100'}`}
-          title={testPlaying ? 'テストプレイを終了して実績を表示' : '2025年の実データでテストプレイ'}
-        >
-          {testPlaying ? <BarChart3 className="h-4 w-4" /> : <CalendarClock className="h-4 w-4" />}
-          <span>{testPlaying ? `終了・実績 ${testProgressLabel || ''}` : '実データテスト'}</span>
-        </button>
-        <button
-          id="btn-undo"
-          type="button"
-          disabled={!canUndo}
-          onClick={onUndo}
-          title={undoLabel ? `${undoLabel}を元に戻す` : '元に戻せる操作はありません'}
-          className="min-h-[44px] flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-xs font-black text-slate-800 shadow-xs transition-colors hover:bg-slate-100 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 touch-manipulation"
-        >
-          <Undo2 className="w-4 h-4" />
-          <span>1つ戻す</span>
-        </button>
-
-        {/* Sound toggle */}
-        <button
-          id="btn-toggle-sound"
-          onClick={onToggleSound}
-          title={soundEnabled ? '通知音 ON' : '通知音 消音'}
-          className={`w-11 h-11 rounded-lg border text-xs transition-colors flex items-center justify-center touch-manipulation ${
-            soundEnabled ? 'bg-[#f1f5f9] text-slate-700 border-[#cbd5e1]' : 'bg-red-50 text-red-500 border-red-200'
-          }`}
-        >
-          {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
-        </button>
-      </div>
-    </header>
+          <label className="text-sm font-bold">
+            注文番号{' '}
+            <input
+              aria-label="探す注文番号"
+              inputMode="numeric"
+              pattern="[0-9]{1,4}"
+              value={digits}
+              onChange={(event) => setDigits(event.target.value.replace(/\D/g, '').slice(0, 4))}
+              className="w-24 rounded border border-slate-300 p-2 font-mono"
+            />
+          </label>
+          <button type="submit" className={cell}>
+            探す
+          </button>
+          <button type="button" className={cell} onClick={() => setSearchOpen(false)}>
+            閉じる
+          </button>
+        </form>
+      )}
+    </>
   );
 };
