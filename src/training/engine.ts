@@ -30,6 +30,7 @@ export const MODES = {
 export interface ScenarioOrder {
   orderId: number;
   atSec: number;
+  comments?: string[];
   items: { name: string; quantity: number; nominee?: number }[];
 }
 export interface Scenario {
@@ -114,6 +115,15 @@ export function parseScenario(input: unknown): Scenario {
       order.items.length > 12
     )
       throw new Error('注文番号・到着時刻が不正です（最後の6分30秒は仕上げ時間です）');
+    if (
+      order.comments !== undefined &&
+      (!Array.isArray(order.comments) ||
+        order.comments.length > 3 ||
+        order.comments.some(
+          (comment) => typeof comment !== 'string' || comment.trim().length === 0 || comment.length > 200
+        ))
+    )
+      throw new Error('コメントは1件200文字以内、1注文3件までにしてください');
     seen.add(order.orderId);
     for (const item of order.items) {
       if (
@@ -133,7 +143,11 @@ export function parseScenario(input: unknown): Scenario {
   return {
     ...value,
     orders: value.orders
-      .map((order) => ({ ...order, items: order.items.map((item) => ({ ...item })) }))
+      .map((order) => ({
+        ...order,
+        ...(order.comments ? { comments: order.comments.map((comment) => comment.trim()) } : {}),
+        items: order.items.map((item) => ({ ...item })),
+      }))
       .sort((a, b) => a.atSec - b.atSec || a.orderId - b.orderId),
   };
 }

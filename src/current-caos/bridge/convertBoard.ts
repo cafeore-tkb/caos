@@ -3,6 +3,7 @@ import { itemAbbr, itemType, masterColor, seniorOnly } from '../../training/mast
 import type { OrderTicket, UnassignedOrder } from '../../types';
 import type { CaosBoardCup, CaosCard } from '../common';
 import type { CardLooks } from '../logic/cards';
+import { type CommentsByOrder, cardComments } from '../logic/comments';
 import { boardLanes, cardPlaces } from '../logic/lanes';
 import type { UnfinishedOrder } from '../logic/unfinished';
 
@@ -12,6 +13,12 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
   const epoch = props.clockOriginMs ?? Math.floor((Date.now() + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
   const nowMs = epoch + props.currentTimeSec * 1000;
   const originals = new Map<string, CardInput>();
+  const commentsByOrder: CommentsByOrder = new Map(
+    [...new Set(props.orderComments?.map((comment) => comment.orderId) ?? [])].map((id) => [
+      id,
+      props.orderComments?.filter((comment) => comment.orderId === id) ?? [],
+    ])
+  );
   const convert = (input: CardInput, bayId: number | null, position: number): CaosCard => {
     const key = keyOf(input);
     originals.set(key, input);
@@ -107,6 +114,7 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
     cards.map((card) => [
       card.key,
       {
+        comments: cardComments(card, commentsByOrder),
         color: masterColor(card.cups[0].item.name, card.nominatedDripper !== null),
         offSenior:
           card.seniorOnly &&
@@ -132,11 +140,11 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
         readyCups: 0,
         emergency: entries.some((card) => card.emergency),
         cards: entries.map((card) => ({ card, place: places.get(card.key) ?? '未割当' })),
-        comments: [],
+        comments: commentsByOrder.get(cups[0].orderId) ?? [],
         waitSec,
         late: waitSec > 900,
       };
     })
     .sort((a, b) => a.orderNo - b.orderNo);
-  return { cards, lanes, looks, nowMs, originals, rows };
+  return { cards, lanes, looks, nowMs, originals, rows, comments: props.orderComments ?? [] };
 }

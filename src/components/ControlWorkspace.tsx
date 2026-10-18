@@ -1,6 +1,7 @@
 import type React from 'react';
 import { LegacyBoard } from '../current-caos/bridge/LegacyBoard';
 import type { CaosPlace } from '../current-caos/common';
+import type { BoardComment } from '../current-caos/logic/comments';
 import type { Barista, OrderTicket, UnassignedOrder } from '../types';
 
 import type { ControlViewMode } from '../utils/controlViews';
@@ -14,6 +15,7 @@ export interface ControlViewProps {
   actionTicketKey: string | null;
   currentTimeSec: number;
   clockOriginMs?: number;
+  orderComments?: readonly BoardComment[];
   onUnstartBay?: (bayId: number) => void;
   onSplitCup?: (key: string, cupId: string) => void;
   onOpenLane?: (bayId: number) => void;

@@ -13,7 +13,8 @@
           "name": "余音ブレンド",
           "quantity": 1
         }
-      ]
+      ],
+      "comments": ["同じ注文の商品は、そろえてお渡しします。"]
     },
     {
       "orderId": 2,
@@ -21,7 +22,8 @@
       "items": [
         {
           "name": "珈琲・俺ブレンド",
-          "quantity": 2
+          "quantity": 2,
+          "nominee": 4
         }
       ]
     },
@@ -50,14 +52,16 @@
       "atSec": 144,
       "items": [
         {
-          "name": "余音ブレンド",
-          "quantity": 2
+          "name": "アロマナティーボ",
+          "quantity": 2,
+          "nominee": 6
         },
         {
           "name": "アイスミルク",
           "quantity": 1
         }
-      ]
+      ],
+      "comments": ["6番の方への指名です。少し待てる旨はお伝え済みです。"]
     },
     {
       "orderId": 6,

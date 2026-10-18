@@ -642,3 +642,15 @@
     height: 54px;
   }
 }
+
+.training-data-mix {
+  font-size: 12px;
+  color: #526a60;
+  margin: 0 0 12px;
+}
+.training-preview-comment {
+  display: block;
+  color: #006c70;
+  font-size: 12px;
+  margin-top: 4px;
+}
