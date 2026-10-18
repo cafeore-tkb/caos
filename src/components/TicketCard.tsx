@@ -1,7 +1,8 @@
-import { Check, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { BeanCode, OrderTicket } from '../types';
+import { OperationalCard } from './OperationalCard';
 
 interface TicketCardProps {
   ticket: OrderTicket;
@@ -39,15 +40,7 @@ export const TicketCard: React.FC<TicketCardProps> = ({
   const isMatchFilter = !highlightFilter || highlightFilter === ticket.beanCode;
   const isOrderSelected = selectedOrderId === ticket.id;
 
-  // Operational color is reserved for drinks that require a special finish/person.
-  let leftBorderColor = 'border-l-slate-400';
-  if (ticket.beanCode === 'SP') leftBorderColor = 'border-l-[#059669]';
-  if (ticket.beanCode === 'ICE') leftBorderColor = 'border-l-[#06b6d4]';
-  if (ticket.beanCode === 'MILK') leftBorderColor = 'border-l-[#8b5cf6]';
-
   const isCompleted = ticket.status === 'completed';
-  const isRebrew = Boolean(ticket.isRebrew);
-  const isNamed = Boolean(ticket.preferredBaristaId);
   const ticketKey = ticket.ticketUid || `${ticket.id}-${ticket.itemIndex || 1}`;
   const isActionOpen = ticket.status === 'scheduled' && actionTicketKey === ticketKey;
   // While dragging, cancel the card's offset on the pad so the finger can slide onto 1-6.
@@ -146,17 +139,16 @@ export const TicketCard: React.FC<TicketCardProps> = ({
         ...(widthPx ? { width: `${widthPx}px` } : {}),
         ...(dragOffset ? { transform: `translate3d(${dragOffset.x}px, ${dragOffset.y}px, 0)` } : {}),
       }}
-      className={`relative group h-full ${dragOffset ? `${isActionOpen ? 'overflow-visible' : 'overflow-hidden'} z-[120] scale-[1.03] opacity-90 shadow-2xl ring-2 ring-blue-500` : isActionOpen ? 'overflow-visible z-[80]' : 'overflow-hidden'} shrink-0 min-w-[135px] rounded-lg border-2 border-l-[5px] ${leftBorderColor} px-2 py-1.5 transition-[box-shadow,border-color] select-none flex flex-col justify-center ${ticket.status === 'scheduled' ? 'cursor-grab active:cursor-grabbing touch-none' : 'cursor-default touch-manipulation'} ${
-        isRebrew
-          ? `bg-red-50 border-red-300 text-slate-900 shadow-xs ${isCompleted ? 'opacity-55 hover:opacity-75' : 'hover:border-red-500 hover:shadow-md'}`
-          : isCompleted
-            ? 'bg-slate-100 border-slate-200 text-slate-500 opacity-50 hover:opacity-70'
-            : isNamed
-              ? 'bg-violet-50 border-violet-300 hover:border-violet-400 shadow-xs hover:shadow-md'
-              : 'bg-white border-[#cbd5e1] hover:border-slate-400 shadow-xs hover:shadow-md'
-      } ${
-        isOrderSelected ? 'ring-4 ring-amber-400 border-amber-500 bg-amber-50/95 shadow-xl scale-[1.02] z-20' : ''
-      } ${!isMatchFilter ? 'opacity-25 blur-[0.5px]' : ''}`}
+      role="button"
+      tabIndex={0}
+      aria-label={`${ticket.id} ${ticket.beanName} ${ticket.cupCount}杯の操作`}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          event.currentTarget.click();
+        }
+      }}
+      className={`relative group h-full shrink-0 min-w-[135px] rounded-lg ${dragOffset || isActionOpen ? 'overflow-visible z-[80]' : 'overflow-hidden'} ${ticket.status === 'scheduled' ? 'cursor-grab active:cursor-grabbing touch-none' : 'cursor-pointer touch-manipulation'} ${isOrderSelected ? 'ring-4 ring-amber-400' : ''} ${!isMatchFilter ? 'opacity-25' : ''}`}
     >
       {dragOffset && dragTargetBay && (
         <div className="absolute right-1 top-1 z-[130] rounded-full bg-blue-700 px-2 py-1 font-mono text-[12px] font-black text-white shadow-md pointer-events-none">
@@ -212,78 +204,10 @@ export const TicketCard: React.FC<TicketCardProps> = ({
           </div>
         </>
       )}
-      {/* Top row: Ticket ID and Badges */}
-      <div>
-        <div className="flex items-center justify-between gap-1 mb-1">
-          <div className="flex items-center gap-1 min-w-0">
-            {/* Large Order Number Label */}
-            <span
-              className={`font-mono text-[22px] font-black tracking-tight leading-none ${
-                isRebrew
-                  ? 'text-red-700'
-                  : isOrderSelected
-                    ? 'text-amber-900 font-black'
-                    : isNamed
-                      ? 'text-violet-700'
-                      : isCompleted
-                        ? 'text-slate-500'
-                        : ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1
-                          ? 'text-slate-950'
-                          : 'text-slate-600'
-              }`}
-            >
-              {ticket.id}
-            </span>
-
-            {/* Cup count badge */}
-            <span className="bg-slate-950 text-white text-[15px] font-mono font-black px-2 py-1 rounded-md leading-none shadow-2xs whitespace-nowrap shrink-0">
-              {ticket.cupCount}杯
-            </span>
-
-            {ticket.preferredBaristaId && (
-              <span className="rounded bg-violet-700 px-1.5 py-0.5 text-[11px] font-black text-white">指名</span>
-            )}
-            {isRebrew && (
-              <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-black text-white">
-                {ticket.status === 'brewing' ? '入れ直し中' : '入れ直し'}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            {isCompleted && !ticket.isInterrupted && (
-              <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-bold px-1.5 py-0.5 rounded leading-none flex items-center gap-0.5">
-                <Check className="w-3 h-3" />
-                <span className="sr-only">完了</span>
-              </span>
-            )}
-            {ticket.isInterrupted && (
-              <span className="rounded border border-red-300 bg-red-50 px-1.5 py-0.5 text-[10px] font-black text-red-700">
-                中断
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Coffee Name */}
-        <div className="flex items-baseline gap-2">
-          <span
-            className={`text-[14px] font-bold truncate leading-tight tracking-tight flex-1 ${
-              isOrderSelected ? 'text-amber-950 font-black' : isCompleted ? 'text-slate-600' : 'text-slate-900'
-            }`}
-            title={ticket.beanName}
-          >
-            {ticket.beanName}
-          </span>
-          {ticket.totalItemsInOrder && ticket.totalItemsInOrder > 1 && (
-            <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-mono font-black text-slate-700 whitespace-nowrap shrink-0">
-              {ticket.itemIndex}/{ticket.totalItemsInOrder}・計{ticket.totalOrderCups}杯
-            </span>
-          )}
-        </div>
-
-        {/* Order Notes (e.g. チャンプ 2杯 + 俺ブレ 1杯) */}
-      </div>
+      <OperationalCard
+        card={ticket}
+        note={isCompleted ? (ticket.isInterrupted ? '中断' : '完了') : ticket.status === 'brewing' ? '抽出中' : '待機'}
+      />
     </div>
   );
 };

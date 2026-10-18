@@ -21,6 +21,7 @@ export interface BeanItem {
 }
 
 export interface OrderTicket {
+  trainingCupIds?: string[];
   id: string; // e.g. "#152"
   ticketUid?: string; // unique identifier for React keys, e.g. "152-1", "152-2"
   itemIndex?: number; // e.g. 1 (of 2 items in order #152)
@@ -70,6 +71,7 @@ export interface Barista {
 }
 
 export interface UnassignedOrder {
+  trainingCupIds?: string[];
   id: string; // e.g. "#162"
   ticketUid?: string; // unique identifier e.g. "162-1", "162-2"
   itemIndex?: number;

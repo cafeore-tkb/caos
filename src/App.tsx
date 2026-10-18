@@ -178,7 +178,7 @@ const historicalOrderToDripUnits = (order: HistoricalOrder): UnassignedOrder[] =
   return splitIntoDripUnits(source);
 };
 
-export default function App() {
+export default function App({ suspended = false }: { suspended?: boolean }) {
   const standaloneTab = (() => {
     const panel = new URLSearchParams(window.location.search).get('panel');
     return panel === 'bays' || panel === 'beans' || panel === 'analytics' ? panel : null;
@@ -246,7 +246,7 @@ export default function App() {
 
   // 普段は cafeore-pos と同じ DB の注文で動かす。実データテスト中（終了後の実績表示も含め、リセットするまで）は
   // DB からの取り込みを止め、テストの注文だけで盤面を動かす。
-  const posActive = !testPlaySession;
+  const posActive = !testPlaySession && !suspended;
   const { orders: posOrders, status: posStatus } = usePosOrders(posActive, POS_API_BASE_URL);
   const baristasRef = useRef(baristas);
   baristasRef.current = baristas;
@@ -332,7 +332,7 @@ export default function App() {
   }, [posActive, posOrders, posIngestEpoch]);
 
   useEffect(() => {
-    if (testPlayStatus !== 'active' || !isRunning) return;
+    if (testPlayStatus !== 'active' || !isRunning || suspended) return;
     // One test-play tick advances one second of historical time. The shared
     // speed control changes the tick frequency so the clock, timeline, order
     // arrivals, and brewing countdown all stay on the same multiplier.
@@ -347,7 +347,7 @@ export default function App() {
       );
     }, 1000 / simSpeed);
     return () => window.clearInterval(timer);
-  }, [testPlayStatus, isRunning, simSpeed]);
+  }, [testPlayStatus, isRunning, simSpeed, suspended]);
 
   useEffect(() => {
     if (
@@ -430,7 +430,7 @@ export default function App() {
 
   // Simulation timer loop
   useEffect(() => {
-    if (!isRunning) return;
+    if (!isRunning || suspended) return;
     const elapsedStep = 1;
 
     const interval = setInterval(() => {
@@ -464,7 +464,7 @@ export default function App() {
     }, 1000 / simSpeed);
 
     return () => clearInterval(interval);
-  }, [isRunning, simSpeed]);
+  }, [isRunning, simSpeed, suspended]);
 
   // Advance / complete a bay's active order
   const handleAdvanceBay = (bayId: number) => {
@@ -655,10 +655,10 @@ export default function App() {
   // over the current operational state.
   // biome-ignore lint/correctness/useExhaustiveDependencies: currentHour is the intentional trigger
   useEffect(() => {
-    if (currentHour === lastAutomaticShiftHour.current) return;
+    if (suspended || currentHour === lastAutomaticShiftHour.current) return;
     lastAutomaticShiftHour.current = currentHour;
     changeShift(false);
-  }, [currentHour]);
+  }, [currentHour, suspended]);
 
   const nextShiftHour = (realTime.getHours() + 1) % 24;
   const nextShiftLabel = `${nextShiftHour.toString().padStart(2, '0')}:00`;

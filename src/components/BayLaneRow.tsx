@@ -1,6 +1,7 @@
 import { ArrowRightCircle, Plus } from 'lucide-react';
 import type React from 'react';
 import type { Barista, BeanCode, OrderTicket } from '../types';
+import { LaneIndicator } from './LaneIndicator';
 import { TicketCard } from './TicketCard';
 
 interface BayLaneRowProps {
@@ -76,14 +77,12 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
   return (
     <div
       data-bay-target={barista.id}
-      className="flex items-center h-[72px] border-b border-[#e2e8f0] bg-white hover:bg-[#fcfdff] transition-colors relative touch-manipulation"
+      className="flex items-center h-[64px] border-b border-[#e2e8f0] bg-white hover:bg-[#fcfdff] transition-colors relative touch-manipulation"
     >
       {/* 1. Dripper information - stable locator on the far left */}
-      <div className="sticky left-0 z-[51] w-[195px] shrink-0 self-stretch px-2 py-1.5 flex items-center gap-2 bg-white border-r border-[#e2e8f0] isolate">
+      <div className="sticky left-0 z-[51] w-[195px] shrink-0 self-stretch px-2 py-1 flex items-center gap-2 bg-white border-r border-[#e2e8f0] isolate">
         {/* The number is a quiet locator; name and active order carry the hierarchy. */}
-        <div className="w-9 h-9 rounded-lg border border-slate-300 bg-slate-100 flex items-center justify-center text-slate-600 font-mono font-bold text-[18px] shrink-0">
-          {barista.bayNumber}
-        </div>
+        <LaneIndicator bay={barista} nowSec={simTimeSec} />
 
         <div className="flex flex-col justify-center min-w-0 flex-1 h-full">
           <div className="flex items-center gap-1 min-w-0 leading-none">
@@ -127,6 +126,7 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
           id={`bay-action-btn-${barista.id}`}
           disabled={barista.queue.length === 0}
           onClick={() => onAdvanceBay(barista.id)}
+          aria-label={`${barista.id}番 次へ`}
           className={`w-full min-h-[48px] rounded-lg font-black text-[15px] flex items-center justify-center gap-1.5 shadow-xs active:scale-95 touch-manipulation ${barista.queue.length === 0 ? 'bg-slate-200 text-slate-500' : isImminent ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-200' : 'bg-[#006c4a] text-white'}`}
           title={`${barista.name}の現在の抽出を確定して次へ`}
         >
@@ -136,7 +136,7 @@ export const BayLaneRow: React.FC<BayLaneRowProps> = ({
       </div>
 
       {/* 3. Timeline Track with Ticket Queue scaled by duration */}
-      <div className="relative h-[72px] py-1.5" style={{ width: `${timelineWidthPx}px` }}>
+      <div className="relative h-[64px] py-1" style={{ width: `${timelineWidthPx}px` }}>
         {positionedTickets.map(({ ticket, startSec, endSec }) => {
           // Drips that ended before the track starts would otherwise pile up at its left edge.
           if (endSec <= timelineStartSec) return null;
