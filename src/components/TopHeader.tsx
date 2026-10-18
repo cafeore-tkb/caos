@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Coffee,
   Database,
+  Gamepad2,
   LayoutGrid,
   Pause,
   Play,
@@ -15,7 +16,7 @@ import {
 } from 'lucide-react';
 import type React from 'react';
 import type { PosConnectionStatus } from '../hooks/usePosOrders';
-import type { ControlViewMode } from './ControlWorkspace';
+import { CONTROL_VIEWS, type ControlViewMode } from './ControlWorkspace';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
 
@@ -87,7 +88,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   ];
 
   return (
-    <header className="h-[56px] bg-white border-b border-[#e2e8f0] px-2 flex items-center justify-between gap-2 shadow-xs select-none shrink-0">
+    <header className="min-h-[56px] overflow-x-auto bg-white border-b border-[#e2e8f0] px-2 flex items-center justify-between gap-2 shadow-xs select-none shrink-0">
       {/* Left side: Clock and Top Metrics */}
       <div className="flex min-w-0 items-center gap-2">
         <nav
@@ -118,7 +119,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
               role="group"
               aria-label="管制盤の表示切替"
             >
-              {(['current', 'new', 'c', 'd'] as const).map((mode) => (
+              {(Object.keys(CONTROL_VIEWS) as ControlViewMode[]).map((mode) => (
                 <button
                   key={mode}
                   type="button"
@@ -126,7 +127,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                   onClick={() => onSelectControlViewMode(mode)}
                   className={`h-10 min-w-9 rounded-md text-[12px] font-black touch-manipulation ${controlViewMode === mode ? 'bg-blue-700 text-white' : 'bg-white text-slate-600'}`}
                 >
-                  {mode === 'current' ? 'A' : mode === 'new' ? 'B' : mode.toUpperCase()}
+                  {CONTROL_VIEWS[mode]}
                 </button>
               ))}
             </div>
@@ -217,6 +218,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Right side: only persistent operational controls */}
       <div className="flex items-center gap-2">
+        <a
+          href="#training"
+          className="flex min-h-11 items-center gap-1 rounded-lg bg-emerald-800 px-3 text-xs font-black text-white"
+        >
+          <Gamepad2 className="h-4 w-4" />
+          ゲーム
+        </a>
         <div
           role="status"
           aria-label={`cafeore-pos ${POS_STATUS_LABEL[posStatus]}`}

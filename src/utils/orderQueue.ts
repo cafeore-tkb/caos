@@ -10,6 +10,7 @@ export const canMergeDripUnits = (first: UnassignedOrder, second: UnassignedOrde
   first.cupCount === 1 &&
   second.cupCount === 1 &&
   first.beanCode === second.beanCode &&
+  first.beanName === second.beanName &&
   first.preferredBaristaId === second.preferredBaristaId;
 
 export const orderNumber = (id: string) => Number(id.match(/\d+/)?.[0]) || Number.MAX_SAFE_INTEGER;

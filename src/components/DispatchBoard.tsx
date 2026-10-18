@@ -185,7 +185,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-[#cbd5e1] shadow-xs flex flex-col relative overflow-hidden shrink-0">
+    <div className="bg-white rounded-lg border border-[#cbd5e1] shadow-xs flex flex-col relative overflow-hidden min-h-0 flex-[0_1_462px]">
       {isPastView && (
         <div className="h-[28px] px-3 bg-amber-50 border-b border-amber-200 text-amber-900 text-[11px] font-bold flex items-center gap-1">
           <RotateCcw className="w-3 h-3" />
@@ -225,7 +225,7 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="overflow-x-auto overflow-y-hidden select-none touch-auto overscroll-x-contain"
+        className="min-h-0 overflow-auto select-none touch-auto overscroll-x-contain"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div className="relative" style={{ width: `${STICKY_LEFT_WIDTH + timelineWidthPx}px` }}>
@@ -233,8 +233,8 @@ export const DispatchBoard: React.FC<DispatchBoardProps> = ({
           <div className="h-[30px] bg-[#f8fafc] border-b border-[#e2e8f0] flex items-center text-[11px] font-mono font-medium text-slate-500 relative">
             {/* Sticky Left Header Cell (290px = 95px Action + 195px Barista) */}
             <div className="sticky left-0 z-[60] w-[290px] shrink-0 h-full text-[11px] font-sans font-bold text-slate-500 flex items-center bg-[#f8fafc] border-r border-[#cbd5e1] shadow-[4px_0_10px_rgba(15,23,42,0.08)] isolate">
-              <span className="w-[95px] px-3 text-center">操作</span>
-              <span className="w-[195px] px-3 border-l border-slate-200">ドリッパー / 抽出担当</span>
+              <span className="w-[195px] px-3">ドリッパー / 抽出担当</span>
+              <span className="w-[95px] px-3 border-l border-slate-200 text-center">操作</span>
             </div>
 
             {/* Scrollable Ruler Track with Ticks & Labels */}

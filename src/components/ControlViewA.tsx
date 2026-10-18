@@ -60,9 +60,10 @@ export const ControlViewA: React.FC<ControlViewAProps> = ({
       timelineCommand={timelineCommand}
     />
 
-    <div className="h-[196px] min-h-0 overflow-visible relative z-[70]">
+    <div className="min-h-[168px] flex-1 overflow-visible relative z-[70]">
       <UnassignedOrdersPanel
         orders={unassignedOrders}
+        baristas={baristas}
         nextAvailable={nextAvailable}
         selectedOrderId={selectedOrderId}
         onSelectOrder={onSelectOrder}
