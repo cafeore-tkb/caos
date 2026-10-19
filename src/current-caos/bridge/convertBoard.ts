@@ -105,7 +105,7 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
   const cards = [
     ...props.unassignedOrders.map((card) => convert(card, null, 0)),
     ...props.baristas.flatMap((bay) => [
-      ...(bay.pastTickets ?? []).map((card) => convert(card, bay.id, 0)),
+      ...(bay.pastTickets ?? []).filter((card) => !card.isInterrupted).map((card) => convert(card, bay.id, 0)),
       ...bay.queue.map((card, index) => convert(card, bay.id, index + 1)),
     ]),
   ];

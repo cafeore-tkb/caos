@@ -155,6 +155,12 @@ export default function TrainingApp() {
                 コメント {scenario.orders.filter((order) => order.comments?.length).length}件
               </p>
             )}
+            {MODES[mode].emergencyChances > 0 && (
+              <p className="training-data-mix">
+                緊急淹れ直し：{MODES[mode].emergencyChances === 1 ? '50%の確率で1件' : '各50%の抽選を2回（最大2件）'}
+                。抽出時間の最後の1/4に入ると通知します。
+              </p>
+            )}
             {scenario && (
               <details>
                 <summary>注文の内容を見る</summary>
@@ -225,7 +231,7 @@ export default function TrainingApp() {
             </h2>
             <p>仕上げた杯数45点・8分以内の準備25点・抽出品質20点・同一注文の仕上がり10点。</p>
             <p className="training-criteria">
-              80点以上には、全抽出杯の90%以上を完了、完了杯の95%以上で予定抽出時間の90%以上を確保、指名・上級生条件の違反ゼロが必要です。
+              80点以上には、全抽出杯の90%以上を完了、完了杯の95%以上で予定抽出時間の90%以上を確保、指名・上級生条件の違反ゼロ、発生した緊急淹れ直しの完了が必要です。
             </p>
             <p>
               一時停止中は操作も停止。終了時は未到着を含む全注文が採点対象です。各モードの80点はその課題の達成目安で、総合判断はフルで確認できます。
@@ -263,7 +269,9 @@ function GameSession({
   onBack: () => void;
   onFinish: (state: GameState) => void;
 }) {
-  const [state, dispatch] = useReducer(gameReducer, scenario, startGame);
+  const [state, dispatch] = useReducer(gameReducer, scenario, (input) =>
+    startGame(input, crypto.getRandomValues(new Uint32Array(1))[0])
+  );
   const [speed, setSpeed] = useState(2);
   const [viewMode, setViewMode] = useState<ControlViewMode>('current');
   const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(
@@ -307,6 +315,9 @@ function GameSession({
         .flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])
         .find((ticket) => ticket.ticketUid === detailKey)
     : null;
+  const pendingEmergencies = state.emergencies.filter((trial) => trial.status === 'pending');
+  const occurredEmergencies = state.emergencies.filter((trial) => trial.triggeredAtSec !== undefined);
+  const detailIncident = pendingEmergencies.find((trial) => trial.sourceKey === detailKey);
   const downloadResult = () => {
     try {
       const blob = new Blob(
@@ -317,6 +328,8 @@ function GameSession({
               scenario: state.scenario,
               result,
               elapsedSec: state.nowSec,
+              randomSeed: state.randomSeed,
+              emergencies: state.emergencies,
               cups: Object.values(state.cups),
               events: state.events,
             },
@@ -356,6 +369,12 @@ function GameSession({
             経過 {clock(state.nowSec)} / {clock(scenario.durationSec)} · 完了 {result.done}/{result.total}杯 · 品質OK{' '}
             {result.quality}杯
           </p>
+          {MODES[scenario.mode].emergencyChances > 0 && (
+            <p>
+              緊急淹れ直し：発生 {occurredEmergencies.length}件 · 完了{' '}
+              {state.emergencies.filter((trial) => trial.status === 'resolved').length}件
+            </p>
+          )}
           <div className="training-result-grid">
             {result.categories.map((category) => (
               <section className="training-panel" key={category.label}>
@@ -482,6 +501,38 @@ function GameSession({
         <span>80点が合格の目安 · 限定豆は1・6番 · ▶で開始・✓で完了</span>
         <span role="status">{state.notice || '未割当の注文カードを選んで、担当者へ割り当ててください'}</span>
       </div>
+      {pendingEmergencies.length > 0 && (
+        <aside className="training-emergencies" aria-label="緊急淹れ直しの通知">
+          {pendingEmergencies.map((trial) => {
+            const source = state.bays
+              .flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])
+              .find((ticket) => ticket.ticketUid === trial.sourceKey);
+            const waiting = state.unassigned.find((card) => card.ticketUid === trial.sourceKey);
+            return (
+              <div role="alert" key={trial.id}>
+                <strong>緊急淹れ直し {source?.id ?? waiting?.id}</strong>
+                <p>
+                  {waiting
+                    ? '対象が未割当です。カードを先に担当者へ配置してください。'
+                    : '抽出中のコーヒーにトラブル。杯数・担当者・元の抽出の扱いを選んでください。'}
+                </p>
+                <button
+                  type="button"
+                  disabled={!source}
+                  onClick={() => {
+                    if (source) {
+                      setEmptyBay(null);
+                      openDetail(source);
+                    }
+                  }}
+                >
+                  入れ直しを手配
+                </button>
+              </div>
+            );
+          })}
+        </aside>
+      )}
       <div className="training-board">
         <ControlWorkspace
           mode={viewMode}
@@ -573,7 +624,7 @@ function GameSession({
                 ? '抽出中。移動すると抽出時間をリセットします。'
                 : '待機中'}
           </p>
-          <details className="my-4 rounded border border-red-200 p-3">
+          <details open={detailIncident ? true : undefined} className="my-4 rounded border border-red-200 p-3">
             <summary className="text-sm font-black text-red-800">緊急の入れ直し</summary>
             <div className="mt-3 flex flex-col gap-2 text-xs">
               <label>
@@ -634,9 +685,13 @@ function GameSession({
                   >
                     <option value="">選択してください</option>
                     <option value="interrupt">中断する</option>
-                    <option value="continue">続ける</option>
+                    <option value="continue">続ける（入れ直し対象を除く）</option>
                   </select>
                 </label>
+              )}
+              {remakeInterrupt === 'interrupt' && <p>中断後、元の列の待機は「始める」で再開します。</p>}
+              {remakeInterrupt === 'interrupt' && Number(remakeCount) < detail.cupCount && (
+                <p>中断した残りの杯は未割当に戻ります。</p>
               )}
               <button
                 type="button"
@@ -651,6 +706,7 @@ function GameSession({
                     bayId: remakeTarget === 'unassigned' ? null : Number(remakeTarget),
                     interrupt: remakeInterrupt === 'interrupt',
                     reason: remakeReason,
+                    incidentId: detailIncident?.id,
                   });
                   setDetailKey(null);
                   setRemakeReason('');
