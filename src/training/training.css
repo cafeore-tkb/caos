@@ -469,7 +469,7 @@
   width: 340px;
   max-height: calc(100% - 124px);
   overflow: auto;
-  z-index: 60;
+  z-index: 90;
   background: #fff;
   padding: 24px;
   border: 1px solid #cbd8d0;
@@ -653,4 +653,38 @@
   color: #006c70;
   font-size: 12px;
   margin-top: 4px;
+}
+
+.training-emergencies {
+  position: absolute;
+  z-index: 85;
+  right: 12px;
+  top: 116px;
+  width: min(360px, calc(100% - 24px));
+  display: grid;
+  gap: 8px;
+}
+.training-emergencies > div {
+  padding: 12px;
+  border: 2px solid #ba2438;
+  border-radius: 10px;
+  background: #fff5f5;
+  color: #7f1c2a;
+  box-shadow: 0 4px 16px #47121d26;
+}
+.training-emergencies strong {
+  font-size: 16px;
+}
+.training-emergencies p {
+  font-size: 12px;
+  margin: 6px 0;
+}
+.training-emergencies button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: #ab2336;
+  color: white;
+  font-weight: 750;
+  cursor: pointer;
 }

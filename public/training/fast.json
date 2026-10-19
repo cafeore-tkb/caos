@@ -22,8 +22,7 @@
       "items": [
         {
           "name": "珈琲・俺ブレンド",
-          "quantity": 2,
-          "nominee": 4
+          "quantity": 2
         }
       ]
     },
@@ -60,8 +59,7 @@
           "name": "アイスミルク",
           "quantity": 1
         }
-      ],
-      "comments": ["6番の方への指名です。少し待てる旨はお伝え済みです。"]
+      ]
     },
     {
       "orderId": 6,

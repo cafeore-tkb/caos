@@ -9,6 +9,7 @@ export const MODES = {
     label: 'ファスト',
     durationSec: 600,
     count: 6,
+    emergencyChances: 0,
     description: '基本の割当と完了。少量の注文で操作を身につける。',
     target: '基本操作',
   },
@@ -16,6 +17,7 @@ export const MODES = {
     label: 'ミドル',
     durationSec: 1200,
     count: 12,
+    emergencyChances: 1,
     description: 'アイス・限定豆・指名・複数杯を並行してさばく。',
     target: '並行判断',
   },
@@ -23,6 +25,7 @@ export const MODES = {
     label: 'フル',
     durationSec: 1800,
     count: 20,
+    emergencyChances: 2,
     description: '注文の集中、分割、同時仕上げまで含めた店舗運営の総合練習。',
     target: '店舗運営',
   },
@@ -57,7 +60,18 @@ export interface GameEvent {
   kind: string;
   message: string;
 }
+export interface EmergencyTrial {
+  id: number;
+  cupId: string | null;
+  willOccur: boolean;
+  status: 'armed' | 'skipped' | 'pending' | 'rebrewing' | 'resolved';
+  sourceKey?: string;
+  triggeredAtSec?: number;
+  resolvedAtSec?: number;
+}
 export interface GameState {
+  randomSeed: number;
+  emergencies: EmergencyTrial[];
   scenario: Scenario;
   nowSec: number;
   status: 'active' | 'finished';
@@ -79,7 +93,15 @@ export type GameAction =
   | { type: 'start'; bayId: number }
   | { type: 'unstart'; bayId: number }
   | { type: 'split'; key: string; cupId: string }
-  | { type: 'rebrew'; key: string; cupCount: number; bayId: number | null; interrupt: boolean; reason: string }
+  | {
+      type: 'rebrew';
+      key: string;
+      cupCount: number;
+      bayId: number | null;
+      interrupt: boolean;
+      reason: string;
+      incidentId?: number;
+    }
   | { type: 'move'; key: string; bayId: number; place?: CaosPlace }
   | { type: 'return'; key: string }
   | { type: 'merge'; first: string; second: string };
@@ -218,7 +240,7 @@ function arrive(state: GameState): GameState {
     arrived: [...state.arrived, ...incoming.map((o) => o.orderId)],
   };
 }
-export function startGame(input: Scenario): GameState {
+export function startGame(input: Scenario, seed = 1): GameState {
   const scenario = parseScenario(input);
   const cups: Record<string, CupResult> = {};
   for (const order of scenario.orders) {
@@ -231,7 +253,30 @@ export function startGame(input: Scenario): GameState {
         }
       });
   }
+  let randomState = seed >>> 0;
+  const random = () => {
+    // Mulberry32: draw once per opportunity, outside the tick reducer; record the seed for replay.
+    randomState += 0x6d2b79f5;
+    let value = randomState;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
+  const candidates = Object.keys(cups);
+  const chanceCount = MODES[scenario.mode].emergencyChances;
+  const used = new Set<string>();
+  const emergencies: EmergencyTrial[] = Array.from({ length: chanceCount }, (_, index) => {
+    const draw = random();
+    const preferred = Math.max(0, Math.ceil((candidates.length * (index + 1)) / (chanceCount + 2)) - 1);
+    const cupId =
+      [...candidates.slice(preferred), ...candidates.slice(0, preferred)].find((id) => !used.has(id)) ?? null;
+    if (cupId) used.add(cupId);
+    const willOccur = cupId !== null && draw < 0.5;
+    return { id: index + 1, cupId, willOccur, status: willOccur ? 'armed' : 'skipped' };
+  });
   return arrive({
+    randomSeed: seed >>> 0,
+    emergencies,
     scenario,
     nowSec: 0,
     status: 'active',
@@ -280,6 +325,47 @@ const toUnassigned = (ticket: OrderTicket): UnassignedOrder => ({
   cardColor: 'blue',
 });
 
+function advanceEmergencies(state: GameState, previousSec: number): GameState {
+  const due = state.emergencies
+    .filter((trial) => trial.status === 'armed')
+    .flatMap((trial) => {
+      const ticket = state.bays
+        .flatMap((bay) => bay.queue)
+        .find((card) => card.status === 'brewing' && trial.cupId && card.trainingCupIds?.includes(trial.cupId));
+      if (!ticket) return [];
+      const atSec = Math.max(
+        previousSec,
+        Math.ceil(
+          Math.max(ticket.startTimeSec ?? state.nowSec, state.cups[trial.cupId ?? '']?.joinedAtSec ?? 0) +
+            ticket.totalDurationSec * 0.75
+        )
+      );
+      return state.nowSec >= atSec ? [{ trial, ticket, atSec }] : [];
+    })
+    .sort((a, b) => a.atSec - b.atSec || a.trial.id - b.trial.id);
+  let next = state;
+  for (const { trial, ticket, atSec } of due) {
+    next = withEvent(
+      {
+        ...next,
+        emergencies: next.emergencies.map((entry) =>
+          entry.id === trial.id
+            ? { ...entry, status: 'pending', sourceKey: keyOf(ticket), triggeredAtSec: atSec }
+            : entry
+        ),
+      },
+      'emergency',
+      `${ticket.id} 緊急淹れ直しが必要です。担当者と元抽出の扱いを選んで手配してください`
+    );
+    next.events[next.events.length - 1] = { ...next.events[next.events.length - 1], atSec };
+  }
+  return next;
+}
+const pendingFor = (state: GameState, ticket: OrderTicket | UnassignedOrder) =>
+  state.emergencies.some(
+    (trial) => trial.status === 'pending' && trial.cupId && ticket.trainingCupIds?.includes(trial.cupId)
+  );
+
 export function gameReducer(state: GameState, action: GameAction): GameState {
   if (state.status === 'finished') return state;
   if (action.type === 'finish')
@@ -289,7 +375,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   if (action.type === 'tick') {
     if (!Number.isFinite(action.seconds) || action.seconds <= 0) return state;
     const nowSec = Math.min(state.scenario.durationSec, state.nowSec + Math.floor(action.seconds));
-    const next = arrive({ ...state, nowSec, bays: state.bays.map((bay) => schedule(bay, nowSec)) });
+    const next = advanceEmergencies(
+      arrive({ ...state, nowSec, bays: state.bays.map((bay) => schedule(bay, nowSec)) }),
+      state.nowSec
+    );
     return nowSec >= state.scenario.durationSec
       ? withEvent({ ...next, status: 'finished' }, 'finish', '制限時間に達しました')
       : next;
@@ -363,7 +452,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     const target = state.bays.find((bay) => bay.id === action.bayId);
     if (action.bayId !== null && (!target || !allowedBay(source, target)))
       return rejected(state, '指名・上級生のみの条件を確認してください');
-    const ids = (source.trainingCupIds ?? []).slice(0, action.cupCount);
+    const incident = state.emergencies.find(
+      (trial) =>
+        trial.status === 'pending' &&
+        (action.incidentId === undefined || trial.id === action.incidentId) &&
+        trial.cupId &&
+        source.trainingCupIds?.includes(trial.cupId)
+    );
+    if (action.incidentId !== undefined && !incident) return state;
+    const originalIds = source.trainingCupIds ?? [];
+    const ids = (
+      incident?.cupId ? [incident.cupId, ...originalIds.filter((id) => id !== incident.cupId)] : originalIds
+    ).slice(0, action.cupCount);
+    const remaining = originalIds.filter((id) => !ids.includes(id));
     if (ids.length !== action.cupCount) return state;
     const cups = { ...state.cups };
     for (const id of ids)
@@ -379,13 +480,32 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       orderedAtSec: state.nowSec,
       badgeTag: `${action.cupCount}杯 入れ直し`,
     };
+    const returned: UnassignedOrder[] = [];
     const bays = state.bays.map((bay) => {
+      const sourceHere = bay.queue.find((card) => keyOf(card) === action.key);
+      if (sourceHere && action.interrupt && remaining.length)
+        returned.push({
+          ...toUnassigned(source),
+          ticketUid: `recovered-${source.ticketUid}-${state.events.length}`,
+          trainingCupIds: remaining,
+          sourceCups: source.sourceCups?.filter((cup) => remaining.includes(cup.id)),
+          cupCount: remaining.length,
+          badgeTag: `${remaining.length}杯 中断後の再割当`,
+        });
       let queue = bay.queue.flatMap((card) =>
         keyOf(card) !== action.key
           ? [card]
-          : action.interrupt
+          : action.interrupt || remaining.length === 0
             ? []
-            : [{ ...card, trainingCupIds: (card.trainingCupIds ?? []).filter((id) => !ids.includes(id)) }]
+            : [
+                {
+                  ...card,
+                  trainingCupIds: remaining,
+                  sourceCups: card.sourceCups?.filter((cup) => remaining.includes(cup.id)),
+                  cupCount: remaining.length,
+                  totalDurationSec: brewDuration(card.beanName, remaining.length),
+                },
+              ]
       );
       if (bay.id === target?.id)
         queue = insertTicket(
@@ -398,21 +518,51 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         {
           ...bay,
           queue,
-          pastTickets: bay.pastTickets?.map((card) =>
-            keyOf(card) === action.key
-              ? {
-                  ...card,
-                  trainingCupIds: (card.trainingCupIds ?? []).filter((id) => !ids.includes(id)),
-                  isInterrupted: true,
-                }
-              : card
-          ),
+          pastTickets: [
+            ...(sourceHere && (action.interrupt || remaining.length === 0)
+              ? [
+                  {
+                    ...sourceHere,
+                    status: 'completed' as const,
+                    completedAtSec: state.nowSec,
+                    isInterrupted: true,
+                    trainingCupIds: [],
+                  },
+                ]
+              : []),
+            ...(bay.pastTickets ?? []).map((card) =>
+              keyOf(card) === action.key
+                ? {
+                    ...card,
+                    trainingCupIds: (card.trainingCupIds ?? []).filter((id) => !ids.includes(id)),
+                    isInterrupted: true,
+                  }
+                : card
+            ),
+          ],
         },
         state.nowSec
       );
     });
     return withEvent(
-      { ...state, cups, bays, unassigned: target ? state.unassigned : [...state.unassigned, remake] },
+      {
+        ...state,
+        cups,
+        bays,
+        emergencies: state.emergencies.map((trial) =>
+          trial.status === 'pending' && trial.cupId && ids.includes(trial.cupId)
+            ? { ...trial, status: 'rebrewing', sourceKey: remake.ticketUid }
+            : trial.status === 'pending' &&
+                trial.cupId &&
+                returned.some((card) => card.trainingCupIds?.includes(trial.cupId ?? ''))
+              ? {
+                  ...trial,
+                  sourceKey: returned.find((card) => card.trainingCupIds?.includes(trial.cupId ?? ''))?.ticketUid,
+                }
+              : trial
+        ),
+        unassigned: [...state.unassigned, ...returned, ...(target ? [] : [remake])],
+      },
       'rebrew',
       `${source.id} ${action.cupCount}杯 入れ直し：${action.reason}`
     );
@@ -441,6 +591,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     const ticket = bay?.queue[0];
     if (!bay || !ticket || ticket.status !== 'brewing' || state.nowSec - (ticket.startTimeSec ?? state.nowSec) < 60)
       return state;
+    if (pendingFor(state, ticket)) return withEvent(state, 'notice', 'この注文の緊急淹れ直しを先に手配してください');
     const ratio = (state.nowSec - (ticket.startTimeSec ?? state.nowSec)) / ticket.totalDurationSec;
     const cups = { ...state.cups };
     for (const id of ticket.trainingCupIds ?? [])
@@ -455,6 +606,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       {
         ...state,
         cups,
+        emergencies: state.emergencies.map((trial) =>
+          trial.status === 'rebrewing' && trial.cupId && ticket.trainingCupIds?.includes(trial.cupId)
+            ? (cups[trial.cupId].brewRatio ?? 0) >= 0.9
+              ? { ...trial, status: 'resolved', resolvedAtSec: state.nowSec }
+              : { ...trial, status: 'pending', sourceKey: keyOf(ticket) }
+            : trial
+        ),
         bays: state.bays.map((entry) =>
           entry.id === bay.id
             ? schedule(
@@ -479,6 +637,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   if (action.type === 'move' || action.type === 'return') {
     const ticket = state.bays.flatMap((bay) => bay.queue).find((card) => keyOf(card) === action.key);
     if (!ticket) return state;
+    if (pendingFor(state, ticket)) return withEvent(state, 'notice', 'この注文の緊急淹れ直しを先に手配してください');
     const target = action.type === 'move' ? state.bays.find((bay) => bay.id === action.bayId) : undefined;
     if (action.type === 'move' && (!target || !allowedBay(ticket, target)))
       return rejected(state, '指名・上級生のみの条件を確認してください');
@@ -513,6 +672,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   }
   const result = mergeBoardCards(state.bays, state.unassigned, action.first, action.second);
   if (!result) return state;
+  if (pendingFor(state, result.merged)) return withEvent(state, 'notice', '緊急淹れ直しの手配前には統合できません');
   if (result.targetBay && !allowedBay(result.merged, result.targetBay))
     return rejected(state, '指名・上級生のみの条件を確認してください');
   const cups = { ...state.cups };
@@ -562,7 +722,14 @@ export function scoreGame(state: GameState) {
     },
   ];
   const penalties = Math.min(20, state.violations * 2);
-  const ready = ratio(done.length) >= 0.9 && ratio(good.length, done.length) >= 0.95 && state.violations === 0;
+  const emergencyPending = state.emergencies.filter(
+    (trial) => trial.status === 'pending' || trial.status === 'rebrewing'
+  ).length;
+  const ready =
+    ratio(done.length) >= 0.9 &&
+    ratio(good.length, done.length) >= 0.95 &&
+    state.violations === 0 &&
+    emergencyPending === 0;
   const raw = Math.max(
     0,
     Math.min(100, Math.round(categories.reduce((sum, category) => sum + category.points, 0) - penalties))
@@ -585,6 +752,7 @@ export function scoreGame(state: GameState) {
     together.length < groups.size
       ? '複数杯の注文は仕上がりの差を60秒以内に。統合と並行抽出を使いましょう。'
       : '同一注文の仕上がりがそろっています。',
+    ...(emergencyPending ? [`緊急淹れ直しが${emergencyPending}件未完了です。手配した杯の抽出を終えましょう。`] : []),
     ...(state.violations ? ['指名と上級生のみの条件を確認しましょう。'] : []),
   ];
   return {

@@ -37,10 +37,34 @@ const single = (name = '余音ブレンド', quantity = 1) =>
 const assign = (state: GameState, bayId = 1) =>
   gameReducer(state, { type: 'assign', key: state.unassigned[0].ticketUid ?? '', bayId });
 
-function runService(mode: GameMode) {
-  let state = startGame(load(mode));
+function runService(mode: GameMode, seed = 1) {
+  let state = startGame(load(mode), seed);
   while (state.status === 'active') {
+    for (const incident of state.emergencies.filter((trial) => trial.status === 'pending')) {
+      const source = state.bays
+        .flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])
+        .find((card) => card.ticketUid === incident.sourceKey);
+      assert.ok(source);
+      const bay = state.bays
+        .filter((entry) => allowedBay(source, entry))
+        .sort((a, b) => {
+          const load = (entry: typeof a) =>
+            entry.queue.reduce((sum, card) => sum + (card.timeRemainingSec ?? card.totalDurationSec), 0) -
+            (source.cupCount === 1 && entry.queue.includes(source) ? (source.timeRemainingSec ?? 0) : 0);
+          return load(a) - load(b);
+        })[0];
+      state = gameReducer(state, {
+        type: 'rebrew',
+        key: required(source.ticketUid),
+        cupCount: 1,
+        bayId: bay.id,
+        interrupt: source.cupCount === 1,
+        reason: '抽出ミス',
+        incidentId: incident.id,
+      });
+    }
     for (const bay of state.bays) {
+      if (bay.queue[0]?.status === 'scheduled') state = gameReducer(state, { type: 'start', bayId: bay.id });
       if (bay.queue[0]?.timeRemainingSec === 0) state = gameReducer(state, { type: 'complete', bayId: bay.id });
     }
     for (const card of state.unassigned) {
@@ -349,7 +373,7 @@ test('remaking a completed cup clears its credit and cannot award a third cup fo
   assert.equal(scoreGame(state).total, 2);
 });
 
-test('continuing the original brew after a remake never credits the remade cup early', () => {
+test('replacing every original cup cannot credit it before the remake completes', () => {
   let state = assign(startGame(single()));
   const key = required(state.bays[0].queue[0].ticketUid);
   state = gameReducer(state, { type: 'tick', seconds: 60 });
@@ -363,19 +387,19 @@ test('continuing the original brew after a remake never credits the remade cup e
   assert.equal(scoreGame(state).score, 100);
 });
 
-test('all default scenarios mix nomination, limited coffee and comments at moderate frequencies', () => {
+test('all default scenarios keep nomination, limited coffee and comments occasional', () => {
   const nominees = new Set<number>();
   for (const mode of Object.keys(MODES) as GameMode[]) {
     const { orders } = load(mode);
     const nominated = orders.filter((order) => order.items.some((item) => item.nominee));
     const limited = orders.filter((order) => order.items.some((item) => seniorOnly(item.name)));
     const commented = orders.filter((order) => order.comments?.length);
-    assert.ok(nominated.length / orders.length >= 0.2 && nominated.length / orders.length <= 0.35, mode);
-    assert.ok(limited.length / orders.length >= 0.15 && limited.length / orders.length <= 0.3, mode);
-    assert.ok(commented.length / orders.length >= 0.25 && commented.length / orders.length <= 0.4, mode);
+    assert.ok(nominated.length / orders.length >= 0.1 && nominated.length / orders.length <= 0.2, mode);
+    assert.ok(limited.length / orders.length >= 0.05 && limited.length / orders.length <= 0.2, mode);
+    assert.ok(commented.length / orders.length >= 0.1 && commented.length / orders.length <= 0.2, mode);
     for (const order of nominated) for (const item of order.items) if (item.nominee) nominees.add(item.nominee);
   }
-  assert.ok(nominees.size >= 4, 'nominations exercise different lanes');
+  assert.ok(nominees.size >= 3, 'nominations exercise different lanes');
 });
 
 test('optional comments are validated, normalized and copied without breaking older JSON', () => {
@@ -428,4 +452,212 @@ test('comments appear on arrival and retain original orders after merging, movin
       [card.orderNo]
     );
   assert.equal(scoreGame(state).total, 2);
+});
+
+const emergencyScenario = (mode: 'middle' | 'full', quantity = 1) =>
+  parseScenario({ ...single('余音ブレンド', quantity), mode, durationSec: MODES[mode].durationSec });
+
+test('mode probabilities are fixed at session start, independent, deterministic and replayable', () => {
+  assert.equal(startGame(single(), 0).emergencies.length, 0);
+  assert.equal(startGame(emergencyScenario('middle'), 0).emergencies.length, 1);
+  const data = emergencyScenario('full', 2);
+  const combinations = [0, 0, 0];
+  const joint = new Set<string>();
+  for (let seed = 0; seed < 2000; seed++) {
+    const state = startGame(data, seed);
+    assert.equal(state.emergencies.length, 2);
+    const enabled = state.emergencies.map((trial) => trial.willOccur);
+    combinations[enabled.filter(Boolean).length]++;
+    joint.add(enabled.join(','));
+    assert.deepEqual(startGame(data, state.randomSeed), state);
+  }
+  assert.equal(joint.size, 4, 'full mode can draw neither, either, or both incidents');
+  assert.ok(combinations[0] > 400 && combinations[0] < 600);
+  assert.ok(combinations[1] > 850 && combinations[1] < 1150);
+  assert.ok(combinations[2] > 400 && combinations[2] < 600);
+});
+
+test('a one-cup incident triggers once at 75 percent, using brewing time rather than game time', () => {
+  let state = startGame(emergencyScenario('middle'), 0);
+  state = gameReducer(state, { type: 'tick', seconds: 100 });
+  assert.equal(state.emergencies[0].status, 'armed', 'unassigned coffee never triggers');
+  state = assign(state);
+  state = gameReducer(state, { type: 'tick', seconds: 224 });
+  assert.equal(state.emergencies[0].status, 'armed');
+  state = gameReducer(state, { type: 'pause' });
+  const paused = state;
+  assert.equal(gameReducer(state, { type: 'tick', seconds: 100 }), paused);
+  state = gameReducer(state, { type: 'pause' });
+  state = gameReducer(state, { type: 'tick', seconds: 1 });
+  assert.equal(state.emergencies[0].status, 'pending');
+  assert.equal(state.emergencies[0].triggeredAtSec, 325);
+  const key = required(state.bays[0].queue[0].ticketUid);
+  assert.equal(
+    gameReducer(state, { type: 'return', key }).unassigned.length,
+    0,
+    'pending source stays available for the response form'
+  );
+  state = gameReducer(state, { type: 'tick', seconds: 100 });
+  state = gameReducer(state, { type: 'complete', bayId: 1 });
+  assert.equal(scoreGame(state).done, 0, 'ignoring an incident cannot credit the damaged cup');
+  assert.equal(state.events.filter((event) => event.kind === 'emergency').length, 1);
+});
+
+test('two-cup boundary, skipped draw and coarse ticks preserve incident timing and source', () => {
+  const data = emergencyScenario('middle', 2);
+  let state = assign(startGame(data, 0));
+  state = gameReducer(state, { type: 'tick', seconds: 269 });
+  assert.equal(state.emergencies[0].status, 'armed');
+  state = gameReducer(state, { type: 'tick', seconds: 1 });
+  assert.equal(state.emergencies[0].triggeredAtSec, 270);
+  const coarse = gameReducer(assign(startGame(data, 0)), { type: 'tick', seconds: 360 });
+  assert.equal(coarse.emergencies[0].triggeredAtSec, 270);
+  assert.equal(coarse.events.find((event) => event.kind === 'emergency')?.atSec, 270);
+  const skipped = gameReducer(assign(startGame(data, 1)), { type: 'tick', seconds: 360 });
+  assert.equal(skipped.emergencies[0].status, 'skipped');
+  assert.equal(skipped.events.filter((event) => event.kind === 'emergency').length, 0);
+});
+
+test('incident response retains scoring identity and requires a properly completed remake', () => {
+  let state = assign(startGame(emergencyScenario('middle'), 0));
+  state = gameReducer(state, { type: 'tick', seconds: 225 });
+  const source = state.bays[0].queue[0];
+  const incident = state.emergencies[0];
+  state = gameReducer(state, {
+    type: 'rebrew',
+    key: required(source.ticketUid),
+    cupCount: 1,
+    bayId: 2,
+    interrupt: true,
+    reason: '抽出ミス',
+    incidentId: incident.id,
+  });
+  assert.equal(state.emergencies[0].status, 'rebrewing');
+  assert.equal(state.bays[1].queue[0].isRebrew, true);
+  assert.equal(state.bays[0].pastTickets?.[0].isInterrupted, true);
+  assert.equal(scoreGame(state).total, 1);
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
+  state = gameReducer(state, { type: 'complete', bayId: 2 });
+  assert.equal(state.emergencies[0].status, 'resolved');
+  assert.equal(scoreGame(state).done, 1);
+  assert.equal(scoreGame(state).score, 75, 'the original order wait remains in the timing score');
+  assert.equal(project(state).cards.length, 1, 'discarded original is not a second completed serving');
+});
+
+test('partially interrupting a two-cup batch returns every unaffected cup for reassignment', () => {
+  let state = assign(startGame(emergencyScenario('middle', 2), 0));
+  state = gameReducer(state, { type: 'tick', seconds: 270 });
+  state = gameReducer(state, {
+    type: 'rebrew',
+    key: required(state.bays[0].queue[0].ticketUid),
+    cupCount: 1,
+    bayId: null,
+    interrupt: true,
+    reason: '抽出ミス',
+    incidentId: 1,
+  });
+  assert.equal(state.unassigned.length, 2);
+  assert.equal(new Set(state.unassigned.flatMap((card) => card.trainingCupIds)).size, 2);
+  state = assign(state, 1);
+  state = assign(state, 2);
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
+  state = gameReducer(state, { type: 'complete', bayId: 1 });
+  state = gameReducer(state, { type: 'complete', bayId: 2 });
+  assert.equal(scoreGame(state).done, 2);
+  assert.equal(state.emergencies[0].status, 'resolved');
+});
+
+test('every incident draw outcome still permits a competent operator to pass the standard modes', () => {
+  for (const mode of ['middle', 'full'] as const) {
+    const choices = new Map<string, number>();
+    for (let seed = 0; seed < 100; seed++)
+      choices.set(
+        startGame(load(mode), seed)
+          .emergencies.map((trial) => trial.willOccur)
+          .join(','),
+        seed
+      );
+    assert.equal(choices.size, mode === 'middle' ? 2 : 4);
+    for (const [draw, seed] of choices) {
+      const state = runService(mode, seed);
+      assert.ok(scoreGame(state).score >= 80, `${mode} ${draw}: ${scoreGame(state).score}`);
+      assert.ok(state.emergencies.filter((trial) => trial.willOccur).every((trial) => trial.status === 'resolved'));
+    }
+  }
+});
+
+test('moving a cup restarts the 75 percent clock without redrawing its chance', () => {
+  let state = assign(startGame(emergencyScenario('middle'), 0));
+  const initial = state.emergencies[0].willOccur;
+  state = gameReducer(state, { type: 'tick', seconds: 100 });
+  state = gameReducer(state, { type: 'move', key: required(state.bays[0].queue[0].ticketUid), bayId: 2 });
+  state = gameReducer(state, { type: 'tick', seconds: 224 });
+  assert.equal(state.emergencies[0].status, 'armed');
+  state = gameReducer(state, { type: 'tick', seconds: 1 });
+  assert.equal(state.emergencies[0].willOccur, initial);
+  assert.equal(state.emergencies[0].triggeredAtSec, 325);
+});
+
+test('two incidents sharing one batch keep the remaining source reachable after partial interruption', () => {
+  let state = assign(startGame(emergencyScenario('full', 2), 0));
+  state = gameReducer(state, { type: 'tick', seconds: 270 });
+  assert.equal(state.emergencies.filter((trial) => trial.status === 'pending').length, 2);
+  state = gameReducer(state, {
+    type: 'rebrew',
+    key: required(state.bays[0].queue[0].ticketUid),
+    cupCount: 1,
+    bayId: 2,
+    interrupt: true,
+    reason: '抽出ミス',
+    incidentId: 1,
+  });
+  const pending = required(state.emergencies.find((trial) => trial.status === 'pending'));
+  assert.equal(pending.sourceKey, state.unassigned[0].ticketUid);
+  state = assign(state, 3);
+  state = gameReducer(state, {
+    type: 'rebrew',
+    key: required(pending.sourceKey),
+    cupCount: 1,
+    bayId: 4,
+    interrupt: true,
+    reason: '抽出ミス',
+    incidentId: pending.id,
+  });
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
+  state = gameReducer(state, { type: 'complete', bayId: 2 });
+  state = gameReducer(state, { type: 'complete', bayId: 4 });
+  assert.equal(state.emergencies.filter((trial) => trial.status === 'resolved').length, 2);
+  assert.equal(scoreGame(state).done, 2);
+});
+
+test('finishing an incident remake too early keeps it pending until a successful second attempt', () => {
+  let state = assign(startGame(emergencyScenario('middle'), 0));
+  state = gameReducer(state, { type: 'tick', seconds: 225 });
+  state = gameReducer(state, {
+    type: 'rebrew',
+    key: required(state.bays[0].queue[0].ticketUid),
+    cupCount: 1,
+    bayId: 2,
+    interrupt: true,
+    reason: '抽出ミス',
+    incidentId: 1,
+  });
+  state = gameReducer(state, { type: 'tick', seconds: 60 });
+  state = gameReducer(state, { type: 'complete', bayId: 2 });
+  assert.equal(state.emergencies[0].status, 'pending');
+  assert.equal(scoreGame(state).passed, false);
+  state = gameReducer(state, {
+    type: 'rebrew',
+    key: required(state.emergencies[0].sourceKey),
+    cupCount: 1,
+    bayId: 3,
+    interrupt: true,
+    reason: '抽出ミス',
+    incidentId: 1,
+  });
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
+  state = gameReducer(state, { type: 'complete', bayId: 3 });
+  assert.equal(state.emergencies[0].status, 'resolved');
+  assert.equal(scoreGame(state).done, 1);
+  assert.equal(scoreGame(state).total, 1);
 });

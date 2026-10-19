@@ -4,9 +4,9 @@ import { seniorOnly, TRAINING_MASTER } from '../src/training/master';
 
 // Deterministic synthetic orders. Never reads production order/customer data.
 const MIX = {
-  fast: { nominated: [1, 4], limited: [4], commented: [0, 4] },
-  middle: { nominated: [1, 5, 9], limited: [2, 7, 10], commented: [0, 3, 6, 9] },
-  full: { nominated: [1, 5, 9, 13, 17], limited: [2, 7, 12, 17], commented: [0, 3, 6, 9, 12, 15] },
+  fast: { nominated: [4], limited: [4], commented: [0] },
+  middle: { nominated: [1, 9], limited: [7], commented: [0, 9] },
+  full: { nominated: [1, 9, 17], limited: [7, 17], commented: [0, 9, 17] },
 } satisfies Record<GameMode, { nominated: number[]; limited: number[]; commented: number[] }>;
 const brewNames = TRAINING_MASTER.items
   .filter((item) => TRAINING_MASTER.item_types.find((type) => type.name === item.item_type)?.needs_brew)
@@ -32,8 +32,8 @@ for (const mode of Object.keys(MODES) as GameMode[]) {
         ? undefined
         : seniorOnly(name)
           ? nomineeIndex % 2 === 0
-            ? 1
-            : 6
+            ? 6
+            : 1
           : nominees[nomineeIndex % nominees.length];
     const items: ScenarioOrder['items'] = [
       {
