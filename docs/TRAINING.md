@@ -2,7 +2,7 @@
 
 ## UIの反映元
 
-cafeore-pos `4b7d7d3d8a0943a0f437c705d5d0e0fc5c49451b` の `services/pos/app/caos/components/ControlViewA.tsx`、`ControlViewC.tsx`、`OrderCard.tsx`、`BoardParts.tsx` を基準とする。カード操作・ドラッグ・未提供一覧・ScrollAreaを含む表示層を同リビジョンから直接移植。詳細は `src/current-caos/UPSTREAM.md`。CaOS既存のチケットモデルへ適合させ、通常画面とゲーム画面で同じ `ControlWorkspace`（A/C） を共有する。
+cafeore-pos `173c9f18b71a4435fd967916378ed4df06efdbc4` の `services/pos/app/caos/components/ControlViewA.tsx`、`ControlViewC.tsx`、`OrderCard.tsx`、`BoardParts.tsx` を基準とする。カード操作・ドラッグ・未提供一覧・ScrollAreaを含む表示層を同リビジョンから直接移植。詳細は `src/current-caos/UPSTREAM.md`。CaOS既存のチケットモデルへ適合させ、通常画面とゲーム画面で同じ `ControlWorkspace`（A/C） を共有する。
 
 - Aは上部のタイムラインと下部の未割当の横帯。Cは6人のドリッパーの行と右側の未割当。A/Cだけを採用し、同じ盤面を自由に切り替える。番号と杯数を大きく表示。
 - 1杯は白抜き、2杯は黒の塗り。指名は黒い点線枠と指名番号で表示。
