@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "kind": "synthetic",
+  "mode": "fast",
+  "title": "ファスト・架空の営業シナリオ",
+  "durationSec": 600,
+  "orders": [
+    {
+      "orderId": 1,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ],
+      "comments": ["同じ注文の商品は、そろえてお渡しします。"]
+    },
+    {
+      "orderId": 2,
+      "atSec": 36,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "orderId": 3,
+      "atSec": 72,
+      "items": [
+        {
+          "name": "ケニア",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 4,
+      "atSec": 108,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 3
+        }
+      ]
+    },
+    {
+      "orderId": 5,
+      "atSec": 144,
+      "items": [
+        {
+          "name": "アロマナティーボ",
+          "quantity": 2,
+          "nominee": 6
+        },
+        {
+          "name": "アイスミルク",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 6,
+      "atSec": 180,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        },
+        {
+          "name": "コースター",
+          "quantity": 1
+        }
+      ]
+    }
+  ]
+}

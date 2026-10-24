@@ -7,7 +7,17 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "includes": ["**", "!src/data/sohosai-2025-day12.json"]
+    "includes": [
+      "**",
+      "!src/data/sohosai-2025-day12.json",
+      "!src/current-caos/components",
+      "!src/current-caos/common",
+      "!src/current-caos/hooks",
+      "!src/current-caos/logic",
+      "!src/current-caos/icons",
+      "!src/current-caos/utils",
+      "!src/current-caos/caos.css"
+    ]
   },
   "formatter": {
     "enabled": true,

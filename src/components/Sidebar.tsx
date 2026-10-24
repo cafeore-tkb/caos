@@ -1,6 +1,6 @@
 import { BarChart3, Coffee, LayoutGrid, SlidersHorizontal } from 'lucide-react';
 import React from 'react';
-import type { ControlViewMode } from './ControlWorkspace';
+import { CONTROL_VIEWS, type ControlViewMode } from './ControlWorkspace';
 
 export type NavTab = 'control' | 'bays' | 'beans' | 'analytics';
 
@@ -67,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     role="group"
                     aria-label="管制盤の表示切替"
                   >
-                    {(['current', 'new', 'c', 'd'] as const).map((mode) => (
+                    {(Object.keys(CONTROL_VIEWS) as ControlViewMode[]).map((mode) => (
                       <button
                         key={mode}
                         type="button"
@@ -75,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         onClick={() => onSelectControlViewMode(mode)}
                         className={`min-h-[44px] rounded-lg text-[12px] font-black transition-colors touch-manipulation ${controlViewMode === mode ? 'bg-slate-950 text-white shadow-sm' : 'bg-white text-slate-600'}`}
                       >
-                        {mode === 'current' ? 'A' : mode === 'new' ? 'B' : mode.toUpperCase()}
+                        {CONTROL_VIEWS[mode]}
                       </button>
                     ))}
                   </div>

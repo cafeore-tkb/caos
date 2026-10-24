@@ -1,6 +1,7 @@
 name: Build Pages bundle
 
 on:
+  pull_request:
   push:
     branches: [main]
   workflow_dispatch:
@@ -20,6 +21,10 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install
+      - name: Check types and style
+        run: npm run lint
+      - name: Test training
+        run: npm run test:training
       - name: Build
         run: npm run build
         env:
