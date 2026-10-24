@@ -101,3 +101,13 @@ A/Cの切替は表示状態だけを変更し、ゲームのカップ台帳・�
 `npm run test:training` は全モードでの合理的な割当方針による合格到達、未操作、早期終了、連打、制限時間、一時停止、条件違反、提供遅延、仕上がり差、統合のカップ追跡、限定豆の区別、移動と戻し、数量分割、マスターのフラグ、不正JSON、コメントの検証・到着時表示・統合後の元注文追跡、緊急の独立抽選・75%境界・一時停止・粗いtick・部分中断・全抽選結果での合格到達を検証する。
 
 `npm run lint`（型検査を含む）、`npm run build` と合わせてCIで実行する。
+
+## Learning flow and browser history (2026-10-25)
+
+`#training` opens a learning menu: tutorial → game → review. Nine interactive lessons cover A/C and order highlighting, number lookup/order tabs/comments and replies, assignment, nomination/senior requirements, undo/start/move/return, merge/split, timed completion, guaranteed emergency handling, and original-brew discard confirmation. Tasks advance only after the relevant interaction or reducer state; the tutorial clock advances only through its practice control. Lessons can be replayed, and experienced operators can open the game directly. Tutorial progress is browser-local and tutorial activity never creates a scored result.
+
+The game retains its three modes, sparse special orders, independent emergency probabilities and 80-point criteria. Continuing an original brew leaves it on the board with current main's discard suggestion, while only the remake retains credit for the replaced cup. A partial discard cannot delete unrelated cups. Queued merged cards can split one cup to unassigned while leaving the other in place.
+
+Finished games are stored in `localStorage` under `caos-training-results-v2` (latest 100 attempts): timestamp, mode, score, category details, feedback, violations, seed, emergency outcomes, cups and action log. The history screen filters by mode, shows best/pass counts and per-attempt details, and exports JSON. `caos-training-results-v1` score/date entries are migrated without inventing unavailable details. Reads validate stored data; denied storage or quota failures leave the current result visible and offer JSON export. Site-data deletion removes this device/browser's results; there is no account or cross-device sync. Course progress uses `caos-training-course-v1`.
+
+Current source reference: `cafeore-pos/main@173c9f18b71a4435fd967916378ed4df06efdbc4`. See `src/current-caos/UPSTREAM.md` for integration boundaries.

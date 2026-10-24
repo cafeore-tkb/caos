@@ -16,6 +16,8 @@ export interface ControlViewProps {
   currentTimeSec: number;
   clockOriginMs?: number;
   orderComments?: readonly BoardComment[];
+  onInteraction?: (kind: string) => void;
+  onDiscard?: (key: string, cupIds: string[]) => boolean;
   onUnstartBay?: (bayId: number) => void;
   onSplitCup?: (key: string, cupId: string) => void;
   onOpenLane?: (bayId: number) => void;
