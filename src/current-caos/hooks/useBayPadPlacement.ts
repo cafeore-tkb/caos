@@ -16,8 +16,12 @@ const pressable = (button: Element) => {
   const rect = button.getBoundingClientRect();
   const x = rect.left + rect.width / 2;
   return [rect.top + 4, rect.bottom - 4].every((y) => {
-    const hit = document.elementFromPoint(x, y);
-    return hit !== null && button.contains(hit);
+    // The tutorial coach moves away after the pad opens; do not let its previous
+    // position make us choose a row that is clipped by the board's scroll area.
+    const hit = document
+      .elementsFromPoint(x, y)
+      .find((element) => !element.closest("[data-training-tour]"));
+    return Boolean(hit && button.contains(hit));
   });
 };
 
