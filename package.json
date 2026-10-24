@@ -12,7 +12,7 @@
     "lint": "biome check . && tsc --noEmit",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "test:training": "node --import tsx --test src/training/*.test.ts",
+    "test:training": "node --import tsx --test src/training/*.test.ts src/current-caos/logic/cardPresentation.test.ts src/current-caos/logic/orderHighlights.test.ts",
     "training:generate": "node --import tsx scripts/generate-training.ts"
   },
   "dependencies": {

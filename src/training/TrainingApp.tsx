@@ -1,4 +1,17 @@
-import { ArrowLeft, Check, Download, FileJson, Flag, Gamepad2, Pause, Play, RotateCcw, Trophy, X } from 'lucide-react';
+import {
+  ArrowLeft,
+  BookOpen,
+  Check,
+  Download,
+  FileJson,
+  Flag,
+  Gamepad2,
+  Pause,
+  Play,
+  RotateCcw,
+  Trophy,
+  X,
+} from 'lucide-react';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { CONTROL_VIEWS, type ControlViewMode, ControlWorkspace } from '../components/ControlWorkspace';
 import type { OrderTicket } from '../types';
@@ -19,24 +32,10 @@ import './training.css';
 const TRAINING_CLOCK_ORIGIN = Date.UTC(2026, 9, 19, 1);
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
 const scenarioUrl = (mode: GameMode) => `${import.meta.env.BASE_URL}training/${mode}.json`;
-type HistoryEntry = { mode: GameMode; score: number; at: string };
-const readHistory = (): HistoryEntry[] => {
-  try {
-    const value = JSON.parse(localStorage.getItem('caos-training-results-v1') ?? '[]');
-    return Array.isArray(value)
-      ? value.filter(
-          (entry) =>
-            entry &&
-            Object.hasOwn(MODES, entry.mode) &&
-            Number.isFinite(entry.score) &&
-            entry.score >= 0 &&
-            entry.score <= 100
-        )
-      : [];
-  } catch {
-    return [];
-  }
-};
+
+import { HistoryView } from './HistoryView';
+import { COURSE_KEY, createResult, saveResult as persistResult, readCourse, readHistory } from './history';
+import { LESSONS, type Lesson, lessonComplete } from './tutorial';
 
 export default function TrainingApp() {
   const [scenario, setScenario] = useState<Scenario | null>(null);
@@ -44,7 +43,12 @@ export default function TrainingApp() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(false);
-  const [history, setHistory] = useState<HistoryEntry[]>(readHistory);
+  const [history, setHistory] = useState(readHistory);
+  const [page, setPage] = useState<'learn' | 'game' | 'history'>('learn');
+  const [lessonIndex, setLessonIndex] = useState<number | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [completed, setCompleted] = useState(readCourse);
+  const [storageError, setStorageError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -66,19 +70,156 @@ export default function TrainingApp() {
     return () => controller.abort();
   }, [mode]);
   const saveResult = (state: GameState) => {
-    const next = [
-      ...readHistory(),
-      { mode: state.scenario.mode, score: scoreGame(state).score, at: new Date().toISOString() },
-    ].slice(-30);
-    setHistory(next);
-    try {
-      localStorage.setItem('caos-training-results-v1', JSON.stringify(next));
-    } catch {
-      /* Results remain visible if storage is full. */
-    }
+    const saved = persistResult(createResult(state));
+    setHistory(saved.entries);
+    setStorageError(saved.saved ? '' : 'ブラウザへの保存に失敗しました。結果画面からJSONを保存してください。');
   };
+  if (lessonIndex !== null)
+    return (
+      <GameSession
+        key={`${lessonIndex}-${attempt}`}
+        scenario={LESSONS[lessonIndex].setup().scenario}
+        lesson={LESSONS[lessonIndex]}
+        lessonNumber={lessonIndex + 1}
+        onBack={() => setLessonIndex(null)}
+        onFinish={() => {}}
+        onRetry={() => setAttempt((value) => value + 1)}
+        onLessonNext={() => {
+          const next = [...new Set([...completed, LESSONS[lessonIndex].id])];
+          setCompleted(next);
+          try {
+            localStorage.setItem(COURSE_KEY, JSON.stringify(next));
+          } catch {
+            setStorageError('チュートリアルの進捗を保存できませんでした。この画面内では続けられます。');
+          }
+          if (lessonIndex + 1 === LESSONS.length) {
+            setLessonIndex(null);
+            setPage('game');
+          } else setLessonIndex(lessonIndex + 1);
+        }}
+      />
+    );
   if (playing && scenario)
-    return <GameSession scenario={scenario} onBack={() => setPlaying(false)} onFinish={saveResult} />;
+    return (
+      <GameSession
+        scenario={scenario}
+        onBack={() => setPlaying(false)}
+        onFinish={saveResult}
+        storageError={storageError}
+        onHistory={() => {
+          setPlaying(false);
+          setPage('history');
+        }}
+      />
+    );
+  if (page === 'history') return <HistoryView entries={history} onBack={() => setPage('learn')} />;
+  if (page === 'learn')
+    return (
+      <main className="training-home">
+        <div className="training-container">
+          <a className="training-back" href="#control">
+            <ArrowLeft size={16} />
+            管制盤に戻る
+          </a>
+          <header className="training-title">
+            <span className="training-eyebrow">
+              <BookOpen size={18} />
+              CaOS LEARNING
+            </span>
+            <h1>操作を覚えて、店舗運営に挑戦。</h1>
+            <p>
+              実際のマスターシートで、注文の確認から緊急対応まで順番に練習します。
+              <br />
+              チュートリアルを終えたら、3つのゲームモードで判断と操作を確かめましょう。
+            </p>
+          </header>
+          <div className="training-learning-flow">
+            <span className="active">1 チュートリアル</span>
+            <span>2 ゲームで実践</span>
+            <span>3 記録を振り返る</span>
+          </div>
+          <section className="training-course-intro training-panel">
+            <div>
+              <h2>
+                <BookOpen size={20} />
+                操作チュートリアル
+              </h2>
+              <p>時間に追われず、実際に操作して学ぶ全{LESSONS.length}レッスン。A・Cは自由に切り替えられます。</p>
+              <b>
+                {LESSONS.filter((lesson) => completed.includes(lesson.id)).length} / {LESSONS.length} 完了
+              </b>
+            </div>
+            <button
+              type="button"
+              className="training-primary"
+              onClick={() =>
+                setLessonIndex(
+                  Math.max(
+                    0,
+                    LESSONS.findIndex((lesson) => !completed.includes(lesson.id))
+                  )
+                )
+              }
+            >
+              <Play size={18} />
+              {LESSONS.every((lesson) => completed.includes(lesson.id))
+                ? '最初から復習する'
+                : completed.length
+                  ? '続きから練習する'
+                  : 'チュートリアルを始める'}
+            </button>
+          </section>
+          <ol className="training-curriculum">
+            {LESSONS.map((lesson, index) => (
+              <li key={lesson.id}>
+                <button type="button" onClick={() => setLessonIndex(index)}>
+                  <span className={`training-lesson-number ${completed.includes(lesson.id) ? 'done' : ''}`}>
+                    {completed.includes(lesson.id) ? <Check size={20} /> : String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span>
+                    <strong>{lesson.title}</strong>
+                    <small>{lesson.steps.map((step) => step.label).join(' / ')}</small>
+                  </span>
+                  <span aria-hidden="true">→</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+          <div className="training-learning-actions">
+            <section className="training-panel">
+              <h2>
+                <Gamepad2 size={18} />
+                ゲームで実践
+              </h2>
+              <p>ファスト・ミドル・フルで80点を目指します。操作を知っている方はここから始められます。</p>
+              <button type="button" className="training-primary" onClick={() => setPage('game')}>
+                ゲームモードへ進む
+              </button>
+            </section>
+            <section className="training-panel">
+              <h2>
+                <Trophy size={18} />
+                自分の記録
+              </h2>
+              <p>
+                {history.length
+                  ? `${history.length}回の挑戦を保存しています。`
+                  : 'ゲームを終了・採点すると、このブラウザに結果を保存します。'}
+                内訳と操作記録を見て、次の練習につなげましょう。
+              </p>
+              <button type="button" className="training-secondary" onClick={() => setPage('history')}>
+                スコア履歴を見る
+              </button>
+            </section>
+          </div>
+          {storageError && (
+            <p role="alert" className="training-error">
+              {storageError}
+            </p>
+          )}
+        </div>
+      </main>
+    );
   const dripCups =
     scenario?.orders.reduce(
       (sum, order) =>
@@ -89,10 +230,16 @@ export default function TrainingApp() {
   return (
     <main className="training-home">
       <div className="training-container">
-        <a className="training-back" href="#control">
-          <ArrowLeft size={16} />
-          管制盤に戻る
-        </a>
+        <div className="training-menu-nav">
+          <button type="button" className="training-back" onClick={() => setPage('learn')}>
+            <ArrowLeft size={16} />
+            練習メニューに戻る
+          </button>
+          <button type="button" className="training-secondary" onClick={() => setPage('history')}>
+            <Trophy size={16} />
+            スコア履歴
+          </button>
+        </div>
         <header className="training-title">
           <span className="training-eyebrow">
             <Gamepad2 size={18} />
@@ -105,6 +252,12 @@ export default function TrainingApp() {
             80点が、店舗運営を任せられる操作の目安です。
           </p>
         </header>
+        {LESSONS.every((lesson) => completed.includes(lesson.id)) && (
+          <p className="training-course-done">
+            <Check size={16} />
+            チュートリアル完了。ゲームで80点を目指しましょう。
+          </p>
+        )}
         <div className="training-mode-grid" role="group" aria-label="ゲームモード">
           {(Object.keys(MODES) as GameMode[]).map((key, index) => {
             const config = MODES[key];
@@ -264,20 +417,36 @@ function GameSession({
   scenario,
   onBack,
   onFinish,
+  lesson,
+  lessonNumber,
+  onLessonNext,
+  onRetry,
+  onHistory,
+  storageError,
 }: {
   scenario: Scenario;
   onBack: () => void;
   onFinish: (state: GameState) => void;
+  lesson?: Lesson;
+  lessonNumber?: number;
+  onLessonNext?: () => void;
+  onRetry?: () => void;
+  onHistory?: () => void;
+  storageError?: string;
 }) {
   const [state, dispatch] = useReducer(gameReducer, scenario, (input) =>
-    startGame(input, crypto.getRandomValues(new Uint32Array(1))[0])
+    lesson ? lesson.setup() : startGame(input, crypto.getRandomValues(new Uint32Array(1))[0])
   );
+  const [interactions, setInteractions] = useState<string[]>([]);
+  const interact = (kind: string) => setInteractions((old) => (old.includes(kind) ? old : [...old, kind]));
   const [speed, setSpeed] = useState(2);
   const [viewMode, setViewMode] = useState<ControlViewMode>('current');
   const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(
     null
   );
   const [selected, setSelected] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [searchNotice, setSearchNotice] = useState('');
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [endOpen, setEndOpen] = useState(false);
   const [emptyBay, setEmptyBay] = useState<number | null>(null);
@@ -288,7 +457,7 @@ function GameSession({
   const [remakeTarget, setRemakeTarget] = useState('');
   const [remakeInterrupt, setRemakeInterrupt] = useState('');
   useEffect(() => {
-    if (state.status !== 'active' || state.paused || endOpen) return;
+    if (lesson || state.status !== 'active' || state.paused || endOpen) return;
     let previous = performance.now();
     let remainder = 0;
     const timer = window.setInterval(() => {
@@ -302,13 +471,13 @@ function GameSession({
       }
     }, 100);
     return () => window.clearInterval(timer);
-  }, [state.status, state.paused, speed, endOpen]);
+  }, [state.status, state.paused, speed, endOpen, lesson]);
   useEffect(() => {
-    if (state.status === 'finished' && !saved.current) {
+    if (!lesson && state.status === 'finished' && !saved.current) {
       saved.current = true;
       onFinish(state);
     }
-  }, [state, onFinish]);
+  }, [state, onFinish, lesson]);
   const result = scoreGame(state);
   const detail = detailKey
     ? state.bays
@@ -413,7 +582,18 @@ function GameSession({
             </ol>
           </details>
           {exportError && <p role="alert">{exportError}</p>}
+          {storageError ? (
+            <p role="alert" className="training-error">
+              {storageError}
+            </p>
+          ) : (
+            <p>このブラウザに結果を保存しました。履歴からいつでも振り返れます。</p>
+          )}
           <div className="training-result-actions">
+            <button type="button" onClick={onHistory}>
+              <Trophy size={18} />
+              スコア履歴を見る
+            </button>
             <button type="button" className="training-primary" onClick={onBack}>
               <RotateCcw size={18} />
               モードを選んで再挑戦
@@ -438,22 +618,30 @@ function GameSession({
     setDetailKey(ticket.ticketUid ?? null);
   };
   return (
-    <div className="training-game">
+    <div className={`training-game ${lesson ? 'is-tutorial' : ''}`}>
       <header className="training-game-header">
         <div>
           <span className="training-eyebrow">CaOS TRAINING</span>
-          <h1>{MODES[scenario.mode].label}</h1>
+          <h1>{lesson ? `レッスン ${lessonNumber} / ${LESSONS.length}` : MODES[scenario.mode].label}</h1>
         </div>
         <nav className="training-view-switch" aria-label="管制盤の表示切替">
           {(Object.keys(CONTROL_VIEWS) as ControlViewMode[]).map((mode) => (
-            <button type="button" key={mode} aria-pressed={viewMode === mode} onClick={() => setViewMode(mode)}>
+            <button
+              type="button"
+              key={mode}
+              aria-pressed={viewMode === mode}
+              onClick={() => {
+                setViewMode(mode);
+                interact(`view:${mode}`);
+              }}
+            >
               {CONTROL_VIEWS[mode]}
             </button>
           ))}
         </nav>
         <div className="training-countdown">
-          <small>残り</small>
-          <b>{clock(scenario.durationSec - state.nowSec)}</b>
+          <small>{lesson ? '練習の時計' : '残り'}</small>
+          <b>{clock(lesson ? state.nowSec : scenario.durationSec - state.nowSec)}</b>
         </div>
         <div className="training-game-counts">
           <b>
@@ -463,30 +651,87 @@ function GameSession({
             完了 {result.done}/{result.total}杯
           </span>
         </div>
-        <div className="training-game-controls">
-          <button
-            type="button"
-            onClick={() => dispatch({ type: 'pause' })}
-            aria-label={state.paused ? '再開' : '一時停止'}
-          >
-            {state.paused ? <Play size={18} /> : <Pause size={18} />}
-          </button>
-          <label>
-            速度
-            <select aria-label="ゲーム速度" value={speed} onChange={(event) => setSpeed(Number(event.target.value))}>
-              {[1, 2, 5, 10].map((value) => (
-                <option key={value} value={value}>
-                  {value}倍
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" onClick={() => setEndOpen(true)}>
-            <Flag size={16} />
-            終了・採点
-          </button>
-        </div>
+        {lesson ? (
+          <div className="training-game-controls">
+            <button type="button" onClick={onRetry}>
+              やり直す
+            </button>
+            <button type="button" onClick={onBack}>
+              メニューへ
+            </button>
+          </div>
+        ) : (
+          <div className="training-game-controls">
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'pause' })}
+              aria-label={state.paused ? '再開' : '一時停止'}
+            >
+              {state.paused ? <Play size={18} /> : <Pause size={18} />}
+            </button>
+            <label>
+              速度
+              <select aria-label="ゲーム速度" value={speed} onChange={(event) => setSpeed(Number(event.target.value))}>
+                {[1, 2, 5, 10].map((value) => (
+                  <option key={value} value={value}>
+                    {value}倍
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" onClick={() => setEndOpen(true)}>
+              <Flag size={16} />
+              終了・採点
+            </button>
+          </div>
+        )}
       </header>
+      {lesson && (
+        <section className="training-lesson-guide" aria-label="レッスンのガイド">
+          <div>
+            <h2>{lesson.title}</h2>
+            <p>{lesson.description}</p>
+            <ul>
+              {lesson.steps.map((step) => (
+                <li className={step.done(state, interactions) ? 'is-done' : ''} key={step.label}>
+                  {step.done(state, interactions) ? '✓' : '○'} {step.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="training-lesson-controls">
+            <button
+              type="button"
+              className="training-secondary"
+              disabled={!state.bays.some((bay) => bay.queue[0]?.status === 'brewing')}
+              onClick={() => {
+                const remaining = state.bays.flatMap((bay) =>
+                  bay.queue[0]?.status === 'brewing' ? [Math.max(1, bay.queue[0].timeRemainingSec ?? 300)] : []
+                );
+                dispatch({
+                  type: 'tick',
+                  seconds: Math.min(Math.max(1, scenario.durationSec - state.nowSec - 1), ...remaining),
+                });
+              }}
+            >
+              抽出時間を進める
+            </button>
+            <button
+              type="button"
+              className="training-primary"
+              disabled={!lessonComplete(lesson, state, interactions)}
+              onClick={onLessonNext}
+            >
+              {lessonNumber === LESSONS.length ? 'ゲームモードへ進む' : '次のレッスンへ'}
+            </button>
+            <span role="status">
+              {lessonComplete(lesson, state, interactions)
+                ? 'できました。次へ進めます。'
+                : '時計は自動で進みません。盤面を操作してみましょう。'}
+            </span>
+          </div>
+        </section>
+      )}
       <div className="training-progress">
         <div style={{ width: `${(100 * state.nowSec) / scenario.durationSec}%` }} />
       </div>
@@ -497,6 +742,39 @@ function GameSession({
           </button>
         </div>
       )}
+      <form
+        className="training-order-search"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const number = Number(search);
+          const order = state.scenario.orders.find(
+            (entry) => entry.orderId === number && state.arrived.includes(number)
+          );
+          if (!order) {
+            setSearchNotice('到着済みの注文番号を入力してください');
+            return;
+          }
+          setSelected(`#${String(number).padStart(3, '0')}`);
+          setSearchNotice(`#${String(number).padStart(3, '0')} を選択しました`);
+          interact('search');
+        }}
+      >
+        <label>
+          番号
+          <input
+            aria-label="注文番号で探す"
+            inputMode="numeric"
+            pattern="[0-9]{1,4}"
+            value={search}
+            onChange={(event) => setSearch(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
+            placeholder="001"
+          />
+        </label>
+        <button type="submit" disabled={!search}>
+          探す
+        </button>
+        <span role="status">{searchNotice}</span>
+      </form>
       <div className="training-game-hint">
         <span>80点が合格の目安 · 限定豆は1・6番 · ▶で開始・✓で完了</span>
         <span role="status">{state.notice || '未割当の注文カードを選んで、担当者へ割り当ててください'}</span>
@@ -552,6 +830,11 @@ function GameSession({
           currentTimeSec={state.nowSec}
           clockOriginMs={TRAINING_CLOCK_ORIGIN}
           orderComments={trainingComments(state, TRAINING_CLOCK_ORIGIN)}
+          onInteraction={interact}
+          onDiscard={(key, cupIds) => {
+            dispatch({ type: 'discard', key, cupIds });
+            return true;
+          }}
           onUnstartBay={(bayId) => dispatch({ type: 'unstart', bayId })}
           onSplitCup={(key, cupId) => dispatch({ type: 'split', key, cupId })}
           selectedOrderId={selected}
@@ -685,7 +968,7 @@ function GameSession({
                   >
                     <option value="">選択してください</option>
                     <option value="interrupt">中断する</option>
-                    <option value="continue">続ける（入れ直し対象を除く）</option>
+                    <option value="continue">続ける（元の抽出を残す）</option>
                   </select>
                 </label>
               )}

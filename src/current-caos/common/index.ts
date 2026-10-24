@@ -34,3 +34,8 @@ export interface OrderComment { author: "cashier" | "master" | "serve" | "others
 export interface OrderEntity { id?: string; orderId: number; comments: OrderComment[]; }
 
 export interface CaosLane { dripper: number; name: string; senior: boolean; }
+
+export { caosDiscardCandidates } from "./lib/caos-discard";
+
+export const AUTHOR_MARKS = {cashier: "レ", master: "マ", serve: "提", others: "他"};
+export type { Cup } from "./models/cup";

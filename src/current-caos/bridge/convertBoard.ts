@@ -1,7 +1,7 @@
 import type { ControlViewProps } from '../../components/ControlWorkspace';
 import { itemAbbr, itemType, masterColor, seniorOnly } from '../../training/master';
 import type { OrderTicket, UnassignedOrder } from '../../types';
-import type { CaosBoardCup, CaosCard } from '../common';
+import { type CaosBoardCup, type CaosCard, type CaosOrderInput, caosDiscardCandidates } from '../common';
 import type { CardLooks } from '../logic/cards';
 import { type CommentsByOrder, cardComments } from '../logic/comments';
 import { boardLanes, cardPlaces } from '../logic/lanes';
@@ -61,7 +61,7 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
       const orderId = sourceCup?.orderId ?? ids[Math.min(index, ids.length - 1)];
       const id = sourceCup?.id ?? input.trainingCupIds?.[index] ?? `${key}:${index}`;
       return {
-        id,
+        id: input.isRebrew ? `${key}:${id}` : id,
         cupId: id,
         orderId,
         orderNo: Number(orderId.replace(/\D/g, '')),
@@ -75,7 +75,7 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
           id: input.beanName,
           name: input.beanName,
           abbr: itemAbbr(input.beanName),
-          item_type: { ...type, id: type.name },
+          item_type: { serve_with_snack: false, ...type, id: type.name },
         },
         nominatedDripper: input.preferredBaristaId ?? null,
         nominee: input.preferredBaristaId
@@ -115,6 +115,14 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
       card.key,
       {
         comments: cardComments(card, commentsByOrder),
+        discardCandidates: caosDiscardCandidates(cards, card),
+        discard: props.onDiscard
+          ? (ids: string[]) =>
+              props.onDiscard?.(
+                card.key,
+                ids.map((id) => card.cups.find((cup) => cup.id === id)?.cupId ?? id)
+              ) ?? false
+          : undefined,
         color: masterColor(card.cups[0].item.name, card.nominatedDripper !== null),
         offSenior:
           card.seniorOnly &&
@@ -130,14 +138,21 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
   const rows: UnfinishedOrder[] = [...groups]
     .filter(([, entries]) => entries.some((card) => card.status !== 'done'))
     .map(([no, entries]) => {
-      const cups = entries.flatMap((card) => card.cups.filter((cup) => cup.orderNo === no));
+      const cups = [
+        ...new Map(
+          entries
+            .slice()
+            .sort((a, b) => Number(a.emergency) - Number(b.emergency))
+            .flatMap((card) => card.cups.filter((cup) => cup.orderNo === no).map((cup) => [cup.cupId, cup] as const))
+        ).values(),
+      ];
       const waitSec = Math.max(0, Math.floor((nowMs - Math.min(...cups.map((cup) => cup.orderedAt.getTime()))) / 1000));
       return {
         orderId: cups[0].orderId,
         orderNo: no,
         status: 'preparing' as const,
         cups: cups.length,
-        readyCups: 0,
+        readyCups: cups.filter((cup) => cup.state.brewFinishedAt !== null).length,
         emergency: entries.some((card) => card.emergency),
         cards: entries.map((card) => ({ card, place: places.get(card.key) ?? '未割当' })),
         comments: commentsByOrder.get(cups[0].orderId) ?? [],
@@ -146,5 +161,31 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
       };
     })
     .sort((a, b) => a.orderNo - b.orderNo);
-  return { cards, lanes, looks, nowMs, originals, rows, comments: props.orderComments ?? [] };
+  const orders: CaosOrderInput[] = [...groups]
+    .map(([no, entries]) => {
+      const cups = [
+        ...new Map(
+          entries.flatMap((card) =>
+            card.cups.filter((cup) => cup.orderNo === no).map((cup) => [cup.cupId, { cup, card }] as const)
+          )
+        ).values(),
+      ];
+      return {
+        id: cups[0].cup.orderId,
+        orderId: no,
+        createdAt: new Date(Math.min(...cups.map(({ cup }) => cup.orderedAt.getTime()))),
+        menus: [],
+        cups: cups.map(({ cup, card }) => ({
+          id: cup.cupId,
+          orderMenuId: '',
+          item: cup.item,
+          readyAt: card.finishedAt,
+          servedAt: null,
+          ...cup.state,
+          emergencies: [],
+        })),
+      };
+    })
+    .sort((a, b) => a.orderId - b.orderId);
+  return { cards, lanes, looks, nowMs, originals, rows, orders, comments: props.orderComments ?? [] };
 }

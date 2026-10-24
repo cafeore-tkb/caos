@@ -93,6 +93,7 @@ export type GameAction =
   | { type: 'start'; bayId: number }
   | { type: 'unstart'; bayId: number }
   | { type: 'split'; key: string; cupId: string }
+  | { type: 'discard'; key: string; cupIds: string[] }
   | {
       type: 'rebrew';
       key: string;
@@ -495,15 +496,15 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       let queue = bay.queue.flatMap((card) =>
         keyOf(card) !== action.key
           ? [card]
-          : action.interrupt || remaining.length === 0
+          : action.interrupt
             ? []
             : [
                 {
                   ...card,
                   trainingCupIds: remaining,
-                  sourceCups: card.sourceCups?.filter((cup) => remaining.includes(cup.id)),
-                  cupCount: remaining.length,
-                  totalDurationSec: brewDuration(card.beanName, remaining.length),
+                  sourceCups: card.sourceCups,
+                  cupCount: card.cupCount,
+                  totalDurationSec: card.totalDurationSec,
                 },
               ]
       );
@@ -519,7 +520,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
           ...bay,
           queue,
           pastTickets: [
-            ...(sourceHere && (action.interrupt || remaining.length === 0)
+            ...(sourceHere && action.interrupt
               ? [
                   {
                     ...sourceHere,
@@ -535,7 +536,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 ? {
                     ...card,
                     trainingCupIds: (card.trainingCupIds ?? []).filter((id) => !ids.includes(id)),
-                    isInterrupted: true,
+                    sourceCups: card.sourceCups?.filter((cup) => !ids.includes(cup.id)),
+                    cupCount: remaining.length,
+                    isInterrupted: remaining.length === 0,
                   }
                 : card
             ),
@@ -568,10 +571,14 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     );
   }
   if (action.type === 'split') {
-    const card = state.unassigned.find((entry) => keyOf(entry) === action.key);
+    const card =
+      state.unassigned.find((entry) => keyOf(entry) === action.key) ??
+      state.bays
+        .flatMap((bay) => bay.queue)
+        .find((entry) => keyOf(entry) === action.key && entry.status === 'scheduled');
     if (card?.cupCount !== 2 || !card.trainingCupIds?.includes(action.cupId)) return state;
     const parts = card.trainingCupIds.map((id) => ({
-      ...card,
+      ...toUnassigned(card as OrderTicket),
       id: `#${String(state.cups[id].orderId).padStart(3, '0')}`,
       ticketUid: `split-${id}`,
       sourceOrderIds: undefined,
@@ -581,9 +588,97 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       badgeTag: '1杯',
     }));
     return withEvent(
-      { ...state, unassigned: [...state.unassigned.filter((entry) => entry !== card), ...parts] },
+      {
+        ...state,
+        bays: state.bays.map((bay) =>
+          schedule(
+            {
+              ...bay,
+              queue: bay.queue.map((entry) =>
+                entry !== card
+                  ? entry
+                  : {
+                      ...entry,
+                      cupCount: 1,
+                      trainingCupIds: entry.trainingCupIds?.filter((id) => id !== action.cupId),
+                      sourceCups: entry.sourceCups?.filter((cup) => cup.id !== action.cupId),
+                      totalDurationSec: brewDuration(entry.beanName, 1),
+                    }
+              ),
+            },
+            state.nowSec
+          )
+        ),
+        unassigned: [
+          ...state.unassigned.filter((entry) => entry !== card),
+          ...('status' in card ? parts.filter((part) => part.trainingCupIds.includes(action.cupId)) : parts),
+        ],
+      },
       'split',
       `${card.id}を1杯ずつに分離`
+    );
+  }
+  if (action.type === 'discard') {
+    const source = state.bays.flatMap((bay) => bay.queue).find((card) => keyOf(card) === action.key);
+    const remakes = [
+      ...state.unassigned,
+      ...state.bays.flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])]),
+    ].filter((card) => card.isRebrew && card.rebrewOfTicketUid === action.key);
+    if (
+      !source ||
+      !action.cupIds.length ||
+      new Set(action.cupIds).size !== action.cupIds.length ||
+      action.cupIds.some(
+        (id) =>
+          source.trainingCupIds?.includes(id) ||
+          !source.sourceCups?.some((cup) => cup.id === id) ||
+          !remakes.some((card) => card.sourceCups?.some((cup) => cup.id === id))
+      )
+    )
+      return state;
+    const remaining = source.sourceCups?.filter((cup) => !action.cupIds.includes(cup.id)) ?? [];
+    return withEvent(
+      {
+        ...state,
+        bays: state.bays.map((bay) =>
+          schedule(
+            {
+              ...bay,
+              queue: bay.queue.flatMap((card) =>
+                keyOf(card) !== action.key
+                  ? [card]
+                  : remaining.length
+                    ? [
+                        {
+                          ...card,
+                          cupCount: remaining.length,
+                          sourceCups: remaining,
+                          totalDurationSec: brewDuration(card.beanName, remaining.length),
+                        },
+                      ]
+                    : []
+              ),
+              pastTickets: [
+                ...(bay.pastTickets ?? []),
+                ...(!remaining.length && bay.queue.includes(source)
+                  ? [
+                      {
+                        ...source,
+                        status: 'completed' as const,
+                        completedAtSec: state.nowSec,
+                        isInterrupted: true,
+                        trainingCupIds: [],
+                      },
+                    ]
+                  : []),
+              ],
+            },
+            state.nowSec
+          )
+        ),
+      },
+      'discard',
+      `${source.id} 淹れ直し登録済みの元抽出 ${action.cupIds.length}杯を破棄`
     );
   }
   if (action.type === 'complete') {
