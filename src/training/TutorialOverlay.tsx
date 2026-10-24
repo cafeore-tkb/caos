@@ -72,7 +72,7 @@ export function TutorialOverlay({
       const viewport = { width: document.documentElement.clientWidth, height: window.innerHeight };
       const obstacles = [
         ...document.querySelectorAll(
-          '.training-ticket-panel, dialog[open], [aria-label="ドリッパーの情報"], [data-comment-dock], [data-caos-action-tray]'
+          '.training-ticket-panel, dialog[open], [aria-label="ドリッパーの情報"], [data-comment-dock], [data-caos-action-tray], [data-search-key] button[data-bay-target]'
         ),
       ]
         .filter((item) => !item.closest('[data-training-tour]'))

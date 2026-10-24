@@ -72,3 +72,12 @@ test('completion positions without a target do not require a fictitious arrow', 
   const panel = placeTour(null, { width: 338, height: 220 }, { width: 1024, height: 768 });
   assert.ok(panel.x > 12 && panel.y > 12);
 });
+test('pointing to one assignment choice leaves both rows of choices visible', () => {
+  const target = { x: 970, y: 181, width: 27, height: 28 };
+  const rows = [
+    { x: 935, y: 177, width: 96, height: 36 },
+    { x: 935, y: 275, width: 96, height: 36 },
+  ];
+  const panel = placeTour(target, { width: 338, height: 250 }, { width: 1280, height: 720 }, rows);
+  for (const row of rows) assert.equal(overlapArea(panel, row), 0);
+});
