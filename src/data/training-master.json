@@ -1,0 +1,360 @@
+{
+  "item_types": [
+    {
+      "name": "blend",
+      "display_name": "ブレンド",
+      "makes_cup": true,
+      "needs_brew": true,
+      "senior_only": false,
+      "iced_brew": false
+    },
+    {
+      "name": "gourmet",
+      "display_name": "グルメ豆",
+      "makes_cup": true,
+      "needs_brew": true,
+      "senior_only": false,
+      "iced_brew": false
+    },
+    {
+      "name": "ice",
+      "display_name": "アイス",
+      "makes_cup": true,
+      "needs_brew": true,
+      "senior_only": false,
+      "iced_brew": true
+    },
+    {
+      "name": "limited",
+      "display_name": "限定",
+      "makes_cup": true,
+      "needs_brew": true,
+      "senior_only": true,
+      "iced_brew": false
+    },
+    {
+      "name": "milk",
+      "display_name": "ミルク",
+      "makes_cup": true,
+      "needs_brew": false,
+      "senior_only": false,
+      "iced_brew": false
+    },
+    {
+      "name": "others",
+      "display_name": "その他",
+      "makes_cup": false,
+      "needs_brew": false,
+      "senior_only": false,
+      "iced_brew": false
+    }
+  ],
+  "items": [
+    {
+      "name": "余音ブレンド",
+      "abbr": "よいん",
+      "item_type": "blend"
+    },
+    {
+      "name": "珈琲・俺ブレンド",
+      "abbr": "俺ブレ",
+      "item_type": "blend"
+    },
+    {
+      "name": "アロマナティーボ",
+      "abbr": "アロマ",
+      "item_type": "limited"
+    },
+    {
+      "name": "チロソ",
+      "abbr": "チロソ",
+      "item_type": "limited"
+    },
+    {
+      "name": "ケニア",
+      "abbr": "ケニア",
+      "item_type": "gourmet"
+    },
+    {
+      "name": "キリマン",
+      "abbr": "キリマン",
+      "item_type": "gourmet"
+    },
+    {
+      "name": "ブラジル",
+      "abbr": "ブラジル",
+      "item_type": "gourmet"
+    },
+    {
+      "name": "アイスコーヒー",
+      "abbr": "氷",
+      "item_type": "ice"
+    },
+    {
+      "name": "アイスオレ",
+      "abbr": "牛",
+      "item_type": "ice"
+    },
+    {
+      "name": "アイスミルク",
+      "abbr": "ミルク",
+      "item_type": "milk"
+    },
+    {
+      "name": "コースター",
+      "abbr": "コースター",
+      "item_type": "others"
+    },
+    {
+      "name": "缶バッジ",
+      "abbr": "バッジ",
+      "item_type": "others"
+    }
+  ],
+  "menus": [
+    {
+      "name": "余音ブレンド",
+      "abbr": "よいん",
+      "price": 500,
+      "key": "q",
+      "priority": 49
+    },
+    {
+      "name": "珈琲・俺ブレンド",
+      "abbr": "俺ブレ",
+      "price": 300,
+      "key": "w",
+      "priority": 48
+    },
+    {
+      "name": "アロマナティーボ",
+      "abbr": "アロマ",
+      "price": 1000,
+      "key": "/",
+      "priority": 45
+    },
+    {
+      "name": "チロソ",
+      "abbr": "チロソ",
+      "price": 1000,
+      "key": "]",
+      "priority": 44
+    },
+    {
+      "name": "ケニア",
+      "abbr": "ケニア",
+      "price": 400,
+      "key": "+",
+      "priority": 39
+    },
+    {
+      "name": "キリマンジャロ",
+      "abbr": "キリマン",
+      "price": 400,
+      "key": ";",
+      "priority": 38
+    },
+    {
+      "name": "ブラジル",
+      "abbr": "ブラジル",
+      "price": 400,
+      "key": "e",
+      "priority": 37
+    },
+    {
+      "name": "アイスコーヒー",
+      "abbr": "氷",
+      "price": 400,
+      "key": "|",
+      "priority": 29
+    },
+    {
+      "name": "アイスオレ",
+      "abbr": "牛",
+      "price": 500,
+      "key": "[",
+      "priority": 28
+    },
+    {
+      "name": "アイスミルク",
+      "abbr": "ミルク",
+      "price": 100,
+      "key": ".",
+      "priority": 27
+    },
+    {
+      "name": "コースター",
+      "abbr": "コースター",
+      "price": 100,
+      "key": ",",
+      "priority": 9
+    },
+    {
+      "name": "缶バッジ",
+      "abbr": "バッジ",
+      "price": 200,
+      "key": "(",
+      "priority": 8
+    }
+  ],
+  "menu_items": [
+    {
+      "menu": "q",
+      "item": "余音ブレンド",
+      "quantity": 1
+    },
+    {
+      "menu": "w",
+      "item": "珈琲・俺ブレンド",
+      "quantity": 1
+    },
+    {
+      "menu": "/",
+      "item": "アロマナティーボ",
+      "quantity": 1
+    },
+    {
+      "menu": "]",
+      "item": "チロソ",
+      "quantity": 1
+    },
+    {
+      "menu": "+",
+      "item": "ケニア",
+      "quantity": 1
+    },
+    {
+      "menu": ";",
+      "item": "キリマン",
+      "quantity": 1
+    },
+    {
+      "menu": "e",
+      "item": "ブラジル",
+      "quantity": 1
+    },
+    {
+      "menu": "|",
+      "item": "アイスコーヒー",
+      "quantity": 1
+    },
+    {
+      "menu": "[",
+      "item": "アイスオレ",
+      "quantity": 1
+    },
+    {
+      "menu": ".",
+      "item": "アイスミルク",
+      "quantity": 1
+    },
+    {
+      "menu": ",",
+      "item": "コースター",
+      "quantity": 1
+    },
+    {
+      "menu": "(",
+      "item": "缶バッジ",
+      "quantity": 1
+    }
+  ],
+  "color_settings": [
+    {
+      "target_type": "Item",
+      "target": "珈琲・俺ブレンド",
+      "screen": "cashier",
+      "color": "#6f2d01"
+    },
+    {
+      "target_type": "Item",
+      "target": "コースター",
+      "screen": "cashier",
+      "color": "#eeeeee"
+    },
+    {
+      "target_type": "Item",
+      "target": "余音ブレンド",
+      "screen": "cashier",
+      "color": "#ffbb00"
+    },
+    {
+      "target_type": "Item",
+      "target": "アイスミルク",
+      "screen": "cashier",
+      "color": "#fef8cd"
+    },
+    {
+      "target_type": "Item",
+      "target": "アイスミルク",
+      "screen": "serve",
+      "color": "#fef8cd"
+    },
+    {
+      "target_type": "Item",
+      "target": "缶バッジ",
+      "screen": "cashier",
+      "color": "#eeeeee"
+    },
+    {
+      "target_type": "Item",
+      "target": "アイスオレ",
+      "screen": "serve",
+      "color": "#fef8cd"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "others",
+      "screen": "nominated",
+      "color": "#ecabed"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "blend",
+      "screen": "nominated",
+      "color": "#ecabed"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "gourmet",
+      "screen": "nominated",
+      "color": "#ecabed"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "ice",
+      "screen": "cashier",
+      "color": "#cdedfe"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "ice",
+      "screen": "master",
+      "color": "#cdedfe"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "ice",
+      "screen": "nominated",
+      "color": "#ecabed"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "limited",
+      "screen": "cashier",
+      "color": "#fecdcd"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "limited",
+      "screen": "master",
+      "color": "#fecdcd"
+    },
+    {
+      "target_type": "ItemType",
+      "target": "limited",
+      "screen": "nominated",
+      "color": "#ecabed"
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { itemCode, masterItem, needsBrew } from '../training/master';
 import type { Barista, BeanCode, UnassignedOrder } from '../types';
 import { splitIntoDripUnits } from './orderQueue';
 
@@ -37,6 +38,7 @@ export const posOrdersSocketUrl = (baseUrl: string) =>
 export const isPendingPosOrder = (order: PosOrder) => order.ready_at === null && order.served_at === null;
 
 const posBeanCode = (name: string, type: string): BeanCode => {
+  if (masterItem(name)) return itemCode(name);
   if (type === 'ice') return 'ICE';
   if (type === 'iceOre') return 'MILK';
   if (name.includes('俺')) return 'ORE';
@@ -60,7 +62,7 @@ export const posOrderTicketPrefix = (posOrderId: string) => `pos-${posOrderId}-`
 export const posOrderToDripUnits = (order: PosOrder, baristas: Barista[]): UnassignedOrder[] => {
   const grouped = new Map<
     string,
-    { beanCode: BeanCode; names: string[]; count: number; preferredBaristaId?: number; assignee?: string }
+    { beanCode: BeanCode; name: string; count: number; preferredBaristaId?: number; assignee?: string }
   >();
   order.menus.forEach((line) => {
     const assignee = line.assignee?.trim() || undefined;
@@ -68,12 +70,17 @@ export const posOrderToDripUnits = (order: PosOrder, baristas: Barista[]): Unass
     line.menu.items.forEach(({ item, quantity }) => {
       const type = item.item_type.name;
       // アイスミルクとグッズは抽出しないので、ドリップ管制に載せない。
-      if (type === 'others' || type === 'milk' || item.name.includes('アイスミルク')) return;
+      if (
+        (masterItem(item.name) && !needsBrew(item.name)) ||
+        type === 'others' ||
+        type === 'milk' ||
+        item.name.includes('アイスミルク')
+      )
+        return;
       const beanCode = posBeanCode(item.name, type);
-      const key = `${beanCode}-${assignee ?? ''}`;
-      const current = grouped.get(key) || { beanCode, names: [], count: 0, preferredBaristaId, assignee };
+      const key = `${item.name}-${assignee ?? ''}`;
+      const current = grouped.get(key) || { beanCode, name: item.name, count: 0, preferredBaristaId, assignee };
       current.count += quantity;
-      if (!current.names.includes(item.abbr)) current.names.push(item.abbr);
       grouped.set(key, current);
     });
   });
@@ -85,10 +92,10 @@ export const posOrderToDripUnits = (order: PosOrder, baristas: Barista[]): Unass
       id,
       ticketUid: `${posOrderTicketPrefix(order.id)}${group.beanCode}-${index}`,
       beanCode: group.beanCode,
-      beanName: `${group.names.join('・')}${unmatchedAssignee}`,
+      beanName: `${group.name}${unmatchedAssignee}`,
       cupCount: group.count,
       badgeTag: `${group.count}杯`,
-      predictedTimeStr: group.count > 1 ? '3分15秒' : '2分15秒',
+      predictedTimeStr: group.count > 1 ? '6分' : '5分',
       recommendedBaristas: group.preferredBaristaId ? `ドリッパー ${group.preferredBaristaId}` : '全ドリッパー',
       recommendedBayIds: group.preferredBaristaId ? [group.preferredBaristaId] : [1, 2, 3, 4, 5, 6],
       preferredBaristaId: group.preferredBaristaId,
@@ -102,5 +109,16 @@ export const posOrderToDripUnits = (order: PosOrder, baristas: Barista[]): Unass
               : 'blue',
     };
   });
-  return splitIntoDripUnits(source);
+  const createdMs = Date.parse(order.created_at);
+  const dayStart = Math.floor((createdMs + 9 * 3600000) / 86400000) * 86400000 - 9 * 3600000;
+  const orderedAtSec = Number.isFinite(createdMs) ? (createdMs - dayStart) / 1000 : undefined;
+  return splitIntoDripUnits(source).map((unit) => ({
+    ...unit,
+    orderedAtSec,
+    sourceCups: Array.from({ length: unit.cupCount }, (_, index) => ({
+      id: `${unit.ticketUid}:${index}`,
+      orderId: id,
+      orderedAtSec,
+    })),
+  }));
 };
