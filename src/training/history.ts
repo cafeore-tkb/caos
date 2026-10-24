@@ -22,6 +22,9 @@ export interface ResultEntry {
 type Store = Pick<Storage, 'getItem' | 'setItem'>;
 const validMode = (mode: unknown): mode is GameMode => typeof mode === 'string' && Object.hasOwn(MODES, mode);
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+// getRandomValues also works in HTTP LAN previews; randomUUID requires HTTPS.
+const resultId = () =>
+  [...crypto.getRandomValues(new Uint32Array(4))].map((part) => part.toString(16).padStart(8, '0')).join('-');
 export function parseHistory(raw: string | null): ResultEntry[] {
   try {
     const data = JSON.parse(raw ?? '[]');
@@ -106,11 +109,7 @@ export function readHistory(store?: Store): ResultEntry[] {
     return [];
   }
 }
-export function createResult(
-  state: GameState,
-  at = new Date().toISOString(),
-  id: string = crypto.randomUUID()
-): ResultEntry {
+export function createResult(state: GameState, at = new Date().toISOString(), id: string = resultId()): ResultEntry {
   const result = scoreGame(state);
   return {
     id,
