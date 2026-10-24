@@ -813,67 +813,6 @@
 .training-learning-actions button {
   margin-top: 12px;
 }
-.training-lesson-guide {
-  display: flex;
-  gap: 20px;
-  justify-content: space-between;
-  background: #fffdf1;
-  border-bottom: 1px solid #d6d0b5;
-  padding: 12px 20px;
-  flex-shrink: 0;
-  max-height: 230px;
-  overflow: auto;
-}
-.training-lesson-guide > div:first-child {
-  flex: 1;
-  min-width: 0;
-}
-.training-lesson-guide h2 {
-  font-size: 17px;
-  font-weight: 850;
-  color: #324337;
-  margin-bottom: 4px;
-}
-.training-lesson-guide p {
-  font-size: 12px;
-  line-height: 1.7;
-  max-width: 900px;
-}
-.training-lesson-guide ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 16px;
-  list-style: none;
-  margin-top: 8px;
-}
-.training-lesson-guide li {
-  color: #777463;
-  font-size: 12px;
-}
-.training-lesson-guide li.is-done {
-  color: #16533e;
-  font-weight: 800;
-}
-.training-lesson-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 225px;
-  flex-shrink: 0;
-}
-.training-lesson-controls .training-primary {
-  min-height: 44px;
-  padding: 8px 16px;
-  font-size: 13px;
-}
-.training-lesson-controls .training-primary:disabled {
-  cursor: default;
-}
-.training-lesson-controls [role="status"] {
-  font-size: 10px;
-  line-height: 1.6;
-  color: #73745d;
-}
 .training-history-filters {
   display: flex;
   gap: 8px;
@@ -984,13 +923,6 @@
   .training-history-list {
     max-height: 260px;
   }
-  .training-lesson-guide {
-    padding: 10px;
-    gap: 12px;
-  }
-  .training-lesson-controls {
-    width: 180px;
-  }
 }
 
 /* Training adds its own controls and lesson guide above the production board. */
@@ -999,9 +931,6 @@
 }
 .training-board > .caos-root {
   min-height: 590px;
-}
-.training-game.is-tutorial .training-board > .caos-root {
-  min-height: 640px;
 }
 .training-board [aria-label="Cコントロール画面"] {
   grid-template-columns: minmax(0, 1fr) 390px;
@@ -1063,4 +992,231 @@
   font-weight: 750;
   font-size: 13px;
   border-radius: 10px;
+}
+
+/* The tutorial is an overlay only: it reserves no space in the operational board. */
+.tutorial-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  pointer-events: none;
+}
+.tutorial-target {
+  position: fixed;
+  border: 3px solid #dc2626;
+  border-radius: 12px;
+  background: #ef444408;
+  box-shadow:
+    0 0 0 4px #fff,
+    0 0 0 7px #dc262638;
+  pointer-events: none;
+  animation: tutorial-ring 1.8s ease-in-out infinite;
+  transition:
+    left 0.14s ease-out,
+    top 0.14s ease-out,
+    width 0.14s ease-out,
+    height 0.14s ease-out;
+}
+.tutorial-arrow {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.tutorial-arrow-under {
+  fill: none;
+  stroke: white;
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+.tutorial-arrow-line {
+  fill: none;
+  stroke: #dc2626;
+  stroke-width: 3;
+  stroke-dasharray: 9 5;
+  stroke-linecap: round;
+  animation: tutorial-arrow-flow 1s linear infinite;
+}
+.tutorial-popup {
+  position: fixed;
+  width: min(338px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  border: 2px solid #dc2626;
+  border-radius: 16px;
+  color: #332b2b;
+  background: #fff;
+  box-shadow:
+    0 12px 45px #3e161e30,
+    0 0 0 5px #fff9;
+  pointer-events: auto;
+  font-family: system-ui, -apple-system, sans-serif;
+  animation: tutorial-appear 0.22s ease-out;
+}
+.tutorial-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 6px 4px 15px;
+  border-bottom: 1px solid #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
+}
+.tutorial-popup-header > span {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+}
+.tutorial-popup-header button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 36px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.tutorial-popup-header button:hover {
+  background: #fee2e2;
+}
+.tutorial-popup-content {
+  padding: 14px 16px 16px;
+}
+.tutorial-step-count {
+  display: flex;
+  justify-content: space-between;
+  color: #dc2626;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+}
+.tutorial-step-count span {
+  color: #8d7373;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+.tutorial-popup h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
+  line-height: 1.5;
+  font-weight: 850;
+  margin: 7px 0;
+}
+.tutorial-popup p {
+  font-size: 12px;
+  line-height: 1.9;
+  margin: 8px 0 0;
+  color: #695254;
+}
+.tutorial-step-track {
+  display: flex;
+  gap: 5px;
+  margin: 16px 0 12px;
+}
+.tutorial-step-track i {
+  height: 4px;
+  flex: 1;
+  border-radius: 3px;
+  background: #ede4e4;
+}
+.tutorial-step-track i.done {
+  background: #278264;
+}
+.tutorial-step-track i.current {
+  background: #dc2626;
+}
+.tutorial-time,
+.tutorial-next {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  border-radius: 9px;
+  width: 100%;
+  padding: 9px 12px;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tutorial-time {
+  border: 1px solid #f4b7b7;
+  background: #fff6f6;
+  color: #b91c1c;
+  margin: 10px 0;
+}
+.tutorial-next {
+  border: 1px solid #b91c1c;
+  background: #dc2626;
+  color: white;
+  margin-top: 14px;
+}
+.tutorial-next:hover {
+  background: #b91c1c;
+}
+.tutorial-pointer-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 750;
+  color: #b91c1c;
+  margin-top: 12px;
+}
+.tutorial-popup.is-collapsed .tutorial-popup-content {
+  padding: 8px 12px;
+}
+.tutorial-popup.is-collapsed .tutorial-step-count,
+.tutorial-popup.is-collapsed p {
+  display: none;
+}
+.tutorial-popup.is-collapsed h2 {
+  font-size: 12px;
+  margin: 0;
+}
+.tutorial-popup.is-complete h2 {
+  color: #177555;
+}
+@keyframes tutorial-ring {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px #fff,
+      0 0 0 7px #dc262638;
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px #fff,
+      0 0 0 12px #dc262616;
+  }
+}
+@keyframes tutorial-arrow-flow {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+@keyframes tutorial-appear {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-target,
+  .tutorial-arrow-line,
+  .tutorial-popup {
+    animation: none;
+    transition: none;
+  }
 }

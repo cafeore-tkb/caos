@@ -111,3 +111,11 @@ The game retains its three modes, sparse special orders, independent emergency p
 Finished games are stored in `localStorage` under `caos-training-results-v2` (latest 100 attempts): timestamp, mode, score, category details, feedback, violations, seed, emergency outcomes, cups and action log. The history screen filters by mode, shows best/pass counts and per-attempt details, and exports JSON. `caos-training-results-v1` score/date entries are migrated without inventing unavailable details. Reads validate stored data; denied storage or quota failures leave the current result visible and offer JSON export. Site-data deletion removes this device/browser's results; there is no account or cross-device sync. Course progress uses `caos-training-course-v1`.
 
 Current source reference: `cafeore-pos/main@173c9f18b71a4435fd967916378ed4df06efdbc4`. See `src/current-caos/UPSTREAM.md` for integration boundaries.
+
+## Floating tutorial guidance
+
+All nine lessons use a non-modal floating guide rendered outside the board layout. The guide follows the first unfinished task and resolves actual visible controls: A/C switches, order lookup/tabs/comments, card bodies and assignment numbers, card action trays, individual rebrew fields, and discard confirmation. A red outline and an animated dashed arrow identify the target without intercepting pointer input. Only the guide itself takes input, and it can be collapsed.
+
+Position is recalculated after scroll, resize and DOM/form changes, avoiding the current target, input panels and confirmation dialogs. A native discard confirmation hosts the guide in the same top layer so it remains visible and interactive. Tutorial descriptions reserve zero board space; the normal and tutorial board start at the same vertical position. The practice clock control appears within the guide only for timed completion tasks. Both pulse and arrow motion honor `prefers-reduced-motion`.
+
+Validation includes the complete nine-lesson browser flow, A/C changes, field-by-field rebrew targeting, confirmation-dialog recovery, collapsing/restoring, and 1024×768 placement. Geometry tests check viewport boundaries, target/form overlap and arrow endpoints.

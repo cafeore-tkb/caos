@@ -35,7 +35,8 @@ const scenarioUrl = (mode: GameMode) => `${import.meta.env.BASE_URL}training/${m
 
 import { HistoryView } from './HistoryView';
 import { COURSE_KEY, createResult, saveResult as persistResult, readCourse, readHistory } from './history';
-import { LESSONS, type Lesson, lessonComplete } from './tutorial';
+import { TutorialOverlay } from './TutorialOverlay';
+import { LESSONS, type Lesson } from './tutorial';
 
 export default function TrainingApp() {
   const [scenario, setScenario] = useState<Scenario | null>(null);
@@ -629,6 +630,7 @@ function GameSession({
             <button
               type="button"
               key={mode}
+              data-tour-view={mode}
               aria-pressed={viewMode === mode}
               onClick={() => {
                 setViewMode(mode);
@@ -653,7 +655,7 @@ function GameSession({
         </div>
         {lesson ? (
           <div className="training-game-controls">
-            <button type="button" onClick={onRetry}>
+            <button type="button" data-tour-retry onClick={onRetry}>
               やり直す
             </button>
             <button type="button" onClick={onBack}>
@@ -687,50 +689,26 @@ function GameSession({
         )}
       </header>
       {lesson && (
-        <section className="training-lesson-guide" aria-label="レッスンのガイド">
-          <div>
-            <h2>{lesson.title}</h2>
-            <p>{lesson.description}</p>
-            <ul>
-              {lesson.steps.map((step) => (
-                <li className={step.done(state, interactions) ? 'is-done' : ''} key={step.label}>
-                  {step.done(state, interactions) ? '✓' : '○'} {step.label}
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="training-lesson-controls">
-            <button
-              type="button"
-              className="training-secondary"
-              disabled={!state.bays.some((bay) => bay.queue[0]?.status === 'brewing')}
-              onClick={() => {
-                const remaining = state.bays.flatMap((bay) =>
-                  bay.queue[0]?.status === 'brewing' ? [Math.max(1, bay.queue[0].timeRemainingSec ?? 300)] : []
-                );
-                dispatch({
-                  type: 'tick',
-                  seconds: Math.min(Math.max(1, scenario.durationSec - state.nowSec - 1), ...remaining),
-                });
-              }}
-            >
-              抽出時間を進める
-            </button>
-            <button
-              type="button"
-              className="training-primary"
-              disabled={!lessonComplete(lesson, state, interactions)}
-              onClick={onLessonNext}
-            >
-              {lessonNumber === LESSONS.length ? 'ゲームモードへ進む' : '次のレッスンへ'}
-            </button>
-            <span role="status">
-              {lessonComplete(lesson, state, interactions)
-                ? 'できました。次へ進めます。'
-                : '時計は自動で進みません。盤面を操作してみましょう。'}
-            </span>
-          </div>
-        </section>
+        <TutorialOverlay
+          lesson={lesson}
+          lessonNumber={lessonNumber ?? 1}
+          state={state}
+          interactions={interactions}
+          mode={viewMode}
+          onNext={() => onLessonNext?.()}
+          onAdvanceTime={() => {
+            const remaining = state.bays.flatMap((bay) =>
+              bay.queue[0]?.status === 'brewing' && bay.queue[0].trainingCupIds?.length
+                ? [Math.max(1, bay.queue[0].timeRemainingSec ?? 300)]
+                : []
+            );
+            if (remaining.length)
+              dispatch({
+                type: 'tick',
+                seconds: Math.min(Math.max(1, scenario.durationSec - state.nowSec - 1), ...remaining),
+              });
+          }}
+        />
       )}
       <div className="training-progress">
         <div style={{ width: `${(100 * state.nowSec) / scenario.durationSec}%` }} />
@@ -1010,6 +988,7 @@ function GameSession({
                   <button
                     type="button"
                     key={bay.id}
+                    data-tour-move={bay.id}
                     disabled={detail.preferredBaristaId !== undefined && detail.preferredBaristaId !== bay.id}
                     onClick={() => {
                       dispatch({ type: 'move', key: detail.ticketUid ?? detail.id, bayId: bay.id });
