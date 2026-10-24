@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { convertBoard } from '../current-caos/bridge/convertBoard';
-import { type GameState, gameReducer, scoreGame } from './engine';
+import { type GameState, gameReducer, scoreGame, startGame } from './engine';
 import { createResult, HISTORY_KEY, LEGACY_KEY, parseHistory, readHistory, saveResult } from './history';
 import { LESSONS, lessonComplete } from './tutorial';
 
@@ -185,4 +185,42 @@ test('emergency lesson is guaranteed and only passes after a properly finished r
   state = gameReducer(state, { type: 'tick', seconds: 300 });
   state = gameReducer(state, { type: 'complete', bayId: 3 });
   assert.ok(lessonComplete(lesson('emergency'), state, []));
+});
+
+test('partial original discard preserves the other cup and both cups receive credit only once', () => {
+  const scenario = lesson('finish').setup().scenario;
+  let state: GameState = {
+    ...startGame({ ...scenario, orders: [{ ...scenario.orders[0], items: [{ name: '余音ブレンド', quantity: 2 }] }] }),
+    emergencies: [],
+  };
+  state = gameReducer(state, { type: 'assign', key: state.unassigned[0].ticketUid ?? '', bayId: 2 });
+  state = gameReducer(state, { type: 'tick', seconds: 270 });
+  const source = state.bays[1].queue[0];
+  state = gameReducer(state, {
+    type: 'rebrew',
+    key: source.ticketUid ?? '',
+    cupCount: 1,
+    bayId: 3,
+    interrupt: false,
+    reason: '抽出ミス',
+  });
+  const projected = board(state);
+  const candidates = projected.looks.get(source.ticketUid ?? '')?.discardCandidates ?? [];
+  assert.equal(candidates.length, 1);
+  assert.equal(projected.rows[0].cups, 2, 'an original and its remake do not increase the order quantity');
+  state = gameReducer(state, {
+    type: 'discard',
+    key: source.ticketUid ?? '',
+    cupIds: candidates.map((cup) => cup.cupId),
+  });
+  assert.equal(state.bays[1].queue[0].cupCount, 1);
+  assert.equal(state.bays[1].queue[0].trainingCupIds?.length, 1);
+  assert.equal(state.bays[2].queue[0].cupCount, 1);
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
+  state = gameReducer(state, { type: 'complete', bayId: 2 });
+  assert.equal(scoreGame(state).done, 1);
+  state = gameReducer(state, { type: 'complete', bayId: 3 });
+  assert.equal(scoreGame(state).done, 2);
+  assert.equal(scoreGame(state).quality, 2);
+  assert.equal(scoreGame(state).total, 2);
 });
