@@ -41,7 +41,6 @@ export function TutorialOverlay({
   const stepIndex = lesson.steps.findIndex((step) => !step.done(state, interactions));
   const complete = stepIndex < 0;
   const hint = complete ? null : tourHint(lesson, stepIndex, state, mode);
-  const progress = lesson.steps.filter((step) => step.done(state, interactions)).length;
   const portalHost = layout?.portal ?? document.body;
 
   useLayoutEffect(() => {
@@ -62,17 +61,24 @@ export function TutorialOverlay({
       }
       if (element && element !== lastRevealed.current) {
         lastRevealed.current = element;
-        element.scrollIntoView({
-          block: 'nearest',
-          inline: 'center',
-          behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-        });
+        const bounds = element.getBoundingClientRect();
+        if (
+          bounds.top < 60 ||
+          bounds.bottom > window.innerHeight - 12 ||
+          bounds.left < 0 ||
+          bounds.right > window.innerWidth
+        )
+          element.scrollIntoView({
+            block: 'nearest',
+            inline: 'center',
+            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          });
       }
       const target = element ? rectOf(element) : null;
       const viewport = { width: document.documentElement.clientWidth, height: window.innerHeight };
       const obstacles = [
         ...document.querySelectorAll(
-          '.training-ticket-panel, dialog[open], [aria-label="ドリッパーの情報"], [data-comment-dock], [data-caos-action-tray], [data-search-key] button[data-bay-target]'
+          '.training-ticket-panel, .caos-side-panel, dialog[open], [aria-label="ドリッパーの情報"], [data-comment-dock], [data-caos-action-tray], [data-search-key] button[data-bay-target]'
         ),
       ]
         .filter((item) => !item.closest('[data-training-tour]'))
@@ -129,9 +135,9 @@ export function TutorialOverlay({
   const arrow = layout?.target ? tourArrow(layout.panel, layout.target) : null;
   const inConfirmation = Boolean(layout && layout.portal !== document.body && lesson.id === 'discard');
   const message = layout?.fallback
-    ? '対象のカードの状態が変わりました。「やり直す」でこのレッスンを最初から練習できます。'
+    ? '対象が変わりました。「やり直す」で再開。'
     : inConfirmation
-      ? '注文番号・杯数を確かめ、赤枠の「元の1杯を破棄」を押します。新しい淹れ直しは残ります。'
+      ? '元の1杯を確認して破棄。淹れ直しは残ります。'
       : hint?.message;
   return createPortal(
     <div data-training-tour className="tutorial-layer">
@@ -176,7 +182,7 @@ export function TutorialOverlay({
         <header className="tutorial-popup-header">
           <span>
             <Sparkles size={15} />
-            操作ガイド {lessonNumber} / {LESSONS.length}
+            練習 {lessonNumber} / {LESSONS.length}
           </span>
           <button
             type="button"
@@ -187,12 +193,7 @@ export function TutorialOverlay({
           </button>
         </header>
         <div className="tutorial-popup-content">
-          <div className="tutorial-step-count">
-            {complete ? 'LESSON CLEAR' : `STEP ${stepIndex + 1} / ${lesson.steps.length}`}{' '}
-            <span>
-              {progress} / {lesson.steps.length} 完了
-            </span>
-          </div>
+          <div className="tutorial-step-count">{complete ? '完了' : `${stepIndex + 1} / ${lesson.steps.length}`}</div>
           <h2 id={`${id}-title`}>
             {complete ? (
               <>
@@ -200,13 +201,13 @@ export function TutorialOverlay({
                 できました！
               </>
             ) : inConfirmation ? (
-              '元の抽出を確認して破棄'
+              '元の1杯を破棄'
             ) : (
               lesson.steps[stepIndex].label
             )}
           </h2>
           <p id={`${id}-instruction`} aria-live="polite">
-            {complete ? '操作を確認できました。次のレッスンへ進みましょう。' : message}
+            {complete ? '次へ進みましょう。' : message}
           </p>
           {expanded && (
             <>
@@ -220,20 +221,15 @@ export function TutorialOverlay({
               </div>
               {hint?.advanceTime && (
                 <button type="button" className="tutorial-time" onClick={onAdvanceTime}>
-                  抽出時間を進める
+                  時間を進める
                 </button>
               )}
               {complete ? (
                 <button type="button" className="tutorial-next" onClick={onNext}>
-                  {lessonNumber === LESSONS.length ? 'ゲームモードへ進む' : '次のレッスンへ'}
+                  {lessonNumber === LESSONS.length ? 'ゲームへ' : '次へ'}
                   <MoveUpRight size={17} />
                 </button>
-              ) : (
-                <div className="tutorial-pointer-note">
-                  <MoveUpRight size={15} />
-                  赤い枠と矢印の先を操作してください
-                </div>
-              )}
+              ) : null}
             </>
           )}
         </div>

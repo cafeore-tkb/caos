@@ -18,17 +18,15 @@ export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBac
       <div className="training-container">
         <button className="training-back" type="button" onClick={onBack}>
           <ArrowLeft size={16} />
-          練習メニューに戻る
+          メニュー
         </button>
         <header className="training-title">
           <span className="training-eyebrow">
             <Trophy size={18} />
             MY RECORDS
           </span>
-          <h1>運営の記録を振り返る</h1>
-          <p>
-            このブラウザに最新100回分を保存します。ブラウザを閉じても残ります。別の端末とは共有されず、サイトデータを消すと削除されます。
-          </p>
+          <h1>スコア履歴</h1>
+          <p>このブラウザに100回保存。サイトデータを消すと記録も消えます。</p>
         </header>
         <div className="training-history-filters" role="group" aria-label="履歴のモード">
           {(['all', 'fast', 'middle', 'full'] as const).map((key) => (
@@ -52,7 +50,7 @@ export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBac
         {visible.length === 0 ? (
           <section className="training-panel">
             <h2>まだ記録がありません</h2>
-            <p>ゲームを終了・採点すると、ここで内訳や改善点を確認できます。チュートリアルはスコアに含めません。</p>
+            <p>ゲーム終了後に保存されます。練習は採点対象外。</p>
           </section>
         ) : (
           <div className="training-history-grid">
@@ -93,12 +91,14 @@ export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBac
                         <small>{c.detail}</small>
                       </div>
                     ))}
-                    <h2>次に意識すること</h2>
-                    <ul className="training-feedback">
-                      {detail.result.feedback.map((f) => (
-                        <li key={f}>{f}</li>
-                      ))}
-                    </ul>
+                    <details>
+                      <summary>次の課題</summary>
+                      <ul className="training-feedback">
+                        {detail.result.feedback.map((f) => (
+                          <li key={f}>{f}</li>
+                        ))}
+                      </ul>
+                    </details>
                     <details>
                       <summary>操作の記録（{detail.events.length}件）</summary>
                       <ol className="training-event-log">
@@ -114,9 +114,7 @@ export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBac
                     </details>
                   </>
                 ) : (
-                  <p>
-                    旧版で保存した記録です。点数と日時を引き継いでいます。新しい挑戦から内訳・改善点・操作記録も保存します。
-                  </p>
+                  <p>旧版の記録：点数と日時のみ。</p>
                 )}
               </article>
             )}
@@ -141,7 +139,7 @@ export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBac
             }}
           >
             <Download size={16} />
-            履歴をJSONで保存
+            JSONで保存
           </button>
         </div>
         {error && <p role="alert">{error}</p>}

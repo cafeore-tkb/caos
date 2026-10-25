@@ -8,7 +8,7 @@ test('every tutorial step has targeted floating guidance', () => {
   for (const lesson of LESSONS)
     for (let step = 0; step < lesson.steps.length; step++) {
       const hint = tourHint(lesson, step, lesson.setup(), 'current');
-      assert.ok(hint.message.length > 10, `${lesson.id}:${step}`);
+      assert.ok(hint.message.length > 0 && hint.message.length <= 48, `${lesson.id}:${step}`);
       assert.ok(hint.queries.length > 0, `${lesson.id}:${step}`);
       for (const query of hint.queries) assert.ok(query.selector);
     }

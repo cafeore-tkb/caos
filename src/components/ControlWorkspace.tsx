@@ -21,6 +21,11 @@ export interface ControlViewProps {
   onUnstartBay?: (bayId: number) => void;
   onSplitCup?: (key: string, cupId: string) => void;
   onOpenLane?: (bayId: number) => void;
+  searchOpen?: boolean;
+  onOpenSearch?: () => void;
+  onCloseSearch?: () => void;
+  emptyBay?: number | null;
+  onCloseEmptySlot?: () => void;
   timelineCommand: { direction: 'back' | 'now' | 'forward'; id: number } | null;
   onSelectOrder: (orderId: string) => void;
   onAdvanceBay: (bayId: number) => void;

@@ -41,46 +41,40 @@ const assign = (state: GameState, index: number, bayId: number): GameAction => (
 export const LESSONS: Lesson[] = [
   {
     id: 'overview',
-    title: '盤面を見渡す',
-    description:
-      'Aは時間軸、Cはドリップ中と待ち列を表示します。同じ注文を選ぶと色付きの枠で追えます。担当番号から上級生の条件も確認しましょう。',
+    title: '表示を切り替える',
+    description: '時間軸・待ち列・注文番号',
     setup: () => prepare(base(), []),
     steps: [
-      { label: 'C（キュー）に切り替える', done: ui('view:c') },
-      { label: 'A（タイムライン）に戻す', done: ui('view:current') },
-      { label: '注文カードの番号を押して強調する', done: ui('highlight') },
-      { label: '担当番号を押して情報を確認する', done: ui('lane') },
+      { label: 'キューに切替', done: ui('view:c') },
+      { label: 'タイムラインに切替', done: ui('view:current') },
+      { label: '注文番号を押す', done: ui('highlight') },
+      { label: '担当番号を押す', done: ui('lane') },
     ],
   },
   {
     id: 'orders',
-    title: '注文とコメントを確認する',
-    description:
-      '未割当は配置前のカード、未提供は仕上がりを待つ注文です。Cの「一覧」では全注文の状態を確認できます。吹き出しからコメントを開き、OKなどの返信を練習しましょう。返信は練習内だけに残ります。',
+    title: '注文を探す',
+    description: '番号検索・コメント・返信',
     setup: () => prepare(base(), []),
     steps: [
-      { label: '番号欄で001を探す', done: ui('search') },
-      { label: '未提供タブを開く', done: ui('unfinished') },
-      { label: 'Cに切り替えて「一覧」を開く', done: ui('all') },
-      { label: '未割当に戻り、コメントの吹き出しを開く', done: ui('comments') },
-      { label: 'コメントにスタンプか文章で返信する', done: ui('reply') },
+      { label: '001を探す', done: ui('search') },
+      { label: '未提供を開く', done: ui('unfinished') },
+      { label: '一覧を開く', done: ui('all') },
+      { label: 'コメントを開く', done: ui('comments') },
+      { label: '返信する', done: ui('reply') },
     ],
   },
   {
     id: 'assign',
-    title: '空いている担当へ割り当てる',
-    description:
-      '未割当のカードを押すと1〜6の配置先が出ます。通常豆を2番へ配置しましょう。空の列では自動で抽出が始まります。ドラッグで列へ置くこともできます。',
+    title: '担当へ割り当てる',
+    description: 'カードを選び、2番へ',
     setup: () => prepare(base(), []),
-    steps: [
-      { label: '注文を2番に割り当て、抽出中にする', done: (state) => state.bays[1].queue[0]?.status === 'brewing' },
-    ],
+    steps: [{ label: '2番に割り当てる', done: (state) => state.bays[1].queue[0]?.status === 'brewing' }],
   },
   {
     id: 'conditions',
-    title: '指名と上級生限定を守る',
-    description:
-      '指名のカードは指定された番号へ。上級生限定の豆は★のある1・6番へ。通常豆を先に使い切らず、条件のある注文の配置先を確保します。',
+    title: '指名・限定豆を振り分ける',
+    description: '指名は指定先、限定豆は★へ',
     setup: () =>
       prepare(
         base([
@@ -91,11 +85,11 @@ export const LESSONS: Lesson[] = [
       ),
     steps: [
       {
-        label: '4番指名のカードを4番に配置する',
+        label: '指名は4番へ',
         done: (state) => state.bays[3].queue.some((card) => card.preferredBaristaId === 4),
       },
       {
-        label: '上級生限定のカードを1番か6番に配置する',
+        label: '限定豆は★へ',
         done: (state) =>
           [state.bays[0], state.bays[5]].some((bay) => bay.queue.some((card) => seniorOnly(card.beanName))),
       },
@@ -103,43 +97,40 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'queue',
-    title: '開始を戻す・待ち列を調整する',
-    description:
-      'カードを押すと操作トレーが出ます。開始から1分未満は「未着手に戻す」、戻した先頭は「始める」で再開。待機カードは長押しで担当変更・未割当に戻す操作ができます。抽出中の移動は時計がリセットされます。',
+    title: '待ち列を調整する',
+    description: '開始を戻す・移動・未割当へ',
     setup: () => {
       const state = base(undefined, 3);
       return prepare(state, [assign(state, 0, 2), assign(state, 1, 2), assign(state, 2, 2)]);
     },
     steps: [
-      { label: '抽出中のカードを未着手に戻す', done: event('unstart') },
-      { label: '先頭の抽出を始める', done: event('start') },
-      { label: '待機のカードを別の担当へ移す', done: event('move') },
-      { label: 'カードを未割当に戻す', done: event('return') },
+      { label: '未着手に戻す', done: event('unstart') },
+      { label: '抽出を始める', done: event('start') },
+      { label: '待機を3番へ移す', done: event('move') },
+      { label: '未割当に戻す', done: event('return') },
     ],
   },
   {
     id: 'merge',
-    title: '同じ商品の1杯を統合・分離する',
-    description:
-      '同じ商品の1杯カードを開き、もう一方の「統合する」を押すと2杯をまとめて抽出できます。統合後は未割当カードの商品名側を押して開き、「分ける」で1杯ずつに戻せます。指名条件が矛盾する組合せは統合できません。',
+    title: 'まとめる・分ける',
+    description: '同じ商品の1杯を統合・分離',
     setup: () => prepare(base(undefined, 2), []),
     steps: [
-      { label: '2枚の1杯カードを統合する', done: event('merge') },
-      { label: '統合したカードから1杯を外す', done: event('split') },
+      { label: '1杯ずつを統合', done: event('merge') },
+      { label: '1杯ずつに分ける', done: event('split') },
     ],
   },
   {
     id: 'finish',
-    title: '時間を見て抽出を完了する',
-    description:
-      '1杯は5分、2杯は6分が目安です。ここでは「抽出時間を進める」で待ち時間を短縮できます。時間が来たらカードの「終える」を押します。残り0秒だけでは完了になりません。',
+    title: '抽出を完了する',
+    description: '時間を見て「終える」',
     setup: () => {
       const state = base();
       return prepare(state, [assign(state, 0, 2)]);
     },
     steps: [
       {
-        label: '抽出時間を進め、予定時間を確保して「終える」を押す',
+        label: '時間を進めて完了',
         done: (state) =>
           Object.values(state.cups).some((cup) => cup.completedSec !== undefined && (cup.brewRatio ?? 0) >= 0.9),
       },
@@ -147,9 +138,8 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: 'emergency',
-    title: '緊急淹れ直しを手配する',
-    description:
-      '抽出後半のトラブルです。「入れ直しを手配」から理由・杯数・担当・元の抽出の扱いを選びます。中断と継続は状況に合わせて判断し、赤い緊急カードも最後まで抽出します。このレッスンでは必ず1件発生します。',
+    title: '緊急で淹れ直す',
+    description: '理由・杯数・担当・中断を選択',
     setup: () => {
       const state = base();
       let prepared = prepare(state, [assign(state, 0, 2)]);
@@ -160,18 +150,17 @@ export const LESSONS: Lesson[] = [
       return gameReducer(prepared, { type: 'tick', seconds: 225 });
     },
     steps: [
-      { label: '通知から淹れ直しを手配する', done: event('rebrew') },
+      { label: '淹れ直しを手配', done: event('rebrew') },
       {
-        label: '新しい緊急カードの抽出時間を確保して完了する',
+        label: '淹れ直しを完了',
         done: (state) => state.emergencies.some((trial) => trial.status === 'resolved'),
       },
     ],
   },
   {
     id: 'discard',
-    title: '淹れ直し元を確認して破棄する',
-    description:
-      '今回は元の抽出を続けたまま、別の担当へ淹れ直しを登録済みです。2番のカードの破棄アイコンを押し、確認画面で対象の杯を確かめて破棄してください。新しい淹れ直しは残し、時間を進めて完了します。ゲーム後は採点内訳と履歴で振り返ります。',
+    title: '元の抽出を破棄する',
+    description: '元を破棄し、淹れ直しを完了',
     setup: () => {
       const state = base();
       const prepared = prepare(state, [assign(state, 0, 2), { type: 'tick', seconds: 225 }]);
@@ -187,9 +176,9 @@ export const LESSONS: Lesson[] = [
       ]);
     },
     steps: [
-      { label: '確認画面から、淹れ直し済みの元抽出を破棄する', done: event('discard') },
+      { label: '元の抽出を破棄', done: event('discard') },
       {
-        label: '残した新しい淹れ直しの抽出を完了する',
+        label: '淹れ直しを完了',
         done: (state) =>
           Object.values(state.cups).every((cup) => cup.completedSec !== undefined && (cup.brewRatio ?? 0) >= 0.9),
       },

@@ -9,11 +9,12 @@ import {
   Pause,
   Play,
   RotateCcw,
+  Search,
   Trophy,
-  X,
 } from 'lucide-react';
 import { useEffect, useReducer, useRef, useState } from 'react';
 import { CONTROL_VIEWS, type ControlViewMode, ControlWorkspace } from '../components/ControlWorkspace';
+import { SidePanel } from '../current-caos/bridge/SidePanel';
 import type { OrderTicket } from '../types';
 import { trainingComments } from './comments';
 import {
@@ -73,7 +74,7 @@ export default function TrainingApp() {
   const saveResult = (state: GameState) => {
     const saved = persistResult(createResult(state));
     setHistory(saved.entries);
-    setStorageError(saved.saved ? '' : 'ブラウザへの保存に失敗しました。結果画面からJSONを保存してください。');
+    setStorageError(saved.saved ? '' : '保存できません。結果JSONを保存してください。');
   };
   if (lessonIndex !== null)
     return (
@@ -91,7 +92,7 @@ export default function TrainingApp() {
           try {
             localStorage.setItem(COURSE_KEY, JSON.stringify(next));
           } catch {
-            setStorageError('チュートリアルの進捗を保存できませんでした。この画面内では続けられます。');
+            setStorageError('進捗を保存できません。このまま続けられます。');
           }
           if (lessonIndex + 1 === LESSONS.length) {
             setLessonIndex(null);
@@ -127,12 +128,8 @@ export default function TrainingApp() {
               <BookOpen size={18} />
               CaOS LEARNING
             </span>
-            <h1>操作を覚えて、店舗運営に挑戦。</h1>
-            <p>
-              実際のマスターシートで、注文の確認から緊急対応まで順番に練習します。
-              <br />
-              チュートリアルを終えたら、3つのゲームモードで判断と操作を確かめましょう。
-            </p>
+            <h1>CaOSを練習する</h1>
+            <p>操作を覚える → ゲームに挑戦 → 記録を見る</p>
           </header>
           <div className="training-learning-flow">
             <span className="active">1 チュートリアル</span>
@@ -145,7 +142,7 @@ export default function TrainingApp() {
                 <BookOpen size={20} />
                 操作チュートリアル
               </h2>
-              <p>時間に追われず、実際に操作して学ぶ全{LESSONS.length}レッスン。A・Cは自由に切り替えられます。</p>
+              <p>全{LESSONS.length}レッスン。時計は手動です。</p>
               <b>
                 {LESSONS.filter((lesson) => completed.includes(lesson.id)).length} / {LESSONS.length} 完了
               </b>
@@ -164,10 +161,10 @@ export default function TrainingApp() {
             >
               <Play size={18} />
               {LESSONS.every((lesson) => completed.includes(lesson.id))
-                ? '最初から復習する'
+                ? '最初から'
                 : completed.length
-                  ? '続きから練習する'
-                  : 'チュートリアルを始める'}
+                  ? '続きから'
+                  : '練習を始める'}
             </button>
           </section>
           <ol className="training-curriculum">
@@ -179,7 +176,7 @@ export default function TrainingApp() {
                   </span>
                   <span>
                     <strong>{lesson.title}</strong>
-                    <small>{lesson.steps.map((step) => step.label).join(' / ')}</small>
+                    <small>{lesson.description}</small>
                   </span>
                   <span aria-hidden="true">→</span>
                 </button>
@@ -192,9 +189,9 @@ export default function TrainingApp() {
                 <Gamepad2 size={18} />
                 ゲームで実践
               </h2>
-              <p>ファスト・ミドル・フルで80点を目指します。操作を知っている方はここから始められます。</p>
+              <p>3モードで挑戦。合格は80点。</p>
               <button type="button" className="training-primary" onClick={() => setPage('game')}>
-                ゲームモードへ進む
+                ゲームへ
               </button>
             </section>
             <section className="training-panel">
@@ -202,14 +199,9 @@ export default function TrainingApp() {
                 <Trophy size={18} />
                 自分の記録
               </h2>
-              <p>
-                {history.length
-                  ? `${history.length}回の挑戦を保存しています。`
-                  : 'ゲームを終了・採点すると、このブラウザに結果を保存します。'}
-                内訳と操作記録を見て、次の練習につなげましょう。
-              </p>
+              <p>{history.length ? `${history.length}回の記録。` : 'このブラウザに結果を保存。'}</p>
               <button type="button" className="training-secondary" onClick={() => setPage('history')}>
-                スコア履歴を見る
+                記録を見る
               </button>
             </section>
           </div>
@@ -234,7 +226,7 @@ export default function TrainingApp() {
         <div className="training-menu-nav">
           <button type="button" className="training-back" onClick={() => setPage('learn')}>
             <ArrowLeft size={16} />
-            練習メニューに戻る
+            メニュー
           </button>
           <button type="button" className="training-secondary" onClick={() => setPage('history')}>
             <Trophy size={16} />
@@ -246,17 +238,13 @@ export default function TrainingApp() {
             <Gamepad2 size={18} />
             CaOS TRAINING
           </span>
-          <h1>店舗を回す、その判断を練習する。</h1>
-          <p>
-            実際のマスターシートと同じ配置で、注文の割当から抽出完了まで。
-            <br />
-            80点が、店舗運営を任せられる操作の目安です。
-          </p>
+          <h1>ゲームモード</h1>
+          <p>80点以上で「店舗運営を任せられるレベル」。</p>
         </header>
         {LESSONS.every((lesson) => completed.includes(lesson.id)) && (
           <p className="training-course-done">
             <Check size={16} />
-            チュートリアル完了。ゲームで80点を目指しましょう。
+            練習完了。ゲームに挑戦！
           </p>
         )}
         <div className="training-mode-grid" role="group" aria-label="ゲームモード">
@@ -292,9 +280,9 @@ export default function TrainingApp() {
           <section className="training-panel">
             <h2>
               <FileJson size={18} />
-              今回のオーダー
+              注文データ
             </h2>
-            <p>添付マスターの12商品を使う架空の注文です。アイスミルク・物販は抽出対象から外します。</p>
+            <p>架空の注文で練習します。</p>
             <div className="training-data-summary">
               {loading
                 ? '読み込み中…'
@@ -311,13 +299,13 @@ export default function TrainingApp() {
             )}
             {MODES[mode].emergencyChances > 0 && (
               <p className="training-data-mix">
-                緊急淹れ直し：{MODES[mode].emergencyChances === 1 ? '50%の確率で1件' : '各50%の抽選を2回（最大2件）'}
-                。抽出時間の最後の1/4に入ると通知します。
+                緊急淹れ直し：{MODES[mode].emergencyChances === 1 ? '50%の確率で1件' : '50%×2回・最大2件'}
+                。抽出75%で通知。
               </p>
             )}
             {scenario && (
               <details>
-                <summary>注文の内容を見る</summary>
+                <summary>注文を見る</summary>
                 <ol className="training-order-preview">
                   {scenario.orders.map((order) => (
                     <li key={order.orderId}>
@@ -383,22 +371,13 @@ export default function TrainingApp() {
               <Trophy size={18} />
               80点の基準
             </h2>
-            <p>仕上げた杯数45点・8分以内の準備25点・抽出品質20点・同一注文の仕上がり10点。</p>
-            <p className="training-criteria">
-              80点以上には、全抽出杯の90%以上を完了、完了杯の95%以上で予定抽出時間の90%以上を確保、指名・上級生条件の違反ゼロ、発生した緊急淹れ直しの完了が必要です。
-            </p>
-            <p>
-              一時停止中は操作も停止。終了時は未到着を含む全注文が採点対象です。各モードの80点はその課題の達成目安で、総合判断はフルで確認できます。
-            </p>
+            <p>完了45点・速さ25点・品質20点・同時仕上げ10点。</p>
+            <p className="training-criteria">完了90%以上・品質達成95%以上・条件違反ゼロ・緊急対応完了。</p>
+            <p>未到着も採点対象。総合練習はフル。</p>
           </section>
         </div>
         <footer className="training-start-row">
-          <p>
-            未割当の注文を選択 → 担当者へ割当 →
-            空の列では自動で抽出開始。残り時間を見てカードの✓で完了します。A・Cはいつでも切り替えできます。
-            <br />
-            同じ商品の1杯同士は、指名条件が矛盾しなければ統合できます。限定豆は上級生の1・6番へ。コメントは吹き出し・未提供タブから確認できます。
-          </p>
+          <p>カードを選ぶ → 担当へ割当 → 時間を見て完了。</p>
           <button
             type="button"
             className="training-primary"
@@ -446,8 +425,7 @@ function GameSession({
     null
   );
   const [selected, setSelected] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
-  const [searchNotice, setSearchNotice] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [endOpen, setEndOpen] = useState(false);
   const [emptyBay, setEmptyBay] = useState<number | null>(null);
@@ -527,7 +505,7 @@ function GameSession({
             <Flag size={18} />
             {MODES[scenario.mode].label} / RESULT
           </span>
-          <h1>今回の運営結果</h1>
+          <h1>結果</h1>
           <div className={`training-score ${result.passed ? 'passed' : ''}`}>
             <strong>
               {result.score}
@@ -558,7 +536,7 @@ function GameSession({
             ))}
           </div>
           <section className="training-panel">
-            <h2>次に意識すること</h2>
+            <h2>次の課題</h2>
             <ul>
               {result.feedback.map((line) => (
                 <li key={line}>{line}</li>
@@ -569,8 +547,8 @@ function GameSession({
                 条件違反 {state.violations}回：−{result.penalties}点
               </p>
             )}
-            {!result.ready && <p>80点の必須条件に届いていないため、得点の上限は79点です。</p>}
-            <p>80点以上：店舗運営を任せられる操作レベル。フルモードで総合的に確認できます。</p>
+            {!result.ready && <p>必須条件が未達のため、上限79点。</p>}
+            <p>総合確認はフルで80点を目指す。</p>
           </section>
           <details className="training-panel">
             <summary>操作の記録（{state.events.length}件）</summary>
@@ -588,16 +566,16 @@ function GameSession({
               {storageError}
             </p>
           ) : (
-            <p>このブラウザに結果を保存しました。履歴からいつでも振り返れます。</p>
+            <p>このブラウザに保存しました。</p>
           )}
           <div className="training-result-actions">
             <button type="button" onClick={onHistory}>
               <Trophy size={18} />
-              スコア履歴を見る
+              記録を見る
             </button>
             <button type="button" className="training-primary" onClick={onBack}>
               <RotateCcw size={18} />
-              モードを選んで再挑戦
+              もう一度
             </button>
             <button type="button" onClick={downloadResult}>
               <Download size={18} />
@@ -612,6 +590,8 @@ function GameSession({
       </main>
     );
   const openDetail = (ticket: OrderTicket) => {
+    setSearchOpen(false);
+    setEmptyBay(null);
     setRemakeReason('');
     setRemakeCount('');
     setRemakeTarget('');
@@ -621,10 +601,6 @@ function GameSession({
   return (
     <div className={`training-game ${lesson ? 'is-tutorial' : ''}`}>
       <header className="training-game-header">
-        <div>
-          <span className="training-eyebrow">CaOS TRAINING</span>
-          <h1>{lesson ? `レッスン ${lessonNumber} / ${LESSONS.length}` : MODES[scenario.mode].label}</h1>
-        </div>
         <nav className="training-view-switch" aria-label="管制盤の表示切替">
           {(Object.keys(CONTROL_VIEWS) as ControlViewMode[]).map((mode) => (
             <button
@@ -642,12 +618,38 @@ function GameSession({
           ))}
         </nav>
         <div className="training-countdown">
-          <small>{lesson ? '練習の時計' : '残り'}</small>
+          <small>{lesson ? '練習' : '残り'}</small>
           <b>{clock(lesson ? state.nowSec : scenario.durationSec - state.nowSec)}</b>
         </div>
+        {viewMode === 'current' && (
+          <button
+            type="button"
+            className="training-now"
+            onClick={() => setTimelineCommand({ direction: 'now', id: performance.now() })}
+          >
+            現在
+          </button>
+        )}
+        <h1 className="training-session-label">
+          {lesson ? `練習 ${lessonNumber}/${LESSONS.length}` : MODES[scenario.mode].label}
+        </h1>
+        <button
+          type="button"
+          className="training-search-toggle"
+          data-tour-search
+          aria-pressed={searchOpen}
+          onClick={() => {
+            setDetailKey(null);
+            setEmptyBay(null);
+            setSearchOpen(!searchOpen);
+          }}
+        >
+          <Search size={17} />
+          番号
+        </button>
         <div className="training-game-counts">
           <b>
-            {state.arrived.length}/{scenario.orders.length}件 到着
+            {state.arrived.length}/{scenario.orders.length}件
           </b>
           <span>
             完了 {result.done}/{result.total}杯
@@ -659,7 +661,7 @@ function GameSession({
               やり直す
             </button>
             <button type="button" onClick={onBack}>
-              メニューへ
+              メニュー
             </button>
           </div>
         ) : (
@@ -713,50 +715,11 @@ function GameSession({
       <div className="training-progress">
         <div style={{ width: `${(100 * state.nowSec) / scenario.durationSec}%` }} />
       </div>
-      {viewMode === 'current' && (
-        <div className="training-timeline-controls">
-          <button type="button" onClick={() => setTimelineCommand({ direction: 'now', id: performance.now() })}>
-            現在
-          </button>
+      {state.notice && pendingEmergencies.length === 0 && (
+        <div className="training-session-notice" role="status">
+          {state.notice}
         </div>
       )}
-      <form
-        className="training-order-search"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const number = Number(search);
-          const order = state.scenario.orders.find(
-            (entry) => entry.orderId === number && state.arrived.includes(number)
-          );
-          if (!order) {
-            setSearchNotice('到着済みの注文番号を入力してください');
-            return;
-          }
-          setSelected(`#${String(number).padStart(3, '0')}`);
-          setSearchNotice(`#${String(number).padStart(3, '0')} を選択しました`);
-          interact('search');
-        }}
-      >
-        <label>
-          番号
-          <input
-            aria-label="注文番号で探す"
-            inputMode="numeric"
-            pattern="[0-9]{1,4}"
-            value={search}
-            onChange={(event) => setSearch(event.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
-            placeholder="001"
-          />
-        </label>
-        <button type="submit" disabled={!search}>
-          探す
-        </button>
-        <span role="status">{searchNotice}</span>
-      </form>
-      <div className="training-game-hint">
-        <span>80点が合格の目安 · 限定豆は1・6番 · ▶で開始・✓で完了</span>
-        <span role="status">{state.notice || '未割当の注文カードを選んで、担当者へ割り当ててください'}</span>
-      </div>
       {pendingEmergencies.length > 0 && (
         <aside className="training-emergencies" aria-label="緊急淹れ直しの通知">
           {pendingEmergencies.map((trial) => {
@@ -767,11 +730,7 @@ function GameSession({
             return (
               <div role="alert" key={trial.id}>
                 <strong>緊急淹れ直し {source?.id ?? waiting?.id}</strong>
-                <p>
-                  {waiting
-                    ? '対象が未割当です。カードを先に担当者へ配置してください。'
-                    : '抽出中のコーヒーにトラブル。杯数・担当者・元の抽出の扱いを選んでください。'}
-                </p>
+                <p>{waiting ? '対象カードを担当へ割当。' : '抽出トラブル。淹れ直してください。'}</p>
                 <button
                   type="button"
                   disabled={!source}
@@ -792,6 +751,15 @@ function GameSession({
       <div className="training-board">
         <ControlWorkspace
           mode={viewMode}
+          emptyBay={emptyBay}
+          onCloseEmptySlot={() => setEmptyBay(null)}
+          searchOpen={searchOpen}
+          onOpenSearch={() => {
+            setDetailKey(null);
+            setEmptyBay(null);
+            setSearchOpen(true);
+          }}
+          onCloseSearch={() => setSearchOpen(false)}
           actionTicketKey={null}
           nextAvailable={state.bays
             .map((bay) => ({
@@ -824,7 +792,11 @@ function GameSession({
             })
           }
           onOpenTicketDetail={openDetail}
-          onOpenEmptySlot={(bayId) => setEmptyBay(bayId)}
+          onOpenEmptySlot={(bayId) => {
+            setDetailKey(null);
+            setSearchOpen(false);
+            setEmptyBay(bayId);
+          }}
           onAssignToBay={(card, bayId, place) =>
             dispatch({ type: 'assign', key: card.ticketUid ?? card.id, bayId, place })
           }
@@ -836,188 +808,160 @@ function GameSession({
           onMergeOrders={(first, second) => dispatch({ type: 'merge', first, second })}
         />
       </div>
-      {emptyBay !== null && (
-        <aside className="training-ticket-panel" aria-label="未割当を選んで配置">
-          <button type="button" className="training-close" onClick={() => setEmptyBay(null)} aria-label="配置を閉じる">
-            <X size={20} />
-          </button>
-          <h2>{emptyBay}番へ配置</h2>
-          <p>割り当てる未割当カードを選んでください。</p>
-          <div className="flex flex-col gap-2">
-            {state.unassigned.length === 0 ? (
-              <p>未割当の注文はありません</p>
-            ) : (
-              state.unassigned.map((card) => (
-                <button
-                  type="button"
-                  key={card.ticketUid}
-                  onClick={() => {
-                    dispatch({ type: 'assign', key: card.ticketUid ?? card.id, bayId: emptyBay });
-                    setEmptyBay(null);
-                  }}
-                >
-                  {card.id} {itemAbbr(card.beanName)} {card.cupCount}杯
-                  {card.preferredBaristaId ? ` / ${card.preferredBaristaId}番指名` : ''}
-                </button>
-              ))
-            )}
-          </div>
-        </aside>
-      )}
       {detail && (
-        <aside className="training-ticket-panel" aria-label="カードの操作">
-          <button
-            type="button"
-            className="training-close"
-            onClick={() => setDetailKey(null)}
-            aria-label="カードの操作を閉じる"
-          >
-            <X size={20} />
-          </button>
-          <h2>
-            {detail.id} {itemAbbr(detail.beanName)}
-          </h2>
-          <p>
-            {detail.cupCount}杯 ·{' '}
-            {detail.status === 'completed'
-              ? '完了済み'
-              : detail.status === 'brewing'
-                ? '抽出中。移動すると抽出時間をリセットします。'
-                : '待機中'}
-          </p>
-          <details open={detailIncident ? true : undefined} className="my-4 rounded border border-red-200 p-3">
-            <summary className="text-sm font-black text-red-800">緊急の入れ直し</summary>
-            <div className="mt-3 flex flex-col gap-2 text-xs">
-              <label>
-                理由
-                <select
-                  aria-label="入れ直しの理由"
-                  value={remakeReason}
-                  onChange={(event) => setRemakeReason(event.target.value)}
-                  className="mt-1 w-full rounded border p-2"
-                >
-                  <option value="">選択してください</option>
-                  {['こぼれ', '抽出ミス', '異物混入', 'その他'].map((reason) => (
-                    <option key={reason}>{reason}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                杯数
-                <select
-                  aria-label="入れ直しの杯数"
-                  value={remakeCount}
-                  onChange={(event) => setRemakeCount(event.target.value)}
-                  className="mt-1 w-full rounded border p-2"
-                >
-                  <option value="">選択してください</option>
-                  {Array.from({ length: detail.cupCount }, (_, index) => index + 1).map((count) => (
-                    <option key={count} value={count}>
-                      {count}杯
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                割当先
-                <select
-                  aria-label="入れ直しの割当先"
-                  value={remakeTarget}
-                  onChange={(event) => setRemakeTarget(event.target.value)}
-                  className="mt-1 w-full rounded border p-2"
-                >
-                  <option value="">選択してください</option>
-                  <option value="unassigned">未割当へ</option>
-                  {state.bays.map((bay) => (
-                    <option key={bay.id} value={bay.id}>
-                      {bay.id}番 {bay.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {detail.status === 'brewing' && (
+        <SidePanel
+          title={detail.status === 'scheduled' ? 'カードの操作' : '緊急（淹れ直し）'}
+          onClose={() => setDetailKey(null)}
+        >
+          <div className="training-card-actions">
+            <h2>
+              {detail.id} {itemAbbr(detail.beanName)}
+            </h2>
+            <p>
+              {detail.cupCount}杯 ·{' '}
+              {detail.status === 'completed'
+                ? '完了済み'
+                : detail.status === 'brewing'
+                  ? '抽出中・移動で時計リセット'
+                  : '待機中'}
+            </p>
+            <details
+              open={detail.status !== 'scheduled' || Boolean(detailIncident)}
+              className="my-4 rounded border border-red-200 p-3"
+            >
+              <summary className="text-sm font-black text-red-800">淹れ直し</summary>
+              <div className="mt-3 flex flex-col gap-2 text-xs">
                 <label>
-                  現在の抽出
+                  理由
                   <select
-                    aria-label="現在の抽出の扱い"
-                    value={remakeInterrupt}
-                    onChange={(event) => setRemakeInterrupt(event.target.value)}
+                    aria-label="入れ直しの理由"
+                    value={remakeReason}
+                    onChange={(event) => setRemakeReason(event.target.value)}
                     className="mt-1 w-full rounded border p-2"
                   >
-                    <option value="">選択してください</option>
-                    <option value="interrupt">中断する</option>
-                    <option value="continue">続ける（元の抽出を残す）</option>
+                    <option value="">選択</option>
+                    {['こぼれ', '抽出ミス', '異物混入', 'その他'].map((reason) => (
+                      <option key={reason}>{reason}</option>
+                    ))}
                   </select>
                 </label>
-              )}
-              {remakeInterrupt === 'interrupt' && <p>中断後、元の列の待機は「始める」で再開します。</p>}
-              {remakeInterrupt === 'interrupt' && Number(remakeCount) < detail.cupCount && (
-                <p>中断した残りの杯は未割当に戻ります。</p>
-              )}
-              <button
-                type="button"
-                disabled={
-                  !remakeReason || !remakeCount || !remakeTarget || (detail.status === 'brewing' && !remakeInterrupt)
-                }
-                onClick={() => {
-                  dispatch({
-                    type: 'rebrew',
-                    key: detail.ticketUid ?? detail.id,
-                    cupCount: Number(remakeCount),
-                    bayId: remakeTarget === 'unassigned' ? null : Number(remakeTarget),
-                    interrupt: remakeInterrupt === 'interrupt',
-                    reason: remakeReason,
-                    incidentId: detailIncident?.id,
-                  });
-                  setDetailKey(null);
-                  setRemakeReason('');
-                  setRemakeCount('');
-                  setRemakeTarget('');
-                  setRemakeInterrupt('');
-                }}
-              >
-                この内容で入れ直す
-              </button>
-            </div>
-          </details>
-          {detail.status !== 'completed' && (
-            <>
-              <h3>担当者を変更</h3>
-              <div className="training-bay-actions">
-                {state.bays.map((bay) => (
-                  <button
-                    type="button"
-                    key={bay.id}
-                    data-tour-move={bay.id}
-                    disabled={detail.preferredBaristaId !== undefined && detail.preferredBaristaId !== bay.id}
-                    onClick={() => {
-                      dispatch({ type: 'move', key: detail.ticketUid ?? detail.id, bayId: bay.id });
-                      setDetailKey(null);
-                    }}
+                <label>
+                  杯数
+                  <select
+                    aria-label="入れ直しの杯数"
+                    value={remakeCount}
+                    onChange={(event) => setRemakeCount(event.target.value)}
+                    className="mt-1 w-full rounded border p-2"
                   >
-                    {bay.id}番{bay.canHandleSpecial ? ' ★' : ''}
-                  </button>
-                ))}
+                    <option value="">選択</option>
+                    {Array.from({ length: detail.cupCount }, (_, index) => index + 1).map((count) => (
+                      <option key={count} value={count}>
+                        {count}杯
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  割当先
+                  <select
+                    aria-label="入れ直しの割当先"
+                    value={remakeTarget}
+                    onChange={(event) => setRemakeTarget(event.target.value)}
+                    className="mt-1 w-full rounded border p-2"
+                  >
+                    <option value="">選択</option>
+                    <option value="unassigned">未割当へ</option>
+                    {state.bays.map((bay) => (
+                      <option key={bay.id} value={bay.id}>
+                        {bay.id}番 {bay.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {detail.status === 'brewing' && (
+                  <label>
+                    現在の抽出
+                    <select
+                      aria-label="現在の抽出の扱い"
+                      value={remakeInterrupt}
+                      onChange={(event) => setRemakeInterrupt(event.target.value)}
+                      className="mt-1 w-full rounded border p-2"
+                    >
+                      <option value="">選択</option>
+                      <option value="interrupt">中断する</option>
+                      <option value="continue">続ける</option>
+                    </select>
+                  </label>
+                )}
+                {remakeInterrupt === 'interrupt' && <p>待機は「始める」で再開。</p>}
+                {remakeInterrupt === 'interrupt' && Number(remakeCount) < detail.cupCount && (
+                  <p>残りの杯は未割当へ。</p>
+                )}
+                <button
+                  type="button"
+                  disabled={
+                    !remakeReason || !remakeCount || !remakeTarget || (detail.status === 'brewing' && !remakeInterrupt)
+                  }
+                  onClick={() => {
+                    dispatch({
+                      type: 'rebrew',
+                      key: detail.ticketUid ?? detail.id,
+                      cupCount: Number(remakeCount),
+                      bayId: remakeTarget === 'unassigned' ? null : Number(remakeTarget),
+                      interrupt: remakeInterrupt === 'interrupt',
+                      reason: remakeReason,
+                      incidentId: detailIncident?.id,
+                    });
+                    setDetailKey(null);
+                    setRemakeReason('');
+                    setRemakeCount('');
+                    setRemakeTarget('');
+                    setRemakeInterrupt('');
+                  }}
+                >
+                  淹れ直す
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  dispatch({ type: 'return', key: detail.ticketUid ?? detail.id });
-                  setDetailKey(null);
-                }}
-              >
-                未割当に戻す
-              </button>
-            </>
-          )}
-          <p>★は上級生。限定豆は1・6番へ。条件違反の操作は受け付けず、記録に残ります。</p>
-        </aside>
+            </details>
+            {detail.status !== 'completed' && (
+              <>
+                <h3>担当者を変更</h3>
+                <div className="training-bay-actions">
+                  {state.bays.map((bay) => (
+                    <button
+                      type="button"
+                      key={bay.id}
+                      data-tour-move={bay.id}
+                      disabled={detail.preferredBaristaId !== undefined && detail.preferredBaristaId !== bay.id}
+                      onClick={() => {
+                        dispatch({ type: 'move', key: detail.ticketUid ?? detail.id, bayId: bay.id });
+                        setDetailKey(null);
+                      }}
+                    >
+                      {bay.id}番{bay.canHandleSpecial ? ' ★' : ''}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    dispatch({ type: 'return', key: detail.ticketUid ?? detail.id });
+                    setDetailKey(null);
+                  }}
+                >
+                  未割当に戻す
+                </button>
+              </>
+            )}
+            <p>★上級生：1・6番</p>
+          </div>
+        </SidePanel>
       )}
       {state.paused && (
         <div className="training-paused">
           <Pause size={32} />
           <h2>一時停止中</h2>
-          <p>時計・注文到着・抽出・操作を止めています</p>
+          <p>時計・操作を停止中</p>
           <button type="button" className="training-primary" onClick={() => dispatch({ type: 'pause' })}>
             <Play size={18} />
             再開する
@@ -1027,13 +971,13 @@ function GameSession({
       {endOpen && (
         <div className="training-dialog-backdrop">
           <section role="dialog" aria-modal="true" aria-labelledby="finish-title" className="training-dialog">
-            <h2 id="finish-title">ここで終了して採点しますか？</h2>
+            <h2 id="finish-title">終了して採点？</h2>
             <p>
-              完了 {result.done}/{result.total}杯。未到着・未完了の杯も0点として採点します。
+              完了 {result.done}/{result.total}杯。残りは0点。
             </p>
             <div>
               <button type="button" onClick={() => setEndOpen(false)}>
-                練習を続ける
+                続ける
               </button>
               <button type="button" className="training-primary" onClick={() => dispatch({ type: 'finish' })}>
                 終了して採点

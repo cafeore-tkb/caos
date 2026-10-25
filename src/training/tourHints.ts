@@ -20,6 +20,10 @@ const tab = (starts: string): TourQuery => ({ selector: '[role="tab"]', starts }
 const view = (mode: string) => q(`[data-tour-view="${mode}"]`);
 const card = (key: string | undefined) => q(`[data-search-key="${(key ?? 'missing').replace(/["\\]/g, '\\$&')}"]`);
 const assigned = (key: string | undefined, bay: number) => q(`${card(key).selector} button[data-bay-target="${bay}"]`);
+const assignmentPanel = (bay: number) => [
+  q(`.caos-side-panel:has([data-assignment-bay="${bay}"][aria-pressed="true"]) button`, '割当を確定'),
+  q(`.caos-side-panel button[data-assignment-bay="${bay}"]`),
+];
 const pendingCard = (state: GameState) =>
   state.bays.flatMap((bay) => bay.queue).find((ticket) => ticket.status === 'scheduled') ??
   state.bays.flatMap((bay) => bay.queue)[0];
@@ -30,13 +34,12 @@ function finishHint(state: GameState): TourHint {
   const ticket = brewing(state);
   if (ticket && (ticket.timeRemainingSec ?? 1) > 0)
     return {
-      message:
-        '赤枠のカードで残り時間を確認しましょう。このガイドの「抽出時間を進める」で待ち時間を短縮できます。時間が来ても自動完了にはなりません。',
+      message: '「時間を進める」で残り0秒に。',
       queries: [card(ticket.ticketUid)],
       advanceTime: true,
     };
   return {
-    message: '赤枠のカードの商品名側を押し、出てきた「終える」を押してください。新しい淹れ直しも同じ操作で完了します。',
+    message: 'カードの商品名 →「終える」。',
     queries: [q('button[aria-label="終える（待機の先頭を始める）"]'), card(ticket?.ticketUid)],
   };
 }
@@ -47,46 +50,46 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
     case 'overview':
       return [
         {
-          message: 'まずCを押してみましょう。担当者ごとの「ドリップ中」と待ち列を、横並びで確認できます。',
+          message: '「キュー」で担当別の待ち列を確認。',
           queries: [view('c')],
         },
         {
-          message: 'Aを押して時間軸に戻ります。表示を変えても注文や抽出状態はそのままです。',
+          message: '「タイムライン」で時間軸を確認。',
           queries: [view('current')],
         },
         {
-          message: 'カードの注文番号「001」を押してください。同じ注文に属するカードが色付きの枠で強調されます。',
+          message: '「001」を押すと、同じ注文を強調。',
           queries: [q('[data-order-highlight-number]')],
         },
         {
-          message: '左端の担当番号を押して、担当者の情報を確認します。★のある1・6番は上級生限定の豆を担当できます。',
+          message: '担当番号から情報を確認。★は上級生。',
           queries: [button('1st 空き')],
         },
       ][step];
     case 'orders':
       return [
         {
-          message: '番号欄に「001」を入力して「探す」を押します。注文番号から対象を見つけて強調できます。',
-          queries: [{ selector: '.training-order-search input', valueNot: '001' }, q('.training-order-search button')],
+          message: '「番号」→「1」。注文を確認して閉じる。',
+          queries: [
+            q('[aria-label="注文番号で探す"]:has([aria-label="#001 の今"]) button[aria-label="閉じる"]'),
+            q('[aria-label="注文番号で探す"] button', '1'),
+            q('[data-tour-search]'),
+          ],
         },
         {
-          message: '「未提供」タブを押してください。仕上がりを待つ注文と、待ち時間・コメントを確認する場所です。',
+          message: '「未提供」で待ち時間を確認。',
           queries: [tab('未提供')],
         },
         {
-          message:
-            mode === 'c'
-              ? '「一覧」を押すと、到着済みの全注文と準備状態を見られます。'
-              : 'Cを押してから、右側の「一覧」タブを開いてください。',
+          message: mode === 'c' ? '「一覧」で全注文を確認。' : '「キュー」→「一覧」。',
           queries: mode === 'c' ? [tab('一覧')] : [view('c')],
         },
         {
-          message: '「未割当」に戻り、注文番号の横の吹き出しを押してください。Cでは右側にコメントチャットが開きます。',
+          message: '「未割当」→ 吹き出しでコメント確認。',
           queries: [q('button[aria-label^="コメント "][aria-label$="件を見る"]'), tab('未割当')],
         },
         {
-          message:
-            '「OK」などのスタンプを押して返信してみましょう。「文章で返信」も使えます。返信はこの練習内だけに記録されます。',
+          message: '「OK」で返信。文章でも返せます。',
           queries: [
             button('「OK」と返す'),
             q('button[aria-label^="コメント "][aria-label$="件を見る"]'),
@@ -96,9 +99,8 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
       ][step];
     case 'assign':
       return {
-        message:
-          '赤枠のカードの商品名側を押し、出てきた配置先「2」を押してください。空いている列では抽出が自動で始まります。',
-        queries: [assigned(first?.ticketUid, 2), card(first?.ticketUid)],
+        message: '商品名 →「2」。空きなら自動で開始。',
+        queries: [...assignmentPanel(2), assigned(first?.ticketUid, 2), card(first?.ticketUid)],
       };
     case 'conditions': {
       const input = state.unassigned.find((entry) =>
@@ -106,26 +108,22 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
       );
       const bay = step === 0 ? 4 : 1;
       return {
-        message:
-          step === 0
-            ? '「4th 指名」のカードを開き、4番に配置してください。指名と違う担当へは割り当てられません。'
-            : '「上級生のみ」のカードを開き、★のある1番か6番へ配置しましょう。矢印は1番を示しています。',
-        queries: [assigned(input?.ticketUid, bay), card(input?.ticketUid)],
+        message: step === 0 ? '指名カードの商品名 →「4」。' : '限定豆は★の1・6番へ。矢印は1番。',
+        queries: [...assignmentPanel(bay), assigned(input?.ticketUid, bay), card(input?.ticketUid)],
       };
     }
     case 'queue':
       return [
         {
-          message: '抽出中のカードを押し、「未着手に戻す」を押します。開始から1分未満なら取り消せます。',
+          message: 'カード →「未着手に戻す」。開始1分未満のみ。',
           queries: [button('未着手に戻す'), card(state.bays[1].queue[0]?.ticketUid)],
         },
         {
-          message: '戻した先頭のカードを押し、「始める」を押してください。待機したままでは抽出の時計は進みません。',
+          message: 'カード →「始める」で再開。',
           queries: [button('始める'), card(state.bays[1].queue[0]?.ticketUid)],
         },
         {
-          message:
-            '待機カードを押し、「3 に再割当」で別の担当へ移してみましょう。長押しの詳細からも担当者を変更できます。',
+          message: '待機カード →「3 に再割当」。',
           queries: [
             q('button[aria-label="3 に再割当"]'),
             q('[data-tour-move="3"]'),
@@ -133,19 +131,18 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
           ],
         },
         {
-          message: '残っている待機カードを押して「未割当に戻す」を選びます。注文は消えず、配置前の一覧に戻ります。',
+          message: '待機カード →「未割当に戻す」。',
           queries: [button('未割当に戻す'), card(pendingCard(state)?.ticketUid)],
         },
       ][step];
     case 'merge':
       return step === 0
         ? {
-            message:
-              '1杯のカードの商品名側を押し、もう一方の「統合する」を押します。同じ商品の2杯をまとめて抽出できます。',
+            message: '商品名 → もう1枚の「統合する」。',
             queries: [q('[data-merge-tap="true"]'), card(first?.ticketUid)],
           }
         : {
-            message: '統合したカードの商品名側を押し、出てきた「分ける」を押してください。1杯ずつのカードへ戻せます。',
+            message: '商品名 →「分ける」で1杯ずつに。',
             queries: [button('分ける'), card(first?.ticketUid)],
           };
     case 'finish':
@@ -154,14 +151,13 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
       return step > 0
         ? finishHint(state)
         : {
-            message:
-              '通知から手配を開き、矢印の欄を順番に選んでください。理由・杯数・割当先・元の抽出を中断するかどうかは、自分で判断します。',
+            message: '手配を開き、理由・杯数・担当・中断を選択。',
             queries: [
               ...['入れ直しの理由', '入れ直しの杯数', '入れ直しの割当先', '現在の抽出の扱い'].map((label) => ({
                 selector: `select[aria-label="${label}"]`,
                 empty: true,
               })),
-              button('この内容で入れ直す'),
+              button('淹れ直す'),
               button('入れ直しを手配'),
             ],
           };
@@ -169,8 +165,7 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
       return step > 0
         ? finishHint(state)
         : {
-            message:
-              '元の抽出の赤枠のアイコンを押し、確認画面で対象の杯を確かめて破棄します。新しい淹れ直しのカードは残ります。',
+            message: '赤枠の破棄ボタン → 元の1杯を確認。',
             queries: [button('元の1杯を破棄'), q('button[aria-label^="淹れ直し登録済み："]')],
           };
     default:
