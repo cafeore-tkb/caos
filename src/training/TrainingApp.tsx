@@ -655,6 +655,11 @@ function GameSession({
             完了 {result.done}/{result.total}杯
           </span>
         </div>
+        {state.notice && pendingEmergencies.length === 0 && (
+          <div className="training-session-notice" role="status">
+            {state.notice}
+          </div>
+        )}
         {lesson ? (
           <div className="training-game-controls">
             <button type="button" data-tour-retry onClick={onRetry}>
@@ -715,11 +720,6 @@ function GameSession({
       <div className="training-progress">
         <div style={{ width: `${(100 * state.nowSec) / scenario.durationSec}%` }} />
       </div>
-      {state.notice && pendingEmergencies.length === 0 && (
-        <div className="training-session-notice" role="status">
-          {state.notice}
-        </div>
-      )}
       {pendingEmergencies.length > 0 && (
         <aside className="training-emergencies" aria-label="緊急淹れ直しの通知">
           {pendingEmergencies.map((trial) => {

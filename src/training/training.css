@@ -1130,19 +1130,16 @@
   color: #475569;
 }
 .training-session-notice {
-  position: fixed;
-  top: 64px;
-  right: 16px;
-  z-index: 110;
-  max-width: min(420px, 90vw);
-  padding: 8px 12px;
-  border: 1px solid #cbd5e1;
-  border-radius: 8px;
-  background: white;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #334155;
   font-size: 12px;
   font-weight: 700;
-  pointer-events: none;
 }
+
 .training-now,
 .training-search-toggle {
   display: flex;
