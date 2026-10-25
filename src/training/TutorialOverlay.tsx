@@ -114,6 +114,8 @@ export function TutorialOverlay({
     const currentPopup = portalHost.querySelector<HTMLElement>('[data-training-tour] [role="dialog"]') ?? popup.current;
     if (currentPopup) resize.observe(currentPopup);
     document.addEventListener('scroll', schedule, true);
+    document.addEventListener('animationend', schedule, true);
+    document.addEventListener('transitionend', schedule, true);
     document.addEventListener('change', schedule, true);
     document.addEventListener('input', schedule, true);
     window.addEventListener('resize', schedule);
@@ -125,6 +127,8 @@ export function TutorialOverlay({
       resize.disconnect();
       mutations.disconnect();
       document.removeEventListener('scroll', schedule, true);
+      document.removeEventListener('animationend', schedule, true);
+      document.removeEventListener('transitionend', schedule, true);
       document.removeEventListener('change', schedule, true);
       document.removeEventListener('input', schedule, true);
       window.removeEventListener('resize', schedule);
