@@ -260,7 +260,8 @@ function project(state: GameState) {
 test('A and C are the only adopted views and share the same current card projection', () => {
   const state = assign(startGame(single()), 2);
   const before = JSON.stringify(state);
-  assert.deepEqual(Object.values(CONTROL_VIEWS), ['A', 'C']);
+  assert.deepEqual(Object.keys(CONTROL_VIEWS), ['current', 'c']);
+  assert.deepEqual(Object.values(CONTROL_VIEWS), ['タイムライン', 'キュー']);
   const projection = project(state);
   assert.equal(projection.lanes[1].brewing?.cups[0].item.abbr, 'よいん');
   assert.equal(projection.lanes[1].brewing?.orderNo, 1);

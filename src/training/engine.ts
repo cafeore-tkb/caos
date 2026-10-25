@@ -10,7 +10,7 @@ export const MODES = {
     durationSec: 600,
     count: 6,
     emergencyChances: 0,
-    description: '基本の割当と完了。少量の注文で操作を身につける。',
+    description: '少量の注文で基本操作。',
     target: '基本操作',
   },
   middle: {
@@ -18,7 +18,7 @@ export const MODES = {
     durationSec: 1200,
     count: 12,
     emergencyChances: 1,
-    description: 'アイス・限定豆・指名・複数杯を並行してさばく。',
+    description: '指名・限定豆を並行して対応。',
     target: '並行判断',
   },
   full: {
@@ -26,7 +26,7 @@ export const MODES = {
     durationSec: 1800,
     count: 20,
     emergencyChances: 2,
-    description: '注文の集中、分割、同時仕上げまで含めた店舗運営の総合練習。',
+    description: '混雑・緊急対応まで総合練習。',
     target: '店舗運営',
   },
 } as const;
@@ -831,24 +831,20 @@ export function scoreGame(state: GameState) {
   );
   const score = ready ? raw : Math.min(79, raw);
   const feedback = [
-    done.length < total
-      ? `未完了が${total - done.length}杯あります。空いている担当者へ早めに分散しましょう。`
-      : '全杯の抽出を完了できました。',
+    done.length < total ? `残り${total - done.length}杯。空いている担当へ分散。` : '全杯完了。',
     done.length === 0
-      ? '抽出を完了すると、経過した抽出時間から品質を評価します。'
+      ? 'まず抽出を完了しましょう。'
       : good.length < done.length
-        ? '「終える」を早く押しすぎています。残り時間を見て抽出品質を守りましょう。'
-        : '完了した杯の抽出時間は適切でした。',
+        ? '完了が早すぎます。残り時間を確認。'
+        : '抽出時間は適切。',
     good.length === 0
-      ? '品質を満たして完了した杯から、提供準備の速さも評価します。'
+      ? '品質を守り、8分以内に準備。'
       : timely.length < good.length
-        ? '8分を超えた杯があります。注文の古い順とレーンの空きを確認しましょう。'
-        : '品質を満たした杯はすべて8分以内に準備できました。',
-    together.length < groups.size
-      ? '複数杯の注文は仕上がりの差を60秒以内に。統合と並行抽出を使いましょう。'
-      : '同一注文の仕上がりがそろっています。',
-    ...(emergencyPending ? [`緊急淹れ直しが${emergencyPending}件未完了です。手配した杯の抽出を終えましょう。`] : []),
-    ...(state.violations ? ['指名と上級生のみの条件を確認しましょう。'] : []),
+        ? '8分超過あり。古い注文を優先。'
+        : '品質を守り、全杯8分以内。',
+    together.length < groups.size ? '同じ注文は60秒差以内に仕上げる。' : '同じ注文をそろえて完了。',
+    ...(emergencyPending ? [`緊急${emergencyPending}件が未完了。淹れ直しを完了。`] : []),
+    ...(state.violations ? ['指名先と★を確認。'] : []),
   ];
   return {
     score,

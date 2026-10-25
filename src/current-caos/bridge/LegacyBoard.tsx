@@ -5,14 +5,17 @@ import type { CaosCard } from '../common';
 import { ControlWorkspace as CurrentWorkspace } from '../components/ControlWorkspace';
 import { FloatingWindowsProvider } from '../components/FloatingWindows';
 import { OrderChatPanel } from '../components/OrderChatPanel';
+import { OrderSearchPanel } from '../components/OrderSearchPanel';
 import { CurrentLanesContext } from '../hooks/useCaosLanes';
 import { useCardMenu } from '../hooks/useCardMenu';
 import type { CommentAnchor } from '../hooks/useCommentPopupPosition';
 import { OrderHighlightsContext, useOrderHighlightState } from '../hooks/useOrderHighlights';
+import { useOrderSearch } from '../hooks/useOrderSearch';
 import { selectedComments } from '../logic/cards';
 import type { BoardComment } from '../logic/comments';
 import { nextAvailableBays } from '../logic/queue';
 import { scrollCardIntoView } from '../utils/scrollToCard';
+import { AssignPanel } from './AssignPanel';
 import { convertBoard } from './convertBoard';
 import { CommentPopup, FreshCommentsContext, OpenCommentsContext, StampReplyContext } from './OrderComments';
 
@@ -45,6 +48,31 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
     });
   };
   const [folded, setFolded] = useState(false);
+  const [digits, setDigits] = useState('');
+  const search = useOrderSearch({
+    digits: props.searchOpen ? digits : null,
+    open: (value) => {
+      setDigits(value);
+      props.onOpenSearch?.();
+    },
+    setDigits,
+    close: () => {
+      props.onCloseSearch?.();
+      if (Number(digits) === 1 && board.orders.some((order) => order.orderId === 1)) props.onInteraction?.('search');
+    },
+    selectOrder: (label) => {
+      props.onSelectOrder(label ?? '');
+    },
+    keyboardEnabled: Boolean(props.onOpenSearch),
+    view: props.mode,
+    orders: board.orders,
+    cards: board.cards,
+    lanes: board.lanes,
+    comments: new Map(
+      board.orders.map((order) => [order.id, board.comments.filter((comment) => comment.orderId === order.id)])
+    ),
+    nowMs: board.nowMs,
+  });
   const original = (card: CaosCard) => board.originals.get(card.key);
   const cardMenu = useCardMenu({
     onRun: (card, action) => {
@@ -187,6 +215,29 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
                       onClose={() => setViewingComments(null)}
                     />
                   )}
+                  {props.searchOpen && (
+                    <OrderSearchPanel
+                      digits={digits}
+                      found={search.found}
+                      pending={search.pending}
+                      looks={board.looks}
+                      onKey={search.press}
+                      onClose={search.finish}
+                    />
+                  )}
+                  {props.emptyBay !== null && props.emptyBay !== undefined && (
+                    <AssignPanel
+                      bayId={props.emptyBay}
+                      lanes={board.lanes}
+                      unassignedOrders={board.cards.filter((card) => card.status === 'unassigned')}
+                      looks={board.looks}
+                      onClose={() => props.onCloseEmptySlot?.()}
+                      onAssign={(card, bayId) => {
+                        const input = original(card);
+                        if (input) props.onAssignToBay(input as UnassignedOrder, bayId);
+                      }}
+                    />
+                  )}
                   {laneInfo !== null && (
                     <aside
                       className="absolute top-16 right-3 z-[100] w-80 rounded-xl border border-slate-300 bg-white p-5 shadow-xl"
@@ -198,9 +249,7 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
                       <h2 className="font-black">
                         {laneInfo}番 {props.baristas.find((bay) => bay.id === laneInfo)?.name}
                       </h2>
-                      <p className="mt-4 text-sm">
-                        訓練中は担当者の構成が固定です。1・6番は上級生として限定豆を担当できます。
-                      </p>
+                      <p className="mt-4 text-sm">1・6番は上級生。限定豆を担当できます。</p>
                     </aside>
                   )}
                 </OpenCommentsContext.Provider>
