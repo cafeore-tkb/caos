@@ -3,7 +3,15 @@ import { useState } from 'react';
 import { type GameMode, MODES } from './engine';
 import type { ResultEntry } from './history';
 
-export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBack: () => void }) {
+export function HistoryView({
+  entries,
+  onBack,
+  onGame,
+}: {
+  entries: ResultEntry[];
+  onBack: () => void;
+  onGame: () => void;
+}) {
   const [mode, setMode] = useState<GameMode | 'all'>('all');
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -14,7 +22,7 @@ export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBac
   const entry = visible.find((e) => e.id === selected) ?? visible[0];
   const detail = entry?.detail;
   return (
-    <main className="training-home">
+    <main className="training-home training-history-screen">
       <div className="training-container">
         <button className="training-back" type="button" onClick={onBack}>
           <ArrowLeft size={16} />
@@ -120,7 +128,10 @@ export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBac
             )}
           </div>
         )}
-        <div className="training-result-actions">
+        <footer className="training-result-actions training-actionbar" aria-label="履歴の操作">
+          <button type="button" className="training-primary" onClick={onGame}>
+            ゲームへ
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -141,7 +152,7 @@ export function HistoryView({ entries, onBack }: { entries: ResultEntry[]; onBac
             <Download size={16} />
             JSONで保存
           </button>
-        </div>
+        </footer>
         {error && <p role="alert">{error}</p>}
       </div>
     </main>
