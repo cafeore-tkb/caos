@@ -2,14 +2,24 @@ import type React from 'react';
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 export function Button({
-  variant: _variant,
-  size: _size,
+  variant = 'default',
+  size = 'default',
   className = '',
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string; size?: string }) {
   return (
     <button
-      className={`inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 font-bold disabled:opacity-40 ${className}`}
+      data-variant={variant}
+      data-size={size}
+      className={`caos-button inline-flex items-center justify-center whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-50 ${className}`}
+      {...props}
+    />
+  );
+}
+export function Input({ className = '', ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      className={`caos-input flex w-full rounded-md border px-3 py-2 disabled:opacity-50 ${className}`}
       {...props}
     />
   );
@@ -33,7 +43,10 @@ export function TwoStepButton({
   }, [armed]);
   return (
     <Button
-      className={className}
+      type="button"
+      size="sm"
+      variant={armed ? 'destructive' : 'outline'}
+      className={`w-full ${className ?? ''}`}
       onBlur={() => setArmed(false)}
       onClick={(event) => {
         event.stopPropagation();
@@ -72,7 +85,7 @@ export function AlertDialogContent({
       ref={ref}
       onCancel={() => onOpenChange(false)}
       aria-label="元の抽出の破棄"
-      className={`m-auto max-w-lg rounded-xl bg-white p-6 shadow-xl backdrop:bg-black/40 ${className}`}
+      className={`m-auto grid w-full max-w-lg gap-4 border border-[#e5e5e5] bg-white p-6 shadow-lg backdrop:bg-black/40 sm:rounded-lg ${className}`}
       {...props}
     >
       {children}
@@ -82,17 +95,17 @@ export function AlertDialogContent({
 }
 export function AlertDialogCancel(props: React.ButtonHTMLAttributes<HTMLButtonElement>) {
   const dialog = useContext(DialogContext);
-  return <Button {...props} onClick={() => dialog.onOpenChange(false)} />;
+  return <Button variant="outline" {...props} onClick={() => dialog.onOpenChange(false)} />;
 }
 export const AlertDialogHeader = (props: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className="mb-4 space-y-2" {...props} />
+  <div className="flex flex-col space-y-2 text-center sm:text-left" {...props} />
 );
 export const AlertDialogTitle = (props: React.HTMLAttributes<HTMLHeadingElement>) => (
-  <h2 className="text-lg font-black" {...props} />
+  <h2 className="font-semibold text-lg" {...props} />
 );
 export const AlertDialogDescription = (props: React.HTMLAttributes<HTMLParagraphElement>) => (
-  <p className="text-sm text-slate-600" {...props} />
+  <p className="text-sm text-[#737373]" {...props} />
 );
 export const AlertDialogFooter = (props: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className="mt-5 flex justify-end gap-3" {...props} />
+  <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2" {...props} />
 );

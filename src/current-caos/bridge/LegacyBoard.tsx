@@ -6,6 +6,7 @@ import { ControlWorkspace as CurrentWorkspace } from '../components/ControlWorks
 import { FloatingWindowsProvider } from '../components/FloatingWindows';
 import { OrderChatPanel } from '../components/OrderChatPanel';
 import { OrderSearchPanel } from '../components/OrderSearchPanel';
+import { LanePanel, RebrewPanel, TicketDetailPanel } from '../components/TicketPanels';
 import { CurrentLanesContext } from '../hooks/useCaosLanes';
 import { useCardMenu } from '../hooks/useCardMenu';
 import type { CommentAnchor } from '../hooks/useCommentPopupPosition';
@@ -89,6 +90,19 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
     },
     onComments: openComments,
   });
+  const panelCard = props.panelTicketKey ? board.cards.find((card) => card.key === props.panelTicketKey) : undefined;
+  const panelLane = board.lanes.find((lane) => lane.id === panelCard?.dripper);
+  const infoLane = board.lanes.find((lane) => lane.id === laneInfo);
+  const move = {
+    onMoveTicket: (card: CaosCard, bayId: number, place?: import('../common').CaosPlace) => {
+      const input = original(card);
+      if (input) props.onMoveTicket(input as OrderTicket, bayId, place);
+    },
+    onReturnToUnassigned: (card: CaosCard) => {
+      const input = original(card);
+      if (input) props.onReturnToUnassigned(input as OrderTicket);
+    },
+  };
   return (
     <div
       className="caos-root h-full min-h-0"
@@ -191,6 +205,9 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
                       if (input) props.onReturnToUnassigned(input as OrderTicket);
                     }}
                     onMergeOrders={props.onMergeOrders}
+                    onCancelEmergency={
+                      props.onCancelEmergency ? (card) => props.onCancelEmergency?.(card.key) : undefined
+                    }
                     onSplitCup={(card, cupId) =>
                       props.onSplitCup?.(card.key, card.cups.find((cup) => cup.id === cupId)?.cupId ?? cupId)
                     }
@@ -238,19 +255,47 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
                       }}
                     />
                   )}
-                  {laneInfo !== null && (
-                    <aside
-                      className="absolute top-16 right-3 z-[100] w-80 rounded-xl border border-slate-300 bg-white p-5 shadow-xl"
-                      aria-label="ドリッパーの情報"
-                    >
-                      <button type="button" className="float-right min-h-11 px-3" onClick={() => setLaneInfo(null)}>
-                        閉じる
-                      </button>
-                      <h2 className="font-black">
-                        {laneInfo}番 {props.baristas.find((bay) => bay.id === laneInfo)?.name}
-                      </h2>
-                      <p className="mt-4 text-sm">1・6番は上級生。限定豆を担当できます。</p>
-                    </aside>
+                  {panelCard &&
+                    props.onClosePanel &&
+                    (panelCard.status === 'queued' ? (
+                      <TicketDetailPanel
+                        ticket={panelCard}
+                        look={board.looks.get(panelCard.key)}
+                        lane={panelLane}
+                        onClose={props.onClosePanel}
+                        {...move}
+                        onSplitCup={(card, cupId) => props.onSplitCup?.(card.key, cupId)}
+                        onCancelEmergency={
+                          props.onCancelEmergency ? (card) => props.onCancelEmergency?.(card.key) : undefined
+                        }
+                      />
+                    ) : props.onAddEmergency ? (
+                      <RebrewPanel
+                        key={panelCard.key}
+                        card={panelCard}
+                        look={board.looks.get(panelCard.key)}
+                        lane={panelLane}
+                        orders={board.orders}
+                        practice
+                        onClose={props.onClosePanel}
+                        move={move}
+                        onAdd={(cups, reason) =>
+                          props.onAddEmergency?.(
+                            cups.map((cup) => cup.cupId),
+                            reason
+                          ) ?? Promise.resolve(null)
+                        }
+                      />
+                    ) : null)}
+                  {infoLane && (
+                    <LanePanel
+                      lane={infoLane}
+                      onClose={() => setLaneInfo(null)}
+                      onMoveQueue={(from, to) => {
+                        for (const card of board.lanes.find((lane) => lane.id === from)?.queued ?? [])
+                          move.onMoveTicket(card, to);
+                      }}
+                    />
                   )}
                 </OpenCommentsContext.Provider>
               </FreshCommentsContext.Provider>

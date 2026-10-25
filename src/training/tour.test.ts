@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { bayPadPlacement } from '../current-caos/logic/bayPadPlacement';
 import { overlapArea, placeTour, tourArrow } from './tourGeometry';
 import { tourHint } from './tourHints';
 import { LESSONS } from './tutorial';
@@ -80,4 +81,25 @@ test('pointing to one assignment choice leaves both rows of choices visible', ()
   ];
   const panel = placeTour(target, { width: 338, height: 250 }, { width: 1280, height: 720 }, rows);
   for (const row of rows) assert.equal(overlapArea(panel, row), 0);
+});
+
+test('assignment choices stay inside desktop and iPad viewports at both scroll edges', () => {
+  for (const viewport of [
+    { width: 1280, height: 720 },
+    { width: 1024, height: 768 },
+  ]) {
+    for (const top of [-20, 70, 200, viewport.height - 70, viewport.height - 10]) {
+      for (const left of [-30, 20, viewport.width - 60]) {
+        const rows = bayPadPlacement({ left, top, bottom: top + 62, width: 180 }, viewport);
+        assert.equal(rows.length, 2);
+        for (const row of rows) {
+          assert.ok(row.top >= 4);
+          assert.ok(row.top + row.height <= viewport.height - 4);
+          assert.ok(row.left >= 4);
+          assert.ok(row.left + row.width <= viewport.width - 4);
+        }
+        assert.ok(rows[0].top + rows[0].height < rows[1].top);
+      }
+    }
+  }
 });

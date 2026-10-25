@@ -67,7 +67,7 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
         orderNo: Number(orderId.replace(/\D/g, '')),
         position: (input.itemIndex ?? 0) * 10 + index,
         emergency: Boolean(input.isRebrew),
-        emergencyReason: input.isRebrew ? '入れ直し' : '',
+        emergencyReason: input.isRebrew ? (input.rebrewReason ?? '') : '',
         orderedAt: new Date(
           epoch + (sourceCup?.orderedAtSec ?? input.orderedAtSec ?? firstSeen.get(key) ?? props.currentTimeSec) * 1000
         ),
@@ -174,10 +174,14 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
         id: cups[0].cup.orderId,
         orderId: no,
         createdAt: new Date(Math.min(...cups.map(({ cup }) => cup.orderedAt.getTime()))),
-        menus: [],
+        menus: cups.map(({ cup }) => ({
+          orderMenuId: cup.cupId,
+          dripper: cup.nominatedDripper,
+          assignee: cup.nominee,
+        })),
         cups: cups.map(({ cup, card }) => ({
           id: cup.cupId,
-          orderMenuId: '',
+          orderMenuId: cup.cupId,
           item: cup.item,
           readyAt: card.finishedAt,
           servedAt: null,

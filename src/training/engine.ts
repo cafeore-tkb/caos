@@ -94,10 +94,13 @@ export type GameAction =
   | { type: 'unstart'; bayId: number }
   | { type: 'split'; key: string; cupId: string }
   | { type: 'discard'; key: string; cupIds: string[] }
+  | { type: 'rebrew-cups'; cupIds: string[]; reason: string }
+  | { type: 'cancel-emergency'; key: string }
   | {
       type: 'rebrew';
       key: string;
       cupCount: number;
+      cupIds?: string[];
       bayId: number | null;
       interrupt: boolean;
       reason: string;
@@ -317,10 +320,10 @@ function schedule(bay: Barista, nowSec: number, startFirst = false): Barista {
   });
   return { ...bay, queue, status: queue.some((ticket) => ticket.status === 'brewing') ? 'brewing' : 'standby' };
 }
-const toUnassigned = (ticket: OrderTicket): UnassignedOrder => ({
+const toUnassigned = (ticket: OrderTicket | UnassignedOrder): UnassignedOrder => ({
   ...ticket,
   badgeTag: `${ticket.cupCount}杯`,
-  predictedTimeStr: `${ticket.totalDurationSec}秒`,
+  predictedTimeStr: `${'totalDurationSec' in ticket ? ticket.totalDurationSec : brewDuration(ticket.beanName, ticket.cupCount)}秒`,
   recommendedBaristas: '条件に合う担当者',
   recommendedBayIds: ticket.preferredBaristaId ? [ticket.preferredBaristaId] : [1, 2, 3, 4, 5, 6],
   cardColor: 'blue',
@@ -356,7 +359,7 @@ function advanceEmergencies(state: GameState, previousSec: number): GameState {
         ),
       },
       'emergency',
-      `${ticket.id} 緊急淹れ直しが必要です。担当者と元抽出の扱いを選んで手配してください`
+      `${ticket.id} 緊急淹れ直しが必要です。カップを選んで手配してください`
     );
     next.events[next.events.length - 1] = { ...next.events[next.events.length - 1], atSec };
   }
@@ -438,17 +441,125 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       `${ticket.id} ${action.type === 'start' ? '抽出を開始' : '未着手に戻す'}`
     );
   }
-  if (action.type === 'rebrew') {
-    const source = state.bays
-      .flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])
-      .find((card) => keyOf(card) === action.key);
+  if (action.type === 'rebrew-cups') {
+    const sources = [...state.unassigned, ...state.bays.flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])];
     if (
-      !source ||
-      !action.reason.trim() ||
-      !Number.isInteger(action.cupCount) ||
-      action.cupCount < 1 ||
-      action.cupCount > source.cupCount
+      !action.cupIds.length ||
+      new Set(action.cupIds).size !== action.cupIds.length ||
+      action.cupIds.some((id) => !sources.some((card) => card.trainingCupIds?.includes(id)))
     )
+      return state;
+    let next = state;
+    for (const source of sources) {
+      const cupIds = action.cupIds.filter((id) => source.trainingCupIds?.includes(id));
+      if (cupIds.length)
+        next = gameReducer(next, {
+          type: 'rebrew',
+          key: keyOf(source),
+          cupCount: cupIds.length,
+          cupIds,
+          bayId: null,
+          interrupt: false,
+          reason: action.reason,
+        });
+    }
+    return next;
+  }
+  if (action.type === 'cancel-emergency') {
+    const remake = [...state.unassigned, ...state.bays.flatMap((bay) => bay.queue)].find(
+      (card) => keyOf(card) === action.key
+    );
+    if (
+      !remake?.isRebrew ||
+      (!state.unassigned.includes(remake as UnassignedOrder) && 'status' in remake && remake.status !== 'scheduled')
+    )
+      return state;
+    const ids = remake.trainingCupIds ?? [];
+    const original = [
+      ...state.unassigned,
+      ...state.bays.flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])]),
+    ].find((card) => keyOf(card) === remake.rebrewOfTicketUid);
+    const recoveredIds = ids.filter((id) => !original || original.discardedCupIds?.includes(id));
+    const restoredIds = ids.filter((id) => !recoveredIds.includes(id));
+    const recovered: UnassignedOrder | null = !recoveredIds.length
+      ? null
+      : {
+          ...toUnassigned(remake),
+          ticketUid: `cancelled-${action.key}-${state.events.length}`,
+          isRebrew: false,
+          rebrewReason: undefined,
+          rebrewOfTicketUid: undefined,
+          discardedCupIds: undefined,
+          trainingCupIds: recoveredIds,
+          sourceCups: remake.sourceCups?.filter((cup) => recoveredIds.includes(cup.id)),
+          cupCount: recoveredIds.length,
+        };
+    const restore = <T extends OrderTicket | UnassignedOrder>(card: T): T => {
+      if (keyOf(card) !== remake.rebrewOfTicketUid || !restoredIds.length) return card;
+      const sourceCups = [
+        ...new Map(
+          [...(card.sourceCups ?? []), ...(remake.sourceCups?.filter((cup) => restoredIds.includes(cup.id)) ?? [])].map(
+            (cup) => [cup.id, cup]
+          )
+        ).values(),
+      ];
+      return {
+        ...card,
+        trainingCupIds: [...new Set([...(card.trainingCupIds ?? []), ...restoredIds])],
+        sourceCups,
+        cupCount: sourceCups.length || card.cupCount,
+        isInterrupted: false,
+      };
+    };
+    const cups = { ...state.cups };
+    const bays = state.bays.map((bay) => {
+      const pastTickets = (bay.pastTickets ?? []).map((card) => {
+        const restored = restore(card);
+        if (restored !== card)
+          for (const id of restoredIds)
+            cups[id] = {
+              ...cups[id],
+              completedSec: card.completedAtSec,
+              brewRatio:
+                ((card.completedAtSec ?? state.nowSec) - (card.startTimeSec ?? state.nowSec)) / card.totalDurationSec,
+            };
+        return restored;
+      });
+      return schedule(
+        { ...bay, pastTickets, queue: bay.queue.filter((card) => keyOf(card) !== action.key).map(restore) },
+        state.nowSec
+      );
+    });
+    return withEvent(
+      {
+        ...state,
+        cups,
+        bays,
+        unassigned: [
+          ...state.unassigned.filter((card) => keyOf(card) !== action.key).map(restore),
+          ...(recovered ? [recovered] : []),
+        ],
+        emergencies: state.emergencies.map((trial) =>
+          trial.status === 'rebrewing' && trial.sourceKey === action.key
+            ? {
+                ...trial,
+                status: 'pending',
+                sourceKey:
+                  trial.cupId && recoveredIds.includes(trial.cupId) ? recovered?.ticketUid : remake.rebrewOfTicketUid,
+              }
+            : trial
+        ),
+      },
+      'cancel-emergency',
+      `${remake.id} 淹れ直しを取り消し`
+    );
+  }
+  if (action.type === 'rebrew') {
+    const source = [
+      ...state.unassigned,
+      ...state.bays.flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])]),
+    ].find((card) => keyOf(card) === action.key);
+    if (!source || !Number.isInteger(action.cupCount) || action.cupCount < 1 || action.cupCount > source.cupCount)
       return state;
     const target = state.bays.find((bay) => bay.id === action.bayId);
     if (action.bayId !== null && (!target || !allowedBay(source, target)))
@@ -462,9 +573,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     );
     if (action.incidentId !== undefined && !incident) return state;
     const originalIds = source.trainingCupIds ?? [];
-    const ids = (
-      incident?.cupId ? [incident.cupId, ...originalIds.filter((id) => id !== incident.cupId)] : originalIds
-    ).slice(0, action.cupCount);
+    const ids =
+      action.cupIds ??
+      (incident?.cupId ? [incident.cupId, ...originalIds.filter((id) => id !== incident.cupId)] : originalIds).slice(
+        0,
+        action.cupCount
+      );
+    if (new Set(ids).size !== ids.length || ids.some((id) => !originalIds.includes(id))) return state;
     const remaining = originalIds.filter((id) => !ids.includes(id));
     if (ids.length !== action.cupCount) return state;
     const cups = { ...state.cups };
@@ -477,9 +592,10 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       sourceCups: source.sourceCups?.filter((cup) => ids.includes(cup.id)),
       cupCount: action.cupCount,
       isRebrew: true,
+      rebrewReason: action.reason.trim().slice(0, 100),
       rebrewOfTicketUid: source.ticketUid,
       orderedAtSec: state.nowSec,
-      badgeTag: `${action.cupCount}杯 入れ直し`,
+      badgeTag: `${action.cupCount}杯 淹れ直し`,
     };
     const returned: UnassignedOrder[] = [];
     const bays = state.bays.map((bay) => {
@@ -564,10 +680,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 }
               : trial
         ),
-        unassigned: [...state.unassigned, ...returned, ...(target ? [] : [remake])],
+        unassigned: [
+          ...(target ? [] : [remake]),
+          ...state.unassigned.map((card) =>
+            keyOf(card) === action.key ? { ...card, trainingCupIds: remaining } : card
+          ),
+          ...returned,
+        ],
       },
       'rebrew',
-      `${source.id} ${action.cupCount}杯 入れ直し：${action.reason}`
+      `${source.id} ${action.cupCount}杯 淹れ直し：${action.reason}`
     );
   }
   if (action.type === 'split') {
@@ -653,6 +775,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                           ...card,
                           cupCount: remaining.length,
                           sourceCups: remaining,
+                          discardedCupIds: [...new Set([...(card.discardedCupIds ?? []), ...action.cupIds])],
                           totalDurationSec: brewDuration(card.beanName, remaining.length),
                         },
                       ]
@@ -667,6 +790,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                         status: 'completed' as const,
                         completedAtSec: state.nowSec,
                         isInterrupted: true,
+                        discardedCupIds: [...new Set([...(source.discardedCupIds ?? []), ...action.cupIds])],
                         trainingCupIds: [],
                       },
                     ]

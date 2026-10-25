@@ -1,49 +1,46 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef } from "react";
+import { bayPadPlacement } from "../logic/bayPadPlacement";
 
-// 1〜6 のボタン（OrderCard の BayPad）の 2 段の置き場所。段の高さと、カードの縁・段どうしの間を空けて、カードの上の縁・下の縁から並べる。
-// ふだんは上に前半・下に後半。片方の段が押せないとき（ヘッダー・帯・ほかのカードの下になる、枠やスクロールバーで切れる）は
-// 両方を下、それでも押せなければ両方を上に寄せる。どれも押せないボタンが残るなら、いちばん多く押せる置き場所にする
-const ROW_PX = 34;
-const STEP_PX = ROW_PX + 4;
-const PLACEMENTS = [
-  [{ top: -STEP_PX }, { bottom: -STEP_PX }],
-  [{ bottom: -STEP_PX }, { bottom: -2 * STEP_PX }],
-  [{ top: -2 * STEP_PX }, { top: -STEP_PX }],
-].map((rows) => rows.map((row) => ({ ...row, height: ROW_PX })));
-
-// ボタンが押せるか：上下の端の近くを指したときに、そのボタンに当たる（ほかのものの下・枠や画面の外なら当たらない）
-const pressable = (button: Element) => {
-  const rect = button.getBoundingClientRect();
-  const x = rect.left + rect.width / 2;
-  return [rect.top + 4, rect.bottom - 4].every((y) => {
-    // The tutorial coach moves away after the pad opens; do not let its previous
-    // position make us choose a row that is clipped by the board's scroll area.
-    const hit = document
-      .elementsFromPoint(x, y)
-      .find((element) => !element.closest("[data-training-tour]"));
-    return Boolean(hit && button.contains(hit));
-  });
-};
-
-/** 開いたときに置き場所を順に試して決める。ref は 2 段をまとめた要素、rows は段ごとの位置と高さ（style） */
+/** Keep the original card DOM ownership, but lift its two rows out of clipping and stacking contexts. */
 export const useBayPadPlacement = () => {
   const ref = useRef<HTMLDivElement>(null);
-  const [index, setIndex] = useState(0);
-  // 試した置き場所ごとの、押せるボタンの数
-  const counts = useRef<number[]>([]);
   useLayoutEffect(() => {
-    const buttons = Array.from(ref.current?.querySelectorAll("button") ?? []);
-    const count = buttons.filter(pressable).length;
-    counts.current[index] = count;
-    // 全部押せればこの置き場所のまま
-    if (count === buttons.length) return;
-    // まだ試していない置き場所があれば次を試す
-    if (counts.current.length < PLACEMENTS.length) {
-      setIndex(counts.current.length);
-      return;
-    }
-    // 全部試したら、いちばん多く押せる置き場所（今がそれなら何もしない）
-    setIndex(counts.current.indexOf(Math.max(...counts.current)));
-  }, [index]);
-  return { ref, rows: PLACEMENTS[index] };
+    const anchor = ref.current?.closest<HTMLElement>("[data-unassigned-uid]");
+    const rows = Array.from(ref.current?.querySelectorAll<HTMLElement>("[data-bay-pad-row]") ?? []);
+    if (!anchor || rows.length !== 2) return;
+    let frame = 0;
+    const position = () => {
+      const rect = anchor.getBoundingClientRect();
+      const positions = bayPadPlacement(rect, { width: window.innerWidth, height: window.innerHeight });
+      rows.forEach((row, index) => {
+        const placement = positions[index];
+        Object.assign(row.style, {
+          left: `${placement.left}px`, top: `${placement.top}px`,
+          width: `${placement.width}px`, height: `${placement.height}px`,
+        });
+      });
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(position);
+    };
+    position();
+    rows.forEach((row) => row.showPopover());
+    // Selection can smoothly scroll the card after the opening layout effect.
+    document.addEventListener("scroll", schedule, true);
+    window.addEventListener("resize", schedule);
+    const observer = new ResizeObserver(schedule);
+    observer.observe(anchor);
+    if (anchor.parentElement) observer.observe(anchor.parentElement);
+    observer.observe(document.documentElement);
+    schedule();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      document.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("resize", schedule);
+      rows.forEach((row) => { if (row.isConnected && row.matches(":popover-open")) row.hidePopover(); });
+    };
+  });
+  return { ref };
 };

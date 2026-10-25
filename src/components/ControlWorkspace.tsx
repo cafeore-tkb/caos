@@ -13,6 +13,10 @@ export interface ControlViewProps {
   nextAvailable: Array<{ bayNumber: number; seconds: number; isStandby: boolean }>;
   selectedOrderId: string | null;
   actionTicketKey: string | null;
+  panelTicketKey?: string | null;
+  onClosePanel?: () => void;
+  onAddEmergency?: (cupIds: string[], reason: string) => Promise<string[] | null>;
+  onCancelEmergency?: (key: string) => void;
   currentTimeSec: number;
   clockOriginMs?: number;
   orderComments?: readonly BoardComment[];
