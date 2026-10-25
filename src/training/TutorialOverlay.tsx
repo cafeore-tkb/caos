@@ -1,4 +1,4 @@
-import { CheckCircle2, ChevronDown, ChevronUp, MoveUpRight, Sparkles } from 'lucide-react';
+import { BookOpen, CheckCircle2, ChevronDown, ChevronUp, MoveUpRight } from 'lucide-react';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { GameState } from './engine';
@@ -181,7 +181,7 @@ export function TutorialOverlay({
       >
         <header className="tutorial-popup-header">
           <span>
-            <Sparkles size={15} />
+            <BookOpen size={15} />
             練習 {lessonNumber} / {LESSONS.length}
           </span>
           <button

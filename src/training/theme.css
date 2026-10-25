@@ -1,0 +1,334 @@
+/* Coffee-club palette, confined to learning screens and their coach controls. */
+.training-home {
+  --practice-ink: #30251e;
+  --practice-muted: #665747;
+  --practice-paper: #fffaf0;
+  --practice-base: #eee5d2;
+  --practice-line: #bcae96;
+  --practice-coffee: #503326;
+  --practice-green: #285846;
+  --practice-blue: #2f4c63;
+  --practice-brick: #954330;
+  --practice-gold: #e9b854;
+  color: var(--practice-ink);
+  background: var(--practice-base);
+}
+.training-home progress {
+  appearance: none;
+  border: 0;
+  border-radius: 2px;
+  background: #d8cbb4;
+  accent-color: var(--practice-green);
+}
+.training-home progress::-webkit-progress-bar {
+  border-radius: 2px;
+  background: #d8cbb4;
+}
+.training-home progress::-webkit-progress-value {
+  border-radius: 2px;
+  background: var(--practice-green);
+}
+.training-home progress::-moz-progress-bar {
+  border-radius: 2px;
+  background: var(--practice-green);
+}
+.training-home .training-eyebrow {
+  color: var(--practice-coffee);
+  letter-spacing: 0.08em;
+}
+.training-home .training-title h1 {
+  color: var(--practice-ink);
+  letter-spacing: -0.025em;
+}
+.training-home .training-title p,
+.training-home .training-panel p,
+.training-home .training-actionbar > p,
+.training-home .training-curriculum small {
+  color: var(--practice-muted);
+}
+.training-home .training-panel,
+.training-home .training-back,
+.training-home .training-secondary,
+.training-home .training-actionbar > a,
+.training-home .training-actionbar > button:not(.training-primary),
+.training-home .training-data-actions > a,
+.training-home .training-data-actions > button {
+  border-color: var(--practice-line);
+  border-radius: 6px;
+  background: var(--practice-paper);
+  color: var(--practice-ink);
+  box-shadow: 0 2px 0 #d1c2a6;
+}
+.training-home .training-primary {
+  border-color: var(--practice-ink);
+  border-radius: 6px;
+  color: #fff9e9;
+  background: var(--practice-coffee);
+  box-shadow: 0 4px 0 var(--practice-ink);
+}
+.training-home .training-primary:hover {
+  background: #38231b;
+}
+.training-home .training-primary:active,
+.training-home .training-secondary:active {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+.training-home .training-actionbar {
+  border-top: 2px solid var(--practice-ink);
+  background: var(--practice-base);
+}
+.training-home :is(button, a, summary):focus-visible {
+  outline: 3px solid var(--practice-blue);
+  outline-offset: 3px;
+}
+.training-dashboard .training-course-intro {
+  border: 1px solid var(--practice-line);
+  border-left: 6px solid var(--practice-coffee);
+  background: var(--practice-paper);
+}
+.training-dashboard .training-course-intro b {
+  color: var(--practice-green);
+  font-family: ui-monospace, monospace;
+}
+.training-dashboard .training-course-intro progress {
+  grid-column: 1 / -1;
+  display: block;
+  width: 100%;
+  height: 7px;
+  margin-top: 10px;
+  accent-color: var(--practice-green);
+}
+.training-dashboard .training-curriculum li {
+  --lesson-color: var(--practice-green);
+}
+.training-dashboard .training-curriculum li:nth-child(n + 4) {
+  --lesson-color: var(--practice-blue);
+}
+.training-dashboard .training-curriculum li:nth-child(n + 7) {
+  --lesson-color: var(--practice-brick);
+}
+.training-dashboard .training-curriculum button {
+  border: 1px solid var(--practice-line);
+  border-left: 5px solid var(--lesson-color);
+  border-radius: 6px;
+  color: var(--practice-ink);
+  background: var(--practice-paper);
+  box-shadow: 0 3px 0 #d1c2a6;
+  transition: transform 0.12s ease-out;
+}
+.training-dashboard .training-curriculum button:hover {
+  transform: translateY(-2px);
+  border-color: var(--lesson-color);
+  background: #fffdf7;
+}
+.training-dashboard .training-curriculum button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.training-dashboard .training-lesson-number {
+  border: 1px solid var(--lesson-color);
+  border-radius: 5px;
+  color: var(--lesson-color);
+  background: #f3ecd9;
+  font-family: ui-monospace, monospace;
+}
+.training-dashboard .training-lesson-number.done {
+  border-color: var(--practice-green);
+  color: #fff9e9;
+  background: var(--practice-green);
+}
+.training-home .training-actionbar.training-menu-actions > button {
+  min-height: 64px;
+  border-width: 2px;
+}
+.training-home .training-menu-actions > button.training-game-entry {
+  border-color: var(--practice-ink);
+  background: var(--practice-gold);
+  box-shadow: 0 4px 0 #88612b;
+}
+.training-home .training-menu-actions > button.training-record-entry {
+  border-color: var(--practice-green);
+  color: var(--practice-green);
+}
+.training-setup-screen {
+  --mode-color: var(--practice-green);
+}
+.training-setup-screen[data-selected-mode="middle"] {
+  --mode-color: var(--practice-blue);
+}
+.training-setup-screen[data-selected-mode="full"] {
+  --mode-color: var(--practice-brick);
+}
+.training-setup-screen .training-mode {
+  --choice-color: var(--practice-green);
+  border: 2px solid var(--practice-line);
+  border-top: 5px solid var(--choice-color);
+  border-radius: 6px;
+  color: var(--practice-ink);
+  background: var(--practice-paper);
+  box-shadow: 0 3px 0 #d1c2a6;
+}
+.training-setup-screen .training-mode:nth-child(2) {
+  --choice-color: var(--practice-blue);
+}
+.training-setup-screen .training-mode:nth-child(3) {
+  --choice-color: var(--practice-brick);
+}
+.training-setup-screen .training-mode-top,
+.training-setup-screen .training-mode p,
+.training-setup-screen .training-mode small {
+  color: var(--practice-muted);
+}
+.training-setup-screen .training-mode.is-selected {
+  border-color: var(--practice-ink);
+  background: var(--choice-color);
+  color: #fff9e9;
+  box-shadow: 0 4px 0 var(--practice-ink);
+}
+.training-setup-screen .training-mode.is-selected :is(.training-mode-top, p, small) {
+  color: #fff9e9;
+}
+.training-mode-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 6px;
+  border: 1px solid var(--practice-ink);
+  border-radius: 3px;
+  background: var(--practice-gold);
+  color: var(--practice-ink);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.training-setup-screen .training-course-done {
+  border-color: var(--practice-green);
+  color: var(--practice-green);
+  background: #e7ebd7;
+}
+.training-setup-screen .training-actionbar .training-primary {
+  background: var(--mode-color);
+}
+.training-home .training-panel .training-criteria {
+  color: var(--practice-coffee);
+}
+.training-result-screen .training-score {
+  border: 2px solid var(--practice-ink);
+  border-radius: 6px;
+  color: #fff9e9;
+  background: var(--practice-coffee);
+}
+.training-result-screen .training-score.passed {
+  background: var(--practice-green);
+}
+.training-result-screen .training-score small {
+  color: #e4d7bf;
+}
+.training-result-screen .training-results > p,
+.training-home .training-history-list small,
+.training-home .training-history-category > small,
+.training-home .training-feedback {
+  color: var(--practice-muted);
+}
+.training-home.training-history-screen .training-history-filters button {
+  --filter-color: var(--practice-coffee);
+  border-color: var(--practice-line);
+  border-radius: 5px;
+  color: var(--practice-ink);
+  background: var(--practice-paper);
+}
+.training-home.training-history-screen .training-history-filters button:nth-child(2) {
+  --filter-color: var(--practice-green);
+}
+.training-home.training-history-screen .training-history-filters button:nth-child(3) {
+  --filter-color: var(--practice-blue);
+}
+.training-home.training-history-screen .training-history-filters button:nth-child(4) {
+  --filter-color: var(--practice-brick);
+}
+.training-home.training-history-screen .training-history-filters button[aria-pressed="true"] {
+  border-color: var(--practice-ink);
+  color: #fff9e9;
+  background: var(--filter-color);
+}
+.training-home.training-history-screen .training-history-list button {
+  border-color: var(--practice-line);
+  border-radius: 6px;
+  color: var(--practice-ink);
+  background: var(--practice-paper);
+}
+.training-home .training-history-list strong {
+  color: var(--practice-coffee);
+}
+.training-home.training-history-screen .training-history-list button[aria-pressed="true"] {
+  border-left: 6px solid var(--practice-green);
+  outline-color: var(--practice-green);
+  background: #e7ebd7;
+}
+.training-home .training-history-category {
+  border-color: #d9cdb6;
+}
+.tutorial-popup {
+  border-color: #a44430;
+  border-radius: 7px;
+  color: #30251e;
+  background: #fffaf0;
+  box-shadow: 0 5px 0 #50332655;
+}
+.tutorial-popup-header {
+  border-color: #d6af94;
+  color: #873b2a;
+  background: #f0dfc8;
+}
+[data-training-tour] .tutorial-popup p {
+  color: #665747;
+}
+.tutorial-time {
+  border-color: #96723c;
+  border-radius: 5px;
+  color: #503326;
+  background: #f7e9be;
+}
+.tutorial-next {
+  border-color: #703020;
+  border-radius: 5px;
+  background: #954330;
+}
+.tutorial-next:hover {
+  background: #703020;
+}
+.training-game .training-game-controls .training-finish-button,
+.training-game .training-dialog .training-primary {
+  border-color: #703020;
+  background: #954330;
+}
+.training-game .training-dialog {
+  border: 2px solid #503326;
+  border-radius: 7px;
+  color: #30251e;
+  background: #fffaf0;
+}
+.training-paused {
+  color: #30251e;
+  background: #f6efdfef;
+  backdrop-filter: none;
+}
+.training-game .training-paused .training-primary {
+  border-color: #30251e;
+  background: #503326;
+}
+@media (max-width: 760px) {
+  .training-setup-screen .training-mode-top {
+    display: flex;
+    min-height: 24px;
+    justify-content: flex-end;
+  }
+  .training-setup-screen .training-mode-top > span:first-child {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .training-dashboard .training-curriculum button {
+    transition: none;
+  }
+}
