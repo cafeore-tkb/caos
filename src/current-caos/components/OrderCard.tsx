@@ -498,7 +498,7 @@ const padTone = (bayId: number, hoveredBay: number | null) =>
     : "border-slate-300 bg-white text-slate-950 disabled:border-slate-700 disabled:bg-slate-700 disabled:text-slate-500";
 
 // カードの上に前半（1〜3）、下に後半（4〜6）を出すドリッパーのボタン（カードの children に置く）。未割当カード（管制盤 A・C）で使い、番号はそのドリッパーの列の最後へ。
-// 段がヘッダー・帯・ほかのカードの下になったり枠で切れたりして押せないときは、両方の段を下か上に寄せる（useBayPadPlacement）。
+// 段は非モーダルの popover でスクロール枠の切り取りを避け、画面端では両方を上か下に寄せる。
 // 指名の番号のあるカードは、その番号のボタンだけ押せる（logic/lanes の moveTargets）。
 // ドラッグで指を滑らせて選べるよう、番号のボタンは data-bay-target を持つ（useCardDrag の bayTargetAt）。
 export const BayPad: React.FC<{
@@ -523,8 +523,9 @@ export const BayPad: React.FC<{
       {[targets.slice(0, half), targets.slice(half)].map((row, index) => (
         <div
           key={row[0].bayId}
-          style={placement.rows[index]}
-          className="absolute right-0 left-0 z-[90] grid grid-cols-3 gap-1 rounded-lg bg-slate-950 p-1 shadow-xl"
+          popover="manual"
+          data-bay-pad-row={index}
+          className="fixed inset-auto m-0 grid grid-cols-3 gap-1 rounded-lg border-0 bg-slate-950 p-1 shadow-xl"
         >
           {row.map(({ bayId, disabled }) => (
             <button

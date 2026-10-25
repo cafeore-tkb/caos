@@ -224,3 +224,109 @@ test('partial original discard preserves the other cup and both cups receive cre
   assert.equal(scoreGame(state).quality, 2);
   assert.equal(scoreGame(state).total, 2);
 });
+
+test('production emergency cup selection keeps the chosen cup, reason and original brew', () => {
+  let state = lesson('merge').setup();
+  for (const card of [...state.unassigned])
+    state = gameReducer(state, { type: 'assign', key: card.ticketUid ?? '', bayId: 2 });
+  const first = state.bays[1].queue[0];
+  const second = state.bays[1].queue[1];
+  const selected = second.trainingCupIds?.[0] ?? '';
+  state = gameReducer(state, { type: 'rebrew-cups', cupIds: [selected], reason: 'ラベル再発行' });
+  assert.deepEqual(state.unassigned[0].trainingCupIds, [selected]);
+  assert.equal(state.unassigned[0].rebrewReason, 'ラベル再発行');
+  assert.equal(state.bays[1].queue[0].ticketUid, first.ticketUid);
+  assert.equal(state.bays[1].queue[0].status, 'brewing');
+  assert.equal(board(state).cards.find((card) => card.emergency)?.cups[0].emergencyReason, 'ラベル再発行');
+  const before = state;
+  assert.equal(gameReducer(state, { type: 'rebrew-cups', cupIds: [selected, 'missing'], reason: '' }), before);
+  assert.equal(gameReducer(state, { type: 'rebrew-cups', cupIds: [selected, selected], reason: '' }), before);
+});
+
+test('emergencies can be registered from unassigned orders with an optional reason, then cancelled', () => {
+  let state = lesson('assign').setup();
+  const original = state.unassigned[0];
+  const ids = original.trainingCupIds ?? [];
+  state = gameReducer(state, { type: 'rebrew-cups', cupIds: ids, reason: '' });
+  assert.equal(state.unassigned[0].isRebrew, true);
+  assert.equal(state.unassigned[0].rebrewReason, '');
+  assert.deepEqual(state.unassigned[0].trainingCupIds, ids);
+  assert.equal(state.unassigned[1].trainingCupIds?.length, 0);
+  state = gameReducer(state, { type: 'cancel-emergency', key: state.unassigned[0].ticketUid ?? '' });
+  assert.equal(state.unassigned.length, 1);
+  assert.deepEqual(state.unassigned[0].trainingCupIds, ids);
+  assert.equal(state.unassigned[0].ticketUid, original.ticketUid);
+});
+
+test('cancelling an unstarted emergency restores the pending incident; a started remake cannot be cancelled', () => {
+  let state = lesson('emergency').setup();
+  const ids = state.bays[1].queue[0].trainingCupIds ?? [];
+  state = gameReducer(state, { type: 'rebrew-cups', cupIds: ids, reason: '抽出ミス' });
+  assert.equal(state.emergencies[0].status, 'rebrewing');
+  state = gameReducer(state, { type: 'cancel-emergency', key: state.unassigned[0].ticketUid ?? '' });
+  assert.equal(state.emergencies[0].status, 'pending');
+  assert.deepEqual(state.bays[1].queue[0].trainingCupIds, ids);
+  state = gameReducer(state, { type: 'rebrew-cups', cupIds: ids, reason: '抽出ミス' });
+  const key = state.unassigned[0].ticketUid ?? '';
+  state = gameReducer(state, { type: 'assign', key, bayId: 3 });
+  assert.equal(gameReducer(state, { type: 'cancel-emergency', key }), state);
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
+  state = gameReducer(state, { type: 'complete', bayId: 3 });
+  assert.equal(state.emergencies[0].status, 'resolved');
+  assert.equal(scoreGame(state).done, 1);
+});
+
+test('a partial remake of a merged card preserves the exact selected cup and other orders', () => {
+  let state = lesson('merge').setup();
+  state = gameReducer(state, {
+    type: 'merge',
+    first: state.unassigned[0].ticketUid ?? '',
+    second: state.unassigned[1].ticketUid ?? '',
+  });
+  state = gameReducer(state, { type: 'assign', key: state.unassigned[0].ticketUid ?? '', bayId: 2 });
+  const source = state.bays[1].queue[0];
+  const selected = source.trainingCupIds?.[1] ?? '';
+  state = gameReducer(state, { type: 'rebrew-cups', cupIds: [selected], reason: '少しこぼれた' });
+  assert.deepEqual(state.unassigned[0].trainingCupIds, [selected]);
+  assert.equal(
+    state.unassigned[0].sourceCups?.[0].orderId,
+    source.sourceCups?.find((cup) => cup.id === selected)?.orderId
+  );
+  assert.deepEqual(
+    state.bays[1].queue[0].trainingCupIds,
+    source.trainingCupIds?.filter((id) => id !== selected)
+  );
+  assert.equal(state.bays[1].queue[0].cupCount, 2);
+  assert.equal(state.bays[1].queue[0].status, 'brewing');
+  assert.equal(Object.keys(state.cups).length, 2);
+});
+
+test('cancelling a remake after completion restores the original cup and its score', () => {
+  let state = lesson('finish').setup();
+  state = gameReducer(state, { type: 'tick', seconds: 300 });
+  state = gameReducer(state, { type: 'complete', bayId: 2 });
+  const completed = state;
+  state = gameReducer(state, { type: 'rebrew-cups', cupIds: Object.keys(state.cups), reason: '' });
+  assert.equal(scoreGame(state).done, 0);
+  state = gameReducer(state, { type: 'cancel-emergency', key: state.unassigned[0].ticketUid ?? '' });
+  assert.equal(scoreGame(state).done, scoreGame(completed).done);
+  assert.equal(scoreGame(state).quality, scoreGame(completed).quality);
+  const original = board(state).cards.find((card) => !card.emergency);
+  assert.equal(original?.cups.length, 1);
+  assert.equal(original?.status, 'done');
+});
+
+test('cancelling after original discard keeps the cup available for a new brew', () => {
+  let state = lesson('emergency').setup();
+  const key = state.bays[1].queue[0].ticketUid ?? '';
+  const ids = state.bays[1].queue[0].trainingCupIds ?? [];
+  state = gameReducer(state, { type: 'rebrew-cups', cupIds: ids, reason: '抽出ミス' });
+  const remakeKey = state.unassigned[0].ticketUid ?? '';
+  state = gameReducer(state, { type: 'discard', key, cupIds: ids });
+  state = gameReducer(state, { type: 'cancel-emergency', key: remakeKey });
+  assert.equal(state.unassigned.length, 1);
+  assert.equal(state.unassigned[0].isRebrew, false);
+  assert.deepEqual(state.unassigned[0].trainingCupIds, ids);
+  assert.equal(state.emergencies[0].sourceKey, state.unassigned[0].ticketUid);
+  assert.equal(state.emergencies[0].status, 'pending');
+});

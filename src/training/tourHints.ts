@@ -132,7 +132,7 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
         },
         {
           message: '待機カード →「未割当に戻す」。',
-          queries: [button('未割当に戻す'), card(pendingCard(state)?.ticketUid)],
+          queries: [button('未割り当に戻す'), button('未割当に戻す'), card(pendingCard(state)?.ticketUid)],
         },
       ][step];
     case 'merge':
@@ -147,20 +147,20 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
           };
     case 'finish':
       return finishHint(state);
-    case 'emergency':
+    case 'emergency': {
+      const remake = state.unassigned.find((card) => card.isRebrew);
       return step > 0
-        ? finishHint(state)
+        ? remake
+          ? {
+              message: '淹れ直しカードの商品名 → 担当番号。',
+              queries: [assigned(remake.ticketUid, 3), card(remake.ticketUid)],
+            }
+          : finishHint(state)
         : {
-            message: '手配を開き、理由・杯数・担当・中断を選択。',
-            queries: [
-              ...['入れ直しの理由', '入れ直しの杯数', '入れ直しの割当先', '現在の抽出の扱い'].map((label) => ({
-                selector: `select[aria-label="${label}"]`,
-                empty: true,
-              })),
-              button('淹れ直す'),
-              button('入れ直しを手配'),
-            ],
+            message: 'カップを選び、理由 → 赤い確定ボタン。',
+            queries: [q('form button[type="submit"]'), button('抽出ミス'), button('淹れ直しを手配')],
           };
+    }
     case 'discard':
       return step > 0
         ? finishHint(state)

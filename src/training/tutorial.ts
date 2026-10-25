@@ -139,7 +139,7 @@ export const LESSONS: Lesson[] = [
   {
     id: 'emergency',
     title: '緊急で淹れ直す',
-    description: '理由・杯数・担当・中断を選択',
+    description: 'カップ・理由を選び、担当へ割当',
     setup: () => {
       const state = base();
       let prepared = prepare(state, [assign(state, 0, 2)]);

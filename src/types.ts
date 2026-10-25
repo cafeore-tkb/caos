@@ -52,6 +52,8 @@ export interface OrderTicket {
   completedAtSec?: number; // for historical completed drip
   isRebrew?: boolean; // emergency remake linked to an original cup
   rebrewOfTicketUid?: string;
+  rebrewReason?: string;
+  discardedCupIds?: string[];
   isInterrupted?: boolean; // original drip stopped because a remake was required
   imminent?: boolean; // e.g. "残 0:07" or "まもなく完了"
   recipe?: {
@@ -99,6 +101,8 @@ export interface UnassignedOrder {
   preferredBaristaId?: number; // 指名。必ず1人だけ
   isRebrew?: boolean;
   rebrewOfTicketUid?: string;
+  rebrewReason?: string;
+  discardedCupIds?: string[];
   cardColor: 'blue' | 'peach' | 'cyan' | 'emerald';
 }
 
