@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  Coffee,
   Download,
   FileJson,
   Flag,
@@ -30,6 +31,7 @@ import {
 import { itemAbbr, needsBrew, seniorOnly } from './master';
 import './training.css';
 import './screens.css';
+import './theme.css';
 
 const TRAINING_CLOCK_ORIGIN = Date.UTC(2026, 9, 19, 1);
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
@@ -127,10 +129,10 @@ export default function TrainingApp() {
           </a>
           <header className="training-title">
             <span className="training-eyebrow">
-              <BookOpen size={18} />
-              CaOS LEARNING
+              <Coffee size={18} />
+              CaOS / 珈琲・俺
             </span>
-            <h1>CaOSを練習する</h1>
+            <h1>マスターシート練習室</h1>
             <p>操作を覚える → ゲームに挑戦 → 記録を見る</p>
           </header>
           <section className="training-course-intro training-panel">
@@ -139,10 +141,15 @@ export default function TrainingApp() {
                 <BookOpen size={20} />
                 操作チュートリアル
               </h2>
-              <p>全{LESSONS.length}レッスン。時計は手動です。</p>
+              <p>全{LESSONS.length}レッスン。待ち時間はボタンで進めます。</p>
               <b>
                 {LESSONS.filter((lesson) => completed.includes(lesson.id)).length} / {LESSONS.length} 完了
               </b>
+              <progress
+                value={LESSONS.filter((lesson) => completed.includes(lesson.id)).length}
+                max={LESSONS.length}
+                aria-label="完了したレッスン"
+              />
             </div>
           </section>
           <ol className="training-curriculum">
@@ -181,16 +188,20 @@ export default function TrainingApp() {
             >
               <Play size={18} />
               {LESSONS.every((lesson) => completed.includes(lesson.id))
-                ? '最初から'
+                ? 'もう一度練習'
                 : completed.length
-                  ? '続きから'
+                  ? '続きから練習'
                   : '練習を始める'}
             </button>
-            <button type="button" className="training-secondary" onClick={() => setPage('game')}>
+            <button type="button" className="training-secondary training-game-entry" onClick={() => setPage('game')}>
               <Gamepad2 size={24} />
-              ゲームへ
+              ゲームに挑戦
             </button>
-            <button type="button" className="training-secondary" onClick={() => setPage('history')}>
+            <button
+              type="button"
+              className="training-secondary training-record-entry"
+              onClick={() => setPage('history')}
+            >
               <Trophy size={24} />
               記録を見る
             </button>
@@ -206,7 +217,7 @@ export default function TrainingApp() {
       0
     ) ?? 0;
   return (
-    <main className="training-home training-setup-screen">
+    <main className="training-home training-setup-screen" data-selected-mode={mode}>
       <div className="training-container">
         <div className="training-menu-nav">
           <button type="button" className="training-back" onClick={() => setPage('learn')}>
@@ -249,7 +260,12 @@ export default function TrainingApp() {
                   <span>
                     0{index + 1} / {config.target}
                   </span>
-                  {mode === key && <Check size={20} />}
+                  {mode === key && (
+                    <span className="training-mode-choice">
+                      <Check size={16} />
+                      選択中
+                    </span>
+                  )}
                 </span>
                 <strong>{config.label}</strong>
                 <p>{config.description}</p>
@@ -357,7 +373,7 @@ export default function TrainingApp() {
               80点の基準
             </h2>
             <p>完了45点・速さ25点・品質20点・同時仕上げ10点。</p>
-            <p className="training-criteria">完了90%以上・品質達成95%以上・条件違反ゼロ・緊急対応完了。</p>
+            <p className="training-criteria">完了90%以上・時間を守った杯95%以上・条件違反なし・緊急対応完了。</p>
             <p>未到着も採点対象。総合練習はフル。</p>
           </section>
         </div>

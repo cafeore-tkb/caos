@@ -127,3 +127,7 @@ The guide uses a short action title and one instruction (at most 48 characters).
 ## Persistent controls outside the board
 
 Learning, setup, results and history use a viewport-height shell. Primary actions remain outside the scrollable lesson/detail areas. The desktop curriculum shows nine lessons in a 3×3 grid; setup keeps all modes and the selected start action visible. Result details and history panes scroll independently from the footer. History can open game setup directly. Primary actions use 64px minimum height and 20px text; results emphasize the score at 96px. `screens.css` scopes these screen changes without modifying production board components or geometry. Tutorial time/next and game pause/finish controls have larger touch targets too.
+
+## Coffee-club visual theme
+
+`theme.css` confines the palette to training menus, setup, results, history and coach controls. Cream paper, espresso text, forest green, ink blue, brick and ochre use solid fills and crisp borders. Each game mode has a consistent accent, an explicit selected label/check, and a matching start button. The course progress bar derives solely from completed lessons. Production board colors and geometry are unchanged; urgent targets retain red arrows. The coach uses a book icon. Copy clarifies manual practice time and the timing requirement for a passing score.
