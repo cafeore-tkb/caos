@@ -29,6 +29,7 @@ import {
 } from './engine';
 import { itemAbbr, needsBrew, seniorOnly } from './master';
 import './training.css';
+import './screens.css';
 
 const TRAINING_CLOCK_ORIGIN = Date.UTC(2026, 9, 19, 1);
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
@@ -114,10 +115,11 @@ export default function TrainingApp() {
         }}
       />
     );
-  if (page === 'history') return <HistoryView entries={history} onBack={() => setPage('learn')} />;
+  if (page === 'history')
+    return <HistoryView entries={history} onBack={() => setPage('learn')} onGame={() => setPage('game')} />;
   if (page === 'learn')
     return (
-      <main className="training-home">
+      <main className="training-home training-dashboard">
         <div className="training-container">
           <a className="training-back" href="#control">
             <ArrowLeft size={16} />
@@ -131,11 +133,6 @@ export default function TrainingApp() {
             <h1>CaOSを練習する</h1>
             <p>操作を覚える → ゲームに挑戦 → 記録を見る</p>
           </header>
-          <div className="training-learning-flow">
-            <span className="active">1 チュートリアル</span>
-            <span>2 ゲームで実践</span>
-            <span>3 記録を振り返る</span>
-          </div>
           <section className="training-course-intro training-panel">
             <div>
               <h2>
@@ -147,6 +144,29 @@ export default function TrainingApp() {
                 {LESSONS.filter((lesson) => completed.includes(lesson.id)).length} / {LESSONS.length} 完了
               </b>
             </div>
+          </section>
+          <ol className="training-curriculum">
+            {LESSONS.map((lesson, index) => (
+              <li key={lesson.id}>
+                <button type="button" onClick={() => setLessonIndex(index)}>
+                  <span className={`training-lesson-number ${completed.includes(lesson.id) ? 'done' : ''}`}>
+                    {completed.includes(lesson.id) ? <Check size={20} /> : String(index + 1).padStart(2, '0')}
+                  </span>
+                  <span>
+                    <strong>{lesson.title}</strong>
+                    <small>{lesson.description}</small>
+                  </span>
+                  <span aria-hidden="true">→</span>
+                </button>
+              </li>
+            ))}
+          </ol>
+          {storageError && (
+            <p role="alert" className="training-error">
+              {storageError}
+            </p>
+          )}
+          <footer className="training-actionbar training-menu-actions" aria-label="練習メニューの操作">
             <button
               type="button"
               className="training-primary"
@@ -166,50 +186,15 @@ export default function TrainingApp() {
                   ? '続きから'
                   : '練習を始める'}
             </button>
-          </section>
-          <ol className="training-curriculum">
-            {LESSONS.map((lesson, index) => (
-              <li key={lesson.id}>
-                <button type="button" onClick={() => setLessonIndex(index)}>
-                  <span className={`training-lesson-number ${completed.includes(lesson.id) ? 'done' : ''}`}>
-                    {completed.includes(lesson.id) ? <Check size={20} /> : String(index + 1).padStart(2, '0')}
-                  </span>
-                  <span>
-                    <strong>{lesson.title}</strong>
-                    <small>{lesson.description}</small>
-                  </span>
-                  <span aria-hidden="true">→</span>
-                </button>
-              </li>
-            ))}
-          </ol>
-          <div className="training-learning-actions">
-            <section className="training-panel">
-              <h2>
-                <Gamepad2 size={18} />
-                ゲームで実践
-              </h2>
-              <p>3モードで挑戦。合格は80点。</p>
-              <button type="button" className="training-primary" onClick={() => setPage('game')}>
-                ゲームへ
-              </button>
-            </section>
-            <section className="training-panel">
-              <h2>
-                <Trophy size={18} />
-                自分の記録
-              </h2>
-              <p>{history.length ? `${history.length}回の記録。` : 'このブラウザに結果を保存。'}</p>
-              <button type="button" className="training-secondary" onClick={() => setPage('history')}>
-                記録を見る
-              </button>
-            </section>
-          </div>
-          {storageError && (
-            <p role="alert" className="training-error">
-              {storageError}
-            </p>
-          )}
+            <button type="button" className="training-secondary" onClick={() => setPage('game')}>
+              <Gamepad2 size={24} />
+              ゲームへ
+            </button>
+            <button type="button" className="training-secondary" onClick={() => setPage('history')}>
+              <Trophy size={24} />
+              記録を見る
+            </button>
+          </footer>
         </div>
       </main>
     );
@@ -221,7 +206,7 @@ export default function TrainingApp() {
       0
     ) ?? 0;
   return (
-    <main className="training-home">
+    <main className="training-home training-setup-screen">
       <div className="training-container">
         <div className="training-menu-nav">
           <button type="button" className="training-back" onClick={() => setPage('learn')}>
@@ -282,7 +267,16 @@ export default function TrainingApp() {
               <FileJson size={18} />
               注文データ
             </h2>
-            <p>架空の注文で練習します。</p>
+            <div className="training-data-actions">
+              <a href={scenarioUrl(mode)} download={`${mode}-orders.json`}>
+                <Download size={16} />
+                標準JSON
+              </a>
+              <button type="button" onClick={() => fileRef.current?.click()}>
+                <FileJson size={16} />
+                JSONを読み込む
+              </button>
+            </div>
             <div className="training-data-summary">
               {loading
                 ? '読み込み中…'
@@ -330,16 +324,7 @@ export default function TrainingApp() {
                 </ol>
               </details>
             )}
-            <div className="training-data-actions">
-              <a href={scenarioUrl(mode)} download={`${mode}-orders.json`}>
-                <Download size={16} />
-                標準JSON
-              </a>
-              <button type="button" onClick={() => fileRef.current?.click()}>
-                <FileJson size={16} />
-                JSONを読み込む
-              </button>
-            </div>
+
             <input
               ref={fileRef}
               type="file"
@@ -376,7 +361,7 @@ export default function TrainingApp() {
             <p>未到着も採点対象。総合練習はフル。</p>
           </section>
         </div>
-        <footer className="training-start-row">
+        <footer className="training-start-row training-actionbar" aria-label="ゲームの開始">
           <p>カードを選ぶ → 担当へ割当 → 時間を見て完了。</p>
           <button
             type="button"
@@ -499,7 +484,7 @@ function GameSession({
   };
   if (state.status === 'finished')
     return (
-      <main className="training-home">
+      <main className="training-home training-result-screen">
         <div className="training-container training-results">
           <span className="training-eyebrow">
             <Flag size={18} />
@@ -523,60 +508,63 @@ function GameSession({
               {state.emergencies.filter((trial) => trial.status === 'resolved').length}件
             </p>
           )}
-          <div className="training-result-grid">
-            {result.categories.map((category) => (
-              <section className="training-panel" key={category.label}>
-                <h2>{category.label}</h2>
-                <strong className="training-category-score">
-                  {category.points.toFixed(1)} <small>/ {category.max}</small>
-                </strong>
-                <progress value={category.points} max={category.max} />
-                <p>{category.detail}</p>
-              </section>
-            ))}
-          </div>
-          <section className="training-panel">
-            <h2>次の課題</h2>
-            <ul>
-              {result.feedback.map((line) => (
-                <li key={line}>{line}</li>
+          <div className="training-result-body" aria-label="採点の詳細">
+            <div className="training-result-grid">
+              {result.categories.map((category) => (
+                <section className="training-panel" key={category.label}>
+                  <h2>{category.label}</h2>
+                  <strong className="training-category-score">
+                    {category.points.toFixed(1)} <small>/ {category.max}</small>
+                  </strong>
+                  <progress value={category.points} max={category.max} />
+                  <p>{category.detail}</p>
+                </section>
               ))}
-            </ul>
-            {result.penalties > 0 && (
-              <p className="training-error">
-                条件違反 {state.violations}回：−{result.penalties}点
+            </div>
+            <section className="training-panel">
+              <h2>次の課題</h2>
+              <ul>
+                {result.feedback.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+              {result.penalties > 0 && (
+                <p className="training-error">
+                  条件違反 {state.violations}回：−{result.penalties}点
+                </p>
+              )}
+              {!result.ready && <p>必須条件が未達のため、上限79点。</p>}
+              <p>総合確認はフルで80点を目指す。</p>
+            </section>
+            <details className="training-panel">
+              <summary>操作の記録（{state.events.length}件）</summary>
+              <ol className="training-event-log">
+                {state.events.map((event) => (
+                  <li key={event.id}>
+                    <time>{clock(event.atSec)}</time> {event.message}
+                  </li>
+                ))}
+              </ol>
+            </details>
+            {exportError && <p role="alert">{exportError}</p>}
+            {storageError ? (
+              <p role="alert" className="training-error">
+                {storageError}
               </p>
+            ) : (
+              <p>このブラウザに保存しました。</p>
             )}
-            {!result.ready && <p>必須条件が未達のため、上限79点。</p>}
-            <p>総合確認はフルで80点を目指す。</p>
-          </section>
-          <details className="training-panel">
-            <summary>操作の記録（{state.events.length}件）</summary>
-            <ol className="training-event-log">
-              {state.events.map((event) => (
-                <li key={event.id}>
-                  <time>{clock(event.atSec)}</time> {event.message}
-                </li>
-              ))}
-            </ol>
-          </details>
-          {exportError && <p role="alert">{exportError}</p>}
-          {storageError ? (
-            <p role="alert" className="training-error">
-              {storageError}
-            </p>
-          ) : (
-            <p>このブラウザに保存しました。</p>
-          )}
-          <div className="training-result-actions">
-            <button type="button" onClick={onHistory}>
-              <Trophy size={18} />
-              記録を見る
-            </button>
+          </div>
+          <div className="training-result-actions training-actionbar" aria-label="採点後の操作">
             <button type="button" className="training-primary" onClick={onBack}>
               <RotateCcw size={18} />
               もう一度
             </button>
+            <button type="button" onClick={onHistory}>
+              <Trophy size={18} />
+              記録を見る
+            </button>
+
             <button type="button" onClick={downloadResult}>
               <Download size={18} />
               結果JSONを保存
@@ -688,7 +676,7 @@ function GameSession({
                 ))}
               </select>
             </label>
-            <button type="button" onClick={() => setEndOpen(true)}>
+            <button type="button" className="training-finish-button" onClick={() => setEndOpen(true)}>
               <Flag size={16} />
               終了・採点
             </button>

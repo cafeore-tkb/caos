@@ -1,0 +1,431 @@
+/* Training screens only. The master-sheet board keeps its production layout. */
+.training-home {
+  padding: 16px 20px;
+  overflow: hidden;
+}
+.training-home > .training-container {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 0;
+}
+.training-home .training-title,
+.training-home .training-actionbar,
+.training-home .training-history-filters,
+.training-home .training-data-summary {
+  flex-shrink: 0;
+}
+.training-home .training-title {
+  padding-right: 180px;
+}
+.training-home .training-title h1,
+.training-result-screen .training-results h1 {
+  font-size: 32px;
+  margin: 4px 0;
+  line-height: 1.25;
+}
+.training-home .training-title p {
+  margin: 4px 0 0;
+  font-size: 14px;
+}
+.training-home .training-back {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-height: 48px;
+  margin: 0;
+  padding: 8px 16px;
+  border: 1px solid #bdcfc3;
+  border-radius: 10px;
+  background: white;
+  font-size: 16px;
+}
+.training-home .training-primary,
+.training-paused .training-primary {
+  min-height: 64px;
+  font-size: 20px;
+  padding: 12px 24px;
+  border: 2px solid #16533e;
+  box-shadow: 0 3px 0 #0c402e;
+}
+.training-home .training-secondary,
+.training-home .training-actionbar > button:not(.training-primary),
+.training-home .training-actionbar > a {
+  min-height: 56px;
+  font-size: 16px;
+  padding: 10px 18px;
+}
+.training-home .training-primary svg {
+  width: 24px;
+  height: 24px;
+}
+.training-home .training-actionbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 12px;
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid #cbd8d0;
+  background: #f1f4f2;
+}
+.training-home .training-actionbar > button,
+.training-home .training-actionbar > a {
+  flex: 1;
+}
+.training-home .training-menu-actions {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+}
+.training-dashboard .training-course-intro {
+  margin: 12px 0 0;
+  padding: 12px 16px;
+}
+.training-dashboard .training-course-intro > div {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+.training-dashboard .training-course-intro h2 {
+  font-size: 20px;
+  margin: 0;
+}
+.training-dashboard .training-course-intro p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+.training-dashboard .training-course-intro b {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  font-size: 22px;
+}
+.training-dashboard .training-curriculum {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(86px, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.training-dashboard .training-curriculum button {
+  padding: 12px;
+  gap: 10px;
+  border-width: 2px;
+}
+.training-dashboard .training-curriculum strong {
+  font-size: 18px;
+  line-height: 1.4;
+}
+.training-dashboard .training-curriculum small {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.training-dashboard .training-lesson-number {
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+}
+.training-setup-screen .training-menu-nav {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  gap: 8px;
+}
+.training-setup-screen .training-menu-nav .training-back {
+  position: static;
+}
+.training-setup-screen .training-title {
+  padding-right: 310px;
+}
+.training-setup-screen .training-course-done {
+  margin: 8px 0 0;
+  padding: 6px 12px;
+}
+.training-setup-screen .training-mode-grid {
+  flex-shrink: 0;
+  margin: 12px 0;
+  gap: 12px;
+}
+.training-setup-screen .training-mode {
+  min-height: 164px;
+  padding: 14px 16px;
+}
+.training-setup-screen .training-mode strong {
+  margin: 6px 0;
+  font-size: 32px;
+}
+.training-setup-screen .training-mode p {
+  margin-bottom: 8px;
+}
+.training-setup-screen .training-mode small {
+  margin-top: 6px;
+}
+.training-setup-screen .training-setup-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.training-setup-screen .training-setup-grid > section {
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+.training-setup-screen .training-panel h2 {
+  font-size: 20px;
+}
+.training-setup-screen .training-data-actions {
+  margin: 0 0 6px;
+}
+.training-setup-screen .training-data-actions > a,
+.training-setup-screen .training-data-actions > button {
+  min-height: 48px;
+  font-size: 14px;
+}
+.training-setup-screen .training-data-summary {
+  font-size: 22px;
+  margin: 8px 0;
+}
+.training-setup-screen summary {
+  min-height: 44px;
+  font-size: 14px;
+}
+.training-setup-screen .training-criteria {
+  font-size: 16px;
+}
+.training-setup-screen .training-actionbar > p {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+}
+.training-setup-screen .training-actionbar > button {
+  flex: 0 0 auto;
+  min-width: 320px;
+}
+.training-result-screen .training-results {
+  max-width: 1120px;
+}
+.training-result-screen .training-results h1 {
+  margin: 2px 0 8px;
+}
+.training-result-screen .training-score {
+  flex-shrink: 0;
+  min-height: 132px;
+  margin: 0 0 8px;
+  padding: 16px 24px;
+}
+.training-result-screen .training-score strong {
+  font-size: 96px;
+}
+.training-result-screen .training-score span {
+  font-size: 22px;
+}
+.training-result-screen .training-results > p {
+  flex-shrink: 0;
+  margin: 4px 0;
+}
+.training-result-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 8px;
+}
+.training-result-screen .training-result-body > section,
+.training-result-screen .training-result-body > details {
+  margin-bottom: 12px;
+}
+.training-result-body .training-result-grid {
+  margin: 0 0 12px;
+}
+.training-result-body .training-panel {
+  padding: 14px;
+}
+.training-result-body .training-category-score {
+  font-size: 36px;
+}
+.training-history-screen .training-history-filters {
+  margin: 12px 0 0;
+}
+.training-history-screen .training-history-filters button {
+  min-height: 52px;
+  min-width: 96px;
+  font-size: 16px;
+}
+.training-history-screen .training-data-summary {
+  margin: 10px 0;
+  font-size: 18px;
+}
+.training-history-screen .training-history-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  align-items: stretch;
+  gap: 12px;
+}
+.training-history-screen .training-history-list {
+  min-height: 0;
+  max-height: none;
+  grid-auto-rows: max-content;
+  align-content: start;
+}
+.training-history-screen .training-history-list button {
+  min-height: 80px;
+  font-size: 16px;
+}
+.training-history-screen .training-history-list strong {
+  font-size: 36px;
+}
+.training-history-screen .training-history-detail {
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+.training-history-screen .training-history-detail h2 {
+  font-size: 24px;
+}
+.training-history-screen .training-container > .training-panel {
+  flex: 1;
+  margin-top: 12px;
+}
+.training-game .training-game-header .training-game-controls button,
+.training-game .training-game-header .training-game-controls label {
+  min-height: 48px;
+  font-size: 16px;
+}
+.training-game .training-game-controls svg {
+  width: 22px;
+  height: 22px;
+}
+.training-game-controls .training-finish-button {
+  border-color: #a51930;
+  background: #a51930;
+  color: white;
+}
+.tutorial-time,
+.tutorial-next {
+  min-height: 56px;
+  font-size: 17px;
+}
+.training-game .training-dialog-backdrop .training-dialog button,
+.training-game .training-dialog-backdrop .training-dialog button:not(.training-primary) {
+  min-height: 56px;
+  font-size: 17px;
+}
+.training-dialog .training-primary {
+  background: #a51930;
+}
+@media (max-width: 760px) {
+  .training-home {
+    padding: 12px;
+  }
+  .training-home .training-title h1 {
+    font-size: 26px;
+  }
+  .training-home .training-title p {
+    font-size: 12px;
+  }
+  .training-dashboard .training-curriculum {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    grid-auto-rows: minmax(92px, auto);
+  }
+  .training-dashboard .training-curriculum strong {
+    font-size: 16px;
+  }
+  .training-dashboard .training-curriculum small {
+    display: none;
+  }
+  .training-dashboard .training-course-intro h2 {
+    font-size: 16px;
+  }
+  .training-dashboard .training-course-intro b {
+    font-size: 18px;
+  }
+  .training-home .training-menu-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+  .training-menu-actions .training-primary {
+    grid-column: 1 / -1;
+  }
+  .training-setup-screen .training-menu-nav {
+    position: static;
+    flex-shrink: 0;
+    justify-content: flex-end;
+    margin-bottom: 8px;
+  }
+  .training-setup-screen .training-title {
+    padding-right: 0;
+  }
+  .training-setup-screen .training-mode-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .training-setup-screen .training-mode {
+    padding: 8px;
+    min-height: 122px;
+  }
+  .training-setup-screen .training-mode strong {
+    font-size: 22px;
+  }
+  .training-setup-screen .training-mode p,
+  .training-setup-screen .training-mode small,
+  .training-setup-screen .training-mode-top {
+    display: none;
+  }
+  .training-setup-screen .training-mode-meta {
+    font-size: 10px;
+  }
+  .training-setup-screen .training-setup-grid {
+    overflow: auto;
+    grid-template-columns: 1fr;
+  }
+  .training-setup-screen .training-setup-grid > section {
+    overflow: visible;
+  }
+  .training-setup-screen .training-actionbar > p {
+    display: none;
+  }
+  .training-setup-screen .training-actionbar > button {
+    min-width: 0;
+    width: 100%;
+  }
+  .training-result-screen .training-score {
+    min-height: 104px;
+    flex-direction: row;
+    padding: 12px;
+    gap: 12px;
+  }
+  .training-result-screen .training-score strong {
+    font-size: 64px;
+  }
+  .training-result-screen .training-score span {
+    font-size: 16px;
+  }
+  .training-result-screen .training-actionbar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .training-result-screen .training-actionbar > button,
+  .training-result-screen .training-actionbar > a {
+    min-height: 52px;
+    padding: 8px;
+    font-size: 14px;
+  }
+  .training-history-screen .training-history-grid {
+    grid-template-columns: minmax(120px, 0.4fr) minmax(0, 0.6fr);
+  }
+  .training-history-screen .training-history-filters button {
+    min-width: 0;
+    flex: 1;
+    padding: 8px;
+    font-size: 14px;
+  }
+  .training-history-screen .training-history-detail h2 {
+    font-size: 20px;
+  }
+}
