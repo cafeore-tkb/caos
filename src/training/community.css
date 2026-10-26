@@ -1,0 +1,300 @@
+/* Shared competition and in-context shift lessons. */
+.training-dashboard .training-curriculum {
+  grid-template-rows: repeat(4, minmax(68px, 1fr));
+}
+.training-dashboard .training-curriculum > li:last-child {
+  grid-column: 1 / -1;
+}
+:where(.training-dashboard) .training-curriculum button {
+  padding: 8px 12px;
+}
+.training-ranking-entry {
+  position: absolute;
+  right: 175px;
+  top: 0;
+  min-height: 48px;
+  padding: 8px 16px;
+  border: 2px solid #493226;
+  border-radius: 6px;
+  background: #e7bb52;
+  color: #241f1a;
+  font-weight: 800;
+}
+.training-rules-link {
+  min-height: 40px;
+  padding: 4px 12px;
+  border: 1px solid #b8a78e;
+  border-radius: 6px;
+  background: #fffcf4;
+  color: #493226;
+  font-weight: 700;
+}
+.training-rules-dialog {
+  width: min(600px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  margin: auto;
+  padding: 24px;
+  background: #fffcf4;
+  color: #241f1a;
+  border: 2px solid #493226;
+  border-radius: 8px;
+  box-shadow: 0 12px 40px #0004;
+}
+.training-rules-dialog::backdrop {
+  background: #1e211c88;
+}
+.training-rules-dialog h2 {
+  font-size: 26px;
+  font-weight: 900;
+  margin: 0 0 16px;
+}
+.training-rules-dialog h3 {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 18px 0 8px;
+}
+.training-rules-dialog p {
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 12px 0;
+}
+.training-rules-dialog small {
+  display: block;
+  color: #655b50;
+  margin-bottom: 16px;
+}
+.training-rules-dialog table,
+.ranking-board table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.training-rules-dialog th,
+.training-rules-dialog td {
+  padding: 10px 6px;
+  border-bottom: 1px solid #d9ccba;
+}
+.training-rules-dialog .training-primary {
+  width: 100%;
+  min-height: 48px;
+  background: #493226;
+  color: white;
+  font-weight: 800;
+  border-radius: 6px;
+}
+.training-result-links {
+  display: flex;
+  gap: 12px;
+  position: absolute;
+  right: 0;
+  top: 0;
+}
+.training-result-links > button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border: 1px solid #b8a78e;
+  background: #fffcf4;
+  border-radius: 6px;
+}
+.training-shift-reminder {
+  flex-shrink: 0;
+}
+.ranking-register {
+  margin: 20px auto;
+  max-width: 640px;
+  width: 100%;
+  overflow: auto;
+  min-height: 0;
+}
+.ranking-register form {
+  display: grid;
+  gap: 12px;
+}
+.ranking-register label {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 800;
+}
+.ranking-register input {
+  min-height: 48px;
+  border: 1px solid #b8a78e;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: #fff;
+  color: #241f1a;
+}
+.ranking-register :where(form) p {
+  font-size: 12px;
+  margin: 0;
+}
+.ranking-register .training-history-filters {
+  margin: 0 0 16px;
+}
+.training-ranking-screen > .training-container {
+  gap: 10px;
+}
+.training-ranking-screen .training-actionbar {
+  margin-top: auto;
+}
+.ranking-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ranking-account strong {
+  margin-right: auto;
+}
+.ranking-account small {
+  color: #71695e;
+  font-weight: 500;
+}
+.ranking-account button,
+.ranking-board-heading button {
+  min-height: 40px;
+  padding: 6px 12px;
+  border: 1px solid #b8a78e;
+  border-radius: 6px;
+  background: #fffcf4;
+}
+.ranking-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.ranking-stats button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 2px solid #b8a78e;
+  background: #fffcf4;
+  border-radius: 6px;
+  text-align: left;
+}
+.ranking-stats button[aria-pressed="true"] {
+  border-color: #1d5b45;
+  background: #edf3e5;
+  box-shadow: 0 2px 0 #1d5b45;
+}
+.ranking-stats strong {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  font-size: 32px;
+}
+.ranking-stats small {
+  font-size: 12px;
+  color: #71695e;
+}
+.ranking-board.training-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 120px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.ranking-board-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid #cabc9f;
+}
+.ranking-board-heading h2 {
+  margin: 0;
+  font-size: 20px;
+}
+.ranking-board-heading button {
+  margin-left: auto;
+}
+.ranking-table-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ranking-table-scroll > p {
+  padding: 20px;
+}
+.ranking-board th {
+  position: sticky;
+  top: 0;
+  background: #eee5d1;
+  font-size: 12px;
+  color: #655b50;
+  z-index: 1;
+}
+.ranking-board th,
+.ranking-board td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #dfd4bf;
+}
+.ranking-board td:first-child {
+  font-family: ui-monospace, monospace;
+  font-weight: 900;
+  font-size: 24px;
+}
+.ranking-board td b {
+  font-size: 24px;
+}
+.ranking-board :where(td) small {
+  display: block;
+  font-size: 11px;
+  color: #71695e;
+}
+.ranking-board tr[data-self="true"] {
+  background: #edf3e5;
+  box-shadow: inset 4px 0 #1d5b45;
+}
+@media (max-width: 900px) {
+  .training-ranking-entry {
+    position: static;
+    align-self: flex-start;
+    min-height: 40px;
+    margin-top: 8px;
+  }
+  .training-dashboard .training-curriculum {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(5, minmax(68px, 1fr));
+  }
+  .training-dashboard .training-curriculum > li:last-child {
+    grid-column: auto;
+  }
+  .training-shift-reminder {
+    font-size: 11px;
+    padding: 4px;
+  }
+  .ranking-board th,
+  .ranking-board td {
+    padding: 10px 8px;
+  }
+}
+
+.training-business-summary {
+  border: 2px solid #427254;
+  border-radius: 14px;
+  padding: 12px 20px;
+  background: #e8f0df;
+  color: #243d2c;
+}
+.training-business-summary > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+}
+.training-business-summary strong {
+  font-size: 30px;
+  font-variant-numeric: tabular-nums;
+}
+.training-business-summary small {
+  font-size: 14px;
+}
+.training-business-summary p {
+  margin: 4px 0;
+  font-size: 13px;
+}

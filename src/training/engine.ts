@@ -1,7 +1,7 @@
 import { type CaosPlace, caosBrewSec } from '../current-caos/common';
 import type { Barista, OrderTicket, UnassignedOrder } from '../types';
 import { insertTicket, mergeBoardCards } from '../utils/orderQueue';
-import { itemAbbr, itemCode, masterItem, needsBrew, seniorOnly } from './master';
+import { itemAbbr, itemCode, itemPrice, itemType, masterItem, needsBrew, seniorOnly } from './master';
 
 export type GameMode = 'fast' | 'middle' | 'full';
 export const MODES = {
@@ -53,6 +53,10 @@ export interface CupResult {
   completedSec?: number;
   brewRatio?: number;
   joinedAtSec?: number;
+  completedBayId?: number;
+  completedBatch?: string;
+  mergedWith?: string;
+  iceDecision?: { opportunity: boolean; senior: boolean };
 }
 export interface GameEvent {
   id: number;
@@ -87,6 +91,8 @@ export interface GameState {
 export type GameAction =
   | { type: 'tick'; seconds: number }
   | { type: 'pause' }
+  | { type: 'set-lane'; bayId: number; name: string; senior: boolean }
+  | { type: 'swap-lanes'; first: number; second: number }
   | { type: 'finish' }
   | { type: 'assign'; key: string; bayId: number; place?: CaosPlace }
   | { type: 'complete'; bayId: number }
@@ -376,6 +382,38 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     return withEvent({ ...state, status: 'finished', paused: false }, 'finish', '採点しました');
   if (action.type === 'pause') return { ...state, paused: !state.paused };
   if (state.paused) return state;
+  if (action.type === 'set-lane')
+    return withEvent(
+      {
+        ...state,
+        bays: state.bays.map((bay) =>
+          bay.id === action.bayId
+            ? { ...bay, name: action.name.trim().slice(0, 40), canHandleSpecial: action.senior }
+            : bay
+        ),
+      },
+      'shift',
+      '担当者を交代しました'
+    );
+  if (action.type === 'swap-lanes') {
+    const first = state.bays.find((bay) => bay.id === action.first),
+      second = state.bays.find((bay) => bay.id === action.second);
+    if (!first || !second || first === second) return state;
+    return withEvent(
+      {
+        ...state,
+        bays: state.bays.map((bay) =>
+          bay === first
+            ? { ...bay, name: second.name, canHandleSpecial: second.canHandleSpecial }
+            : bay === second
+              ? { ...bay, name: first.name, canHandleSpecial: first.canHandleSpecial }
+              : bay
+        ),
+      },
+      'shift',
+      '担当者を入れ替えました'
+    );
+  }
   if (action.type === 'tick') {
     if (!Number.isFinite(action.seconds) || action.seconds <= 0) return state;
     const nowSec = Math.min(state.scenario.durationSec, state.nowSec + Math.floor(action.seconds));
@@ -400,6 +438,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     return withEvent(
       {
         ...state,
+        cups: recordIceDecision(state, order, bay),
         unassigned: state.unassigned.filter((card) => keyOf(card) !== action.key),
         bays: state.bays.map((entry) =>
           entry.id === bay.id
@@ -817,6 +856,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       cups[id] = {
         ...cups[id],
         completedSec: state.nowSec,
+        completedBayId: bay.id,
+        completedBatch: `${bay.id}:${state.nowSec}:${[...(ticket.trainingCupIds ?? [])].sort().join(',')}`,
         brewRatio:
           (state.nowSec - Math.max(ticket.startTimeSec ?? state.nowSec, cups[id].joinedAtSec ?? 0)) /
           ticket.totalDurationSec,
@@ -883,6 +924,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       {
         ...state,
         bays,
+        cups: target ? recordIceDecision(state, ticket, target) : state.cups,
         unassigned: action.type === 'return' ? [...state.unassigned, toUnassigned(ticket)] : state.unassigned,
       },
       action.type,
@@ -894,7 +936,9 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   if (pendingFor(state, result.merged)) return withEvent(state, 'notice', '緊急淹れ直しの手配前には統合できません');
   if (result.targetBay && !allowedBay(result.merged, result.targetBay))
     return rejected(state, '指名・上級生のみの条件を確認してください');
-  const cups = { ...state.cups };
+  const cups = result.targetBay ? recordIceDecision(state, result.merged, result.targetBay) : { ...state.cups };
+  const mergedIds = result.merged.trainingCupIds ?? [];
+  for (const id of mergedIds) cups[id] = { ...cups[id], mergedWith: mergedIds.find((other) => other !== id) };
   if ('status' in result.merged && result.merged.status === 'brewing')
     for (const id of result.joinedIds) cups[id] = { ...cups[id], joinedAtSec: state.nowSec };
   return withEvent(
@@ -902,6 +946,32 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     'merge',
     `${result.merged.id}を2杯抽出に統合`
   );
+}
+
+// Judge the available alternatives at dispatch time. A nominated cup has no choice.
+function recordIceDecision(state: GameState, card: UnassignedOrder | OrderTicket, target: Barista) {
+  const cups = { ...state.cups };
+  const wait = (bay: Barista) =>
+    bay.queue
+      .filter((ticket) => keyOf(ticket) !== keyOf(card))
+      .reduce(
+        (sum, ticket) =>
+          sum +
+          (ticket.status === 'brewing'
+            ? Math.max(0, ticket.totalDurationSec - (state.nowSec - (ticket.startTimeSec ?? state.nowSec)))
+            : ticket.totalDurationSec),
+        0
+      );
+  const eligible = itemType(card.beanName)?.iced_brew && card.cupCount === 1 && !card.preferredBaristaId;
+  const opportunity = Boolean(
+    eligible && state.bays.some((bay) => bay.canHandleSpecial && wait(bay) <= wait(target) + 60)
+  );
+  for (const id of card.trainingCupIds ?? [])
+    cups[id] = {
+      ...cups[id],
+      iceDecision: { opportunity, senior: Boolean(target.canHandleSpecial) },
+    };
+  return cups;
 }
 
 export function scoreGame(state: GameState) {
@@ -919,8 +989,11 @@ export function scoreGame(state: GameState) {
         60
   );
   const ratio = (n: number, d = total) => (d === 0 ? 0 : n / d);
+  const iceChoices = done.filter((cup) => cup.iceDecision?.opportunity);
+  const seniorIce = iceChoices.filter((cup) => cup.iceDecision?.senior);
+  const iceRatio = iceChoices.length ? seniorIce.length / iceChoices.length : done.length ? 1 : 0;
   const categories = [
-    { label: '仕上げた杯数', points: 45 * ratio(done.length), max: 45, detail: `${done.length} / ${total}杯` },
+    { label: '仕上げた杯数', points: 35 * ratio(done.length), max: 35, detail: `${done.length} / ${total}杯` },
     {
       label: '8分以内の提供準備',
       points: 25 * ratio(timely.length),
@@ -939,6 +1012,14 @@ export function scoreGame(state: GameState) {
       max: 10,
       detail: `${together.length} / ${groups.size}件（全杯を60秒以内の差で仕上げ）`,
     },
+    {
+      label: 'アイス1杯の配分',
+      points: 10 * iceRatio,
+      max: 10,
+      detail: iceChoices.length
+        ? `上級生へ ${seniorIce.length} / ${iceChoices.length}杯（上級生の待ち時間が＋60秒以内の場面）`
+        : '指名・2杯抽出・上級生が忙しい場面は対象外',
+    },
   ];
   const penalties = Math.min(20, state.violations * 2);
   const emergencyPending = state.emergencies.filter(
@@ -948,7 +1029,8 @@ export function scoreGame(state: GameState) {
     ratio(done.length) >= 0.9 &&
     ratio(good.length, done.length) >= 0.95 &&
     state.violations === 0 &&
-    emergencyPending === 0;
+    emergencyPending === 0 &&
+    (iceChoices.length === 0 || iceRatio >= 0.5);
   const raw = Math.max(
     0,
     Math.min(100, Math.round(categories.reduce((sum, category) => sum + category.points, 0) - penalties))
@@ -969,8 +1051,35 @@ export function scoreGame(state: GameState) {
     together.length < groups.size ? '同じ注文は60秒差以内に仕上げる。' : '同じ注文をそろえて完了。',
     ...(emergencyPending ? [`緊急${emergencyPending}件が未完了。淹れ直しを完了。`] : []),
     ...(state.violations ? ['指名先と★を確認。'] : []),
+    ...(iceChoices.length && iceRatio < 0.5 ? ['アイス1杯は、余裕のある上級生へ。対象杯の半数以上が必要。'] : []),
   ];
+  // Each original cup contributes once, even after a remake. Only sound completed cups earn sales/bonuses.
+  const revenue = good.reduce((sum, cup) => sum + itemPrice(cup.name), 0);
+  const nominated = good.filter((cup) => cup.nominee !== undefined && cup.nominee === cup.completedBayId).length;
+  const limited = good.filter((cup) => seniorOnly(cup.name)).length;
+  const mergedBatches = new Set(
+    good
+      .filter((cup) => {
+        const partner = good.find((other) => other.id === cup.mergedWith);
+        return (
+          partner &&
+          partner.mergedWith === cup.id &&
+          partner.completedBatch === cup.completedBatch &&
+          cup.completedBatch
+        );
+      })
+      .map((cup) => cup.completedBatch)
+  );
+  const bonuses = [
+    { label: '指名', count: nominated, unit: 100, points: nominated * 100 },
+    { label: '限定', count: limited, unit: 150, points: limited * 150 },
+    { label: '2杯統合', count: mergedBatches.size, unit: 100, points: mergedBatches.size * 100 },
+  ];
+  const business = { revenue, bonuses, score: revenue + bonuses.reduce((sum, bonus) => sum + bonus.points, 0) };
   return {
+    rulesVersion: '2026-10-v2',
+    business,
+    iceAllocation: { opportunities: iceChoices.length, senior: seniorIce.length },
     score,
     passed: score >= 80,
     categories,

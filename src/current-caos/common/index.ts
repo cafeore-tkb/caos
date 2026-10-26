@@ -39,3 +39,5 @@ export { caosDiscardCandidates } from "./lib/caos-discard";
 
 export const AUTHOR_MARKS = {cashier: "レ", master: "マ", serve: "提", others: "他"};
 export type { Cup } from "./models/cup";
+
+export { isSeniorName, laneCandidates } from "./lib/caosShiftFeed";

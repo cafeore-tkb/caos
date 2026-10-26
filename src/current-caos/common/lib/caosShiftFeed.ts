@@ -40,6 +40,8 @@ export interface ShiftDrill {
 }
 
 export interface ShiftFeed {
+  /** Standalone lesson override; production feeds retain the 30-minute default. */
+  slotMinutes?: number;
   /** 本番の枠の開始（日本時間 "YYYY-MM-DD HH:MM"）→ 1st〜6th の氏名 */
   drippers: Record<string, string[]>;
   drills: ShiftDrill[];
@@ -247,7 +249,7 @@ export const currentShiftPeriods = (
       return {
         date,
         startMs,
-        endMs: startMs + SHIFT_SLOT_MINUTES * MINUTE_MS,
+        endMs: startMs + (feed.slotMinutes ?? SHIFT_SLOT_MINUTES) * MINUTE_MS,
         names,
       };
     })

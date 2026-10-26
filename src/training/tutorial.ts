@@ -184,6 +184,25 @@ export const LESSONS: Lesson[] = [
       },
     ],
   },
+  {
+    id: 'shift',
+    title: 'シフトを交代する',
+    description: '通知・予定の交代・予定外の交代',
+    setup: () => {
+      const state = prepare(base(), []);
+      return { ...state, scenario: { ...state.scenario, durationSec: 2400 } };
+    },
+    steps: [
+      { label: '10分前の通知', done: (state) => state.nowSec >= 60 },
+      { label: '5分前の通知', done: (state) => state.nowSec >= 360 },
+      { label: '11時へ進む', done: (state) => state.nowSec >= 660 },
+      { label: '予定の人へ交代', done: ui('shift:scheduled') },
+      { label: '予定外の人へ交代', done: ui('shift:typed') },
+      { label: '別の担当者と入れ替える', done: ui('shift:swap') },
+      { label: '担当を空きにする', done: ui('shift:clear') },
+      { label: '候補から担当を戻す', done: ui('shift:restore') },
+    ],
+  },
 ];
 export const lessonComplete = (lesson: Lesson, state: GameState, interactions: string[]) =>
   lesson.steps.every((step) => step.done(state, interactions));

@@ -16,7 +16,8 @@ import {
   scoreGame,
   startGame,
 } from './engine';
-import { itemPrice, needsBrew, seniorOnly, TRAINING_MASTER } from './master';
+import { itemPrice, itemType, needsBrew, seniorOnly, TRAINING_MASTER } from './master';
+import { randomScenario } from './randomScenario';
 
 const required = <T>(value: T | null | undefined): T => {
   assert.ok(value !== null && value !== undefined);
@@ -37,8 +38,8 @@ const single = (name = '余音ブレンド', quantity = 1) =>
 const assign = (state: GameState, bayId = 1) =>
   gameReducer(state, { type: 'assign', key: state.unassigned[0].ticketUid ?? '', bayId });
 
-function runService(mode: GameMode, seed = 1) {
-  let state = startGame(load(mode), seed);
+function runService(mode: GameMode, seed = 1, variedSeed?: number) {
+  let state = startGame(variedSeed !== undefined ? randomScenario(load(mode), variedSeed) : load(mode), seed);
   while (state.status === 'active') {
     for (const incident of state.emergencies.filter((trial) => trial.status === 'pending')) {
       const source = state.bays
@@ -73,9 +74,21 @@ function runService(mode: GameMode, seed = 1) {
         .sort(
           (a, b) =>
             a.queue.reduce((sum, ticket) => sum + (ticket.timeRemainingSec ?? ticket.totalDurationSec), 0) +
-            (!seniorOnly(card.beanName) && a.canHandleSpecial ? 150 : 0) -
+            (a.canHandleSpecial
+              ? itemType(card.beanName)?.iced_brew && card.cupCount === 1
+                ? -60
+                : !seniorOnly(card.beanName)
+                  ? 150
+                  : 0
+              : 0) -
             b.queue.reduce((sum, ticket) => sum + (ticket.timeRemainingSec ?? ticket.totalDurationSec), 0) -
-            (!seniorOnly(card.beanName) && b.canHandleSpecial ? 150 : 0)
+            (b.canHandleSpecial
+              ? itemType(card.beanName)?.iced_brew && card.cupCount === 1
+                ? -60
+                : !seniorOnly(card.beanName)
+                  ? 150
+                  : 0
+              : 0)
         )[0];
       state = gameReducer(state, { type: 'assign', key: card.ticketUid ?? '', bayId: bay.id });
     }
@@ -661,4 +674,12 @@ test('finishing an incident remake too early keeps it pending until a successful
   assert.equal(state.emergencies[0].status, 'resolved');
   assert.equal(scoreGame(state).done, 1);
   assert.equal(scoreGame(state).total, 1);
+});
+
+test('varied basket orders remain playable with the same emergency draw', () => {
+  for (const mode of ['fast', 'middle', 'full'] as const)
+    for (let seed = 0; seed < 12; seed++) {
+      const result = scoreGame(runService(mode, 1, seed));
+      assert.ok(result.score >= 80, `${mode} seed ${seed}: ${result.score}; ${JSON.stringify(result.iceAllocation)}`);
+    }
 });
