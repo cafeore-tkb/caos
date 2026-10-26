@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { GradeBadge } from './GradeBadge';
 import { SCORING_VERSION } from './replay';
 export function ScoreRules() {
   const [open, setOpen] = useState(false);
@@ -20,6 +21,47 @@ export function ScoreRules() {
             </button>
           </header>
           <div className="training-rules-content">
+            <h3>評定 / A+・A・B・C・D</h3>
+            <table aria-label="評定の基準">
+              <tbody>
+                <tr>
+                  <th>
+                    <GradeBadge score={95} />
+                  </th>
+                  <td>95点以上、または80点以上で上位10％未満</td>
+                </tr>
+                <tr>
+                  <th>
+                    <GradeBadge score={80} />
+                  </th>
+                  <td>80〜94点</td>
+                </tr>
+                <tr>
+                  <th>
+                    <GradeBadge score={70} />
+                  </th>
+                  <td>70〜79点</td>
+                </tr>
+                <tr>
+                  <th>
+                    <GradeBadge score={60} />
+                  </th>
+                  <td>60〜69点</td>
+                </tr>
+                <tr>
+                  <th>
+                    <GradeBadge score={0} />
+                  </th>
+                  <td>60点未満 / 不合格</td>
+                </tr>
+              </tbody>
+            </table>
+            <p>
+              相対評価は、同じモード・現行ルールの挑戦者1人につき自己ベスト1件。同点者全員を含め、10％ちょうどは対象外。95点以上は人数に関係なくA+です。
+            </p>
+            <p>
+              端末だけの評定は点数で判定。履歴の共有評定は保存時点の記録です。ランキングの評定は人数と記録に応じて変わります。店舗運営の目安は引き続き80点以上です。
+            </p>
             <h3>マスター評価 / 100点</h3>
             <table>
               <thead>

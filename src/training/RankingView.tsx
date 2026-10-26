@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { type GameMode, MODES } from './engine';
+import { GradeBadge } from './GradeBadge';
+import type { GradeAssessment } from './grades';
 import { type Login, type Ranking, RankingError, rankingApi, readPending, storeLogin, syncRuns } from './rankingClient';
 import { ScoreRules } from './ScoreRules';
 
@@ -26,7 +28,14 @@ export function RankingView({
     [loading, setLoading] = useState(false);
   const [ranking, setRanking] = useState<Ranking | null>(null);
   const [stats, setStats] = useState<
-    { mode: GameMode; best: number; business_best: number; attempts: number; passed: number }[]
+    {
+      mode: GameMode;
+      best: number;
+      business_best: number;
+      attempts: number;
+      passed: number;
+      assessment: GradeAssessment;
+    }[]
   >([]);
   const requestId = useRef(0);
   const refresh = useCallback(async () => {
@@ -216,7 +225,8 @@ export function RankingView({
                       <small>{metric === 'master' ? '点' : 'pt'}</small>
                     </strong>
                     <small>
-                      {s?.attempts ?? 0}回 / 合格{s?.passed ?? 0}回
+                      {s && metric === 'master' && <GradeBadge score={s.best} assessment={s.assessment} />}{' '}
+                      {s?.attempts ?? 0}回 / 運営目安クリア{s?.passed ?? 0}回
                     </small>
                   </button>
                 );
@@ -255,7 +265,8 @@ export function RankingView({
                         </td>
                         <td>
                           <b>{row.score}</b>
-                          <small>{row.passed ? '合格' : '練習中'}</small>
+                          <GradeBadge score={row.score} assessment={row.assessment} />
+                          <small>{row.passed ? '運営目安クリア' : '運営目安は80点'}</small>
                         </td>
                         <td>
                           <b>

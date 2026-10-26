@@ -1,6 +1,7 @@
 import { ArrowLeft, Download, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import { type GameMode, MODES } from './engine';
+import { GradeBadge } from './GradeBadge';
 import type { ResultEntry } from './history';
 
 export function HistoryView({
@@ -71,7 +72,7 @@ export function HistoryView({
                   </span>
                   <strong>
                     {e.score}
-                    <small>点</small>
+                    <small>点</small> <GradeBadge score={e.score} assessment={e.detail?.assessment} />
                   </strong>
                 </button>
               ))}
@@ -79,7 +80,8 @@ export function HistoryView({
             {entry && (
               <article className="training-panel training-history-detail">
                 <h2>
-                  {MODES[entry.mode].label} · {entry.score}点
+                  {MODES[entry.mode].label} · {entry.score}点{' '}
+                  <GradeBadge score={entry.score} assessment={detail?.assessment} />
                 </h2>
                 <p>
                   {new Date(entry.at).toLocaleString('ja-JP')} · {detail?.result.rulesVersion ?? '旧ルール'}
@@ -90,6 +92,7 @@ export function HistoryView({
                       {detail.title} · 完了 {detail.result.done}/{detail.result.total}杯 · 品質OK{' '}
                       {detail.result.quality}杯 · 条件違反 {detail.violations}回
                     </p>
+                    <p>{detail.assessment ? '保存時の共有評定' : '点数評定（相対評価なし）'}</p>
                     <p className="training-criteria">{detail.result.label}</p>
                     {detail.result.business && (
                       <p>

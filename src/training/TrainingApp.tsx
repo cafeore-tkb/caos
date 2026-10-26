@@ -29,10 +29,12 @@ import {
   scoreGame,
   startGame,
 } from './engine';
+import { GradeBadge } from './GradeBadge';
+import type { GradeAssessment } from './grades';
 import { itemAbbr, needsBrew, seniorOnly } from './master';
 import { RankingView } from './RankingView';
 import { randomScenario } from './randomScenario';
-import { beginRun, queueRun, type RankedRun, readLogin, syncRuns } from './rankingClient';
+import { beginRun, queueRun, type RankedRun, rankingApi, readLogin, syncRuns } from './rankingClient';
 import { appendReplay, SCORING_VERSION } from './replay';
 import { ScoreRules } from './ScoreRules';
 import { SHIFT_FEED, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
@@ -68,6 +70,7 @@ export default function TrainingApp() {
   const [localSeed, setLocalSeed] = useState(1);
   const [starting, setStarting] = useState(false);
   const [sharingStatus, setSharingStatus] = useState('');
+  const [assessments, setAssessments] = useState<Record<string, GradeAssessment>>({});
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const controller = new AbortController();
@@ -90,7 +93,8 @@ export default function TrainingApp() {
     return () => controller.abort();
   }, [mode]);
   const saveResult = (state: GameState, actions: GameAction[]) => {
-    const saved = persistResult(createResult(state));
+    const entry = createResult(state);
+    const saved = persistResult(entry);
     setHistory(saved.entries);
     setStorageError(saved.saved ? '' : '保存できません。結果JSONを保存してください。');
     if (login && rankedRun) {
@@ -98,11 +102,26 @@ export default function TrainingApp() {
         queueRun(login, rankedRun.id, actions);
         setSharingStatus('ランキングに送信中…');
         void syncRuns(login)
-          .then(({ skipped }) =>
+          .then(async ({ skipped }) => {
             setSharingStatus(
               skipped ? '共有できない記録があります。端末の履歴で確認できます。' : 'ランキングに反映しました。'
-            )
-          )
+            );
+            try {
+              const { assessment } = await rankingApi<{ assessment: GradeAssessment }>(
+                `/runs/${rankedRun.id}/grade`,
+                login
+              );
+              setAssessments((old) => ({ ...old, [rankedRun.id]: assessment }));
+              if (entry.detail) {
+                const updated = persistResult({ ...entry, detail: { ...entry.detail, assessment } });
+                setHistory(updated.entries);
+                if (!updated.saved) setStorageError('共有評定を端末に保存できませんでした。');
+              }
+            } catch {
+              // A saved game remains valid when the additional cohort lookup is temporarily unavailable.
+              setSharingStatus('記録を送信しました。共有評定はランキングで確認できます。');
+            }
+          })
           .catch((cause) => setSharingStatus(`${cause.message} ランキング画面から再送できます。`));
       } catch {
         setSharingStatus('共有用の記録を保存できませんでした。');
@@ -168,6 +187,7 @@ export default function TrainingApp() {
         onFinish={saveResult}
         seed={rankedRun?.seed ?? localSeed}
         sharingStatus={sharingStatus}
+        assessment={rankedRun ? assessments[rankedRun.id] : null}
         onRanking={() => {
           setPlaying(false);
           setPage('ranking');
@@ -509,6 +529,7 @@ function GameSession({
   storageError,
   seed,
   sharingStatus,
+  assessment,
   onRanking,
 }: {
   scenario: Scenario;
@@ -516,6 +537,7 @@ function GameSession({
   onFinish: (state: GameState, actions: GameAction[]) => void;
   seed?: number;
   sharingStatus?: string;
+  assessment?: GradeAssessment | null;
   onRanking?: () => void;
   lesson?: Lesson;
   lessonNumber?: number;
@@ -623,6 +645,7 @@ function GameSession({
           </div>
           {sharingStatus && <p role="status">{sharingStatus}</p>}
           <div className={`training-score ${result.passed ? 'passed' : ''}`}>
+            <GradeBadge score={result.score} assessment={assessment} />
             <strong>
               <small>マスター評価 </small>
               {result.score}
@@ -630,6 +653,10 @@ function GameSession({
             </strong>
             <span>{result.label}</span>
           </div>
+          <p className="training-grade-caption">
+            {assessment ? '共有評定' : '点数評定（相対評価なし）'} · {result.score >= 60 ? '評定は合格' : 'D：不合格'} ·
+            店舗運営の目安は80点以上
+          </p>
           <section className="training-business-summary" aria-label="営業スコアの内訳">
             <div>
               <span>営業スコア</span>
