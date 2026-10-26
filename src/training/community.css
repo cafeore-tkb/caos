@@ -34,7 +34,7 @@
   max-height: calc(100dvh - 32px);
   overflow: auto;
   margin: auto;
-  padding: 24px;
+  padding: 0;
   background: #fffcf4;
   color: #241f1a;
   border: 2px solid #493226;
@@ -297,4 +297,29 @@
 .training-business-summary p {
   margin: 4px 0;
   font-size: 13px;
+}
+
+.training-rules-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #fffcf4;
+  border-bottom: 1px solid #d9ccba;
+}
+.training-rules-header h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.training-rules-header .training-primary {
+  width: auto;
+  padding: 8px 18px;
+  flex-shrink: 0;
+}
+.training-rules-content {
+  padding: 0 24px 16px;
 }
