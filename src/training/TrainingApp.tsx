@@ -470,6 +470,9 @@ export default function TrainingApp() {
             className="training-secondary"
             onClick={() => {
               setRankedRun(null);
+              const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+              setLocalSeed(seed);
+              if (scenario && !customScenario) setScenario(randomScenario(scenario, seed));
               setSharingStatus('端末に記録します。');
               setPlaying(true);
             }}
