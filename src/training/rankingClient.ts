@@ -2,14 +2,9 @@ import type { GameAction, GameMode, Scenario } from './engine';
 import type { GradeAssessment } from './grades';
 import { RANKING_API } from './rankingConfig';
 import { SCORING_VERSION } from './replay';
-export interface Player {
-  id: string;
-  username: string;
-  displayName: string;
-}
-export interface Login {
+export interface DeviceSession {
   token: string;
-  player: Player;
+  player: { id: string };
 }
 export interface RankedRun {
   id: string;
@@ -19,7 +14,6 @@ export interface RankedRun {
 }
 export interface Rank {
   player_id: string;
-  username: string;
   display_name: string;
   score: number;
   business_score: number;
@@ -42,8 +36,9 @@ export interface Ranking {
   rulesVersion: string;
 }
 const AUTH_KEY = 'caos-ranking-login-v1';
-const PENDING_KEY = 'caos-ranking-pending-v1';
-export function readLogin(): Login | null {
+const PENDING_KEY = 'caos-ranking-pending-v2';
+const NAME_KEY = 'caos-ranking-display-name-v1';
+export function readSession(): DeviceSession | null {
   try {
     const v = JSON.parse(localStorage.getItem(AUTH_KEY) ?? 'null');
     return /^[a-f0-9]{64}$/.test(v?.token ?? '') && typeof v?.player?.id === 'string' ? v : null;
@@ -51,7 +46,7 @@ export function readLogin(): Login | null {
     return null;
   }
 }
-export function storeLogin(value: Login | null) {
+export function storeSession(value: DeviceSession | null) {
   if (value) localStorage.setItem(AUTH_KEY, JSON.stringify(value));
   else localStorage.removeItem(AUTH_KEY);
 }
@@ -63,14 +58,14 @@ export class RankingError extends Error {
     super(message);
   }
 }
-export async function rankingApi<T>(path: string, login: Login | null, data?: unknown): Promise<T> {
+export async function rankingApi<T>(path: string, session: DeviceSession | null, data?: unknown): Promise<T> {
   if (!RANKING_API) throw new RankingError('ランキングは準備中です');
   let response: Response;
   try {
     response = await fetch(`${RANKING_API}${path}`, {
       method: data === undefined ? 'GET' : 'POST',
       headers: {
-        ...(login ? { Authorization: `Bearer ${login.token}` } : {}),
+        ...(session ? { Authorization: `Bearer ${session.token}` } : {}),
         ...(data === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       body: data === undefined ? undefined : JSON.stringify(data),
@@ -85,37 +80,84 @@ export async function rankingApi<T>(path: string, login: Login | null, data?: un
   if (!response.ok) throw new RankingError(body.error ?? '通信に失敗しました', response.status);
   return body;
 }
-export async function beginRun(login: Login, mode: GameMode) {
-  const run = await rankingApi<RankedRun>('/runs', login, { mode });
+export function readDisplayName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY)?.trim().slice(0, 30) ?? '';
+  } catch {
+    return '';
+  }
+}
+export function storeDisplayName(name: string) {
+  try {
+    localStorage.setItem(NAME_KEY, name);
+  } catch {
+    /* The submitted score still exists on the server. */
+  }
+}
+export async function beginRun(mode: GameMode, existing: DeviceSession | null) {
+  let session = existing ?? readSession();
+  if (!session) session = await rankingApi<DeviceSession>('/session', null, {});
+  let run: RankedRun;
+  try {
+    run = await rankingApi<RankedRun>('/runs', session, { mode });
+  } catch (error) {
+    if (!(error instanceof RankingError) || error.status !== 401) throw error;
+    session = await rankingApi<DeviceSession>('/session', null, {});
+    run = await rankingApi<RankedRun>('/runs', session, { mode });
+  }
+  try {
+    storeSession(session);
+  } catch {
+    /* The current run can continue without persistent storage. */
+  }
   if (run.rulesVersion !== SCORING_VERSION)
     throw new RankingError('採点ルールが更新されました。画面を再読み込みしてください。');
-  return run;
+  return { run, session };
 }
 interface Pending {
   runId: string;
   playerId: string;
   actions: GameAction[];
+  displayName: string;
 }
 export function readPending(): Pending[] {
   try {
     const a = JSON.parse(localStorage.getItem(PENDING_KEY) ?? '[]');
-    return Array.isArray(a) ? a.filter((p) => p && typeof p.runId === 'string' && Array.isArray(p.actions)) : [];
+    return Array.isArray(a)
+      ? a.filter(
+          (p) => p && typeof p.runId === 'string' && typeof p.displayName === 'string' && Array.isArray(p.actions)
+        )
+      : [];
   } catch {
     return [];
   }
 }
-export function queueRun(login: Login, runId: string, actions: GameAction[]) {
+export function queueRun(session: DeviceSession, runId: string, actions: GameAction[], displayName: string) {
   const pending = readPending().filter((p) => p.runId !== runId);
   localStorage.setItem(
     PENDING_KEY,
-    JSON.stringify([...pending, { runId, playerId: login.player.id, actions }].slice(-20))
+    JSON.stringify([...pending, { runId, playerId: session.player.id, actions, displayName }].slice(-20))
   );
 }
-export async function syncRuns(login: Login) {
+export async function publishRun(session: DeviceSession, runId: string, actions: GameAction[], displayName: string) {
+  try {
+    queueRun(session, runId, actions, displayName);
+  } catch {
+    /* Online publishing also works when browser storage is unavailable. */
+  }
+  const response = await rankingApi(`/runs/${runId}/submit`, session, { actions, displayName });
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(readPending().filter((p) => p.runId !== runId)));
+  } catch {
+    /* Retrying an already published trace is idempotent. */
+  }
+  return response;
+}
+export async function syncRuns(session: DeviceSession) {
   let skipped = 0;
-  for (const run of readPending().filter((p) => p.playerId === login.player.id)) {
+  for (const run of readPending().filter((p) => p.playerId === session.player.id)) {
     try {
-      await rankingApi(`/runs/${run.runId}/submit`, login, { actions: run.actions });
+      await rankingApi(`/runs/${run.runId}/submit`, session, { actions: run.actions, displayName: run.displayName });
     } catch (error) {
       if (error instanceof RankingError && [400, 404, 409, 410].includes(error.status)) skipped++;
       else throw error;

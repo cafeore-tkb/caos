@@ -100,44 +100,6 @@
 .training-shift-reminder {
   flex-shrink: 0;
 }
-.ranking-register {
-  margin: 20px auto;
-  max-width: 640px;
-  width: 100%;
-  overflow: auto;
-  min-height: 0;
-}
-.ranking-register form {
-  display: grid;
-  gap: 12px;
-}
-.ranking-register label {
-  display: grid;
-  gap: 4px;
-  font-size: 14px;
-  font-weight: 800;
-}
-.ranking-register input {
-  min-height: 48px;
-  border: 1px solid #b8a78e;
-  border-radius: 6px;
-  padding: 8px 12px;
-  background: #fff;
-  color: #241f1a;
-}
-.ranking-register :where(form) p {
-  font-size: 12px;
-  margin: 0;
-}
-.ranking-register .training-history-filters {
-  margin: 0 0 16px;
-}
-.training-ranking-screen > .training-container {
-  gap: 10px;
-}
-.training-ranking-screen .training-actionbar {
-  margin-top: auto;
-}
 .ranking-account {
   display: flex;
   align-items: center;
@@ -366,4 +328,47 @@
 .training-grade-caption {
   font-size: 13px;
   margin: 0;
+}
+
+.training-score-publisher {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) auto;
+  align-items: end;
+  gap: 6px 16px;
+  padding: 10px 16px;
+  border: 2px solid #497154;
+  border-radius: 8px;
+  background: #f5f3df;
+  flex-shrink: 0;
+}
+.training-score-publisher label {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.training-score-publisher input {
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px;
+  background: #fffcf4;
+  color: #241f1a;
+  border: 1px solid #a39177;
+  border-radius: 6px;
+  font-size: 18px;
+}
+.training-score-publisher .training-primary {
+  min-height: 48px;
+  padding: 8px 20px;
+  font-size: 18px;
+}
+.training-score-publisher small,
+.training-score-publisher p {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+}
+.training-publish-done {
+  color: #28553d;
+  font-weight: 800;
 }
