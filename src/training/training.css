@@ -1230,3 +1230,19 @@
   background: #dc2626;
   color: white;
 }
+
+@media (max-width: 900px) {
+  .training-game-header {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+  }
+  .training-game-controls {
+    flex-shrink: 0;
+  }
+  .training-game .training-game-header .training-game-controls button {
+    white-space: nowrap;
+    min-height: 44px;
+    font-size: 14px;
+  }
+}
