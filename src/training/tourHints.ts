@@ -161,6 +161,49 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
             queries: [q('form button[type="submit"]'), button('抽出ミス'), button('淹れ直しを手配')],
           };
     }
+    case 'shift': {
+      const nameButton = q('[data-change-dripper="1"]');
+      if (step < 3)
+        return {
+          message: [
+            '10:49。予告はまだありません。10:50へ進めます。',
+            '10分前の通知と「次：」を確認。次は10:55。',
+            '5分前は強調表示。次は11:00へ。',
+          ][step],
+          queries: [q('[data-tour-shift-notice]'), nameButton],
+          advanceTime: true,
+        };
+      if (step === 3)
+        return {
+          message: '11時でも自動交代しません。担当名 →「佐藤」。',
+          queries: [q('[data-lane-candidate="佐藤"]'), nameButton],
+        };
+      if (step === 4 && state.nowSec < 1260)
+        return {
+          message: '次は予告のない11:10で、予定外の交代を練習。',
+          queries: [nameButton],
+          advanceTime: true,
+        };
+      if (step === 4)
+        return {
+          message: '担当名 → 名前に「田中」→「この名前にする」。',
+          queries: [button('この名前にする'), q('input[aria-label="担当者の名前"]'), nameButton],
+        };
+      if (step === 5)
+        return {
+          message: '担当名 →「2nd」で、別レーンの人と入れ替え。',
+          queries: [q('[data-lane-swap="2"]'), nameButton],
+        };
+      if (step === 6)
+        return {
+          message: '担当名 →「空きにする」。人が抜けたときに使います。',
+          queries: [button('空きにする'), nameButton],
+        };
+      return {
+        message: '担当者なし → 予定の「佐藤」で担当を戻します。',
+        queries: [q('[data-lane-candidate="佐藤"]'), nameButton],
+      };
+    }
     case 'discard':
       return step > 0
         ? finishHint(state)

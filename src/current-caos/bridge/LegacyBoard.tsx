@@ -4,6 +4,7 @@ import type { OrderTicket, UnassignedOrder } from '../../types';
 import type { CaosCard } from '../common';
 import { ControlWorkspace as CurrentWorkspace } from '../components/ControlWorkspace';
 import { FloatingWindowsProvider } from '../components/FloatingWindows';
+import { LaneChangeDialog } from '../components/LaneChangeDialog';
 import { OrderChatPanel } from '../components/OrderChatPanel';
 import { OrderSearchPanel } from '../components/OrderSearchPanel';
 import { LanePanel, RebrewPanel, TicketDetailPanel } from '../components/TicketPanels';
@@ -39,6 +40,8 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
       scrollCardIntoView(card.key);
   }, [props.selectedOrderId, highlight.selectLabel]);
   const [tab, setTab] = useState<'unassigned' | 'unfinished'>('unassigned');
+  const [changingLane, setChangingLane] = useState<number | null>(null);
+  const [shiftSettings, setShiftSettings] = useState(false);
   const [laneInfo, setLaneInfo] = useState<number | null>(null);
   const [viewingComments, setViewingComments] = useState<{ label: string; anchor?: CommentAnchor } | null>(null);
   const openComments = (label: string, anchor?: HTMLElement) => {
@@ -117,7 +120,11 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
         <CurrentLanesContext.Provider
           value={{
             bays: props.baristas,
-            editable: props.onOpenLane !== undefined,
+            editable: Boolean(props.shift) || props.onOpenLane !== undefined,
+            feed: props.shift?.feed ?? null,
+            nowMs: board.nowMs,
+            onPick: props.shift?.onPick,
+            onChange: props.shift ? (id) => setChangingLane(id) : undefined,
             onOpen: (id) => {
               if (props.onOpenLane) props.onOpenLane(id);
               else {
@@ -287,6 +294,51 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
                         }
                       />
                     ) : null)}
+                  {props.shift && changingLane !== null && board.lanes.find((lane) => lane.id === changingLane) && (
+                    <LaneChangeDialog
+                      lane={{
+                        dripper: changingLane,
+                        name: props.baristas.find((bay) => bay.id === changingLane)?.name ?? '',
+                        senior: Boolean(props.baristas.find((bay) => bay.id === changingLane)?.canHandleSpecial),
+                      }}
+                      lanes={props.baristas.map((bay) => ({
+                        dripper: bay.id,
+                        name: bay.name,
+                        senior: Boolean(bay.canHandleSpecial),
+                      }))}
+                      shiftFeed={{ feed: props.shift.feed, feedKey: '練習シフト', loading: false, error: null }}
+                      nowMs={board.nowMs}
+                      onPick={(name, senior) => {
+                        props.shift?.onPick(changingLane, name, senior);
+                        setChangingLane(null);
+                      }}
+                      onSwap={(other) => {
+                        props.shift?.onSwap(changingLane, other);
+                        setChangingLane(null);
+                      }}
+                      onOpenSettings={() => setShiftSettings(true)}
+                      onClose={() => setChangingLane(null)}
+                    />
+                  )}
+                  {shiftSettings && (
+                    <aside
+                      data-caos-layer
+                      className="fixed inset-0 z-[210] flex items-center justify-center bg-black/40 p-4"
+                    >
+                      <section className="max-w-md rounded-xl bg-white p-6 text-slate-950" aria-label="練習用シフト">
+                        <h2 className="font-black text-xl">シフトの予定</h2>
+                        <p className="my-3">10:00–11:00 → 11:00–12:00</p>
+                        <p>本番は設定の「合言葉」で予定を読み込みます。予定がなくても、名前入力で交代できます。</p>
+                        <button
+                          type="button"
+                          className="mt-4 min-h-11 rounded bg-slate-950 px-5 text-white"
+                          onClick={() => setShiftSettings(false)}
+                        >
+                          閉じる
+                        </button>
+                      </section>
+                    </aside>
+                  )}
                   {infoLane && (
                     <LanePanel
                       lane={infoLane}

@@ -1,6 +1,6 @@
 import type React from 'react';
 import { LegacyBoard } from '../current-caos/bridge/LegacyBoard';
-import type { CaosPlace } from '../current-caos/common';
+import type { CaosPlace, ShiftFeed } from '../current-caos/common';
 import type { BoardComment } from '../current-caos/logic/comments';
 import type { Barista, OrderTicket, UnassignedOrder } from '../types';
 
@@ -9,6 +9,11 @@ import type { ControlViewMode } from '../utils/controlViews';
 export { CONTROL_VIEWS, type ControlViewMode } from '../utils/controlViews';
 export interface ControlViewProps {
   baristas: Barista[];
+  shift?: {
+    feed: ShiftFeed;
+    onPick: (id: number, name: string, senior: boolean) => void;
+    onSwap: (first: number, second: number) => void;
+  };
   unassignedOrders: UnassignedOrder[];
   nextAvailable: Array<{ bayNumber: number; seconds: number; isStandby: boolean }>;
   selectedOrderId: string | null;

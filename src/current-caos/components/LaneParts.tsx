@@ -116,6 +116,7 @@ export const LaneChangeButton: React.FC<{
     <div className="inline-flex min-w-0 max-w-full flex-col items-start gap-1">
       <LaneButton
         dripper={dripper}
+        data-change-dripper={dripper}
         title={
           upcoming
             ? `${label}から${upcoming.name}へ交代`

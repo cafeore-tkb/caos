@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  BellRing,
   BookOpen,
   Check,
   Coffee,
@@ -13,11 +14,12 @@ import {
   Search,
   Trophy,
 } from 'lucide-react';
-import { useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { CONTROL_VIEWS, type ControlViewMode, ControlWorkspace } from '../components/ControlWorkspace';
 import type { OrderTicket } from '../types';
 import { trainingComments } from './comments';
 import {
+  type GameAction,
   type GameMode,
   type GameState,
   gameReducer,
@@ -28,9 +30,16 @@ import {
   startGame,
 } from './engine';
 import { itemAbbr, needsBrew, seniorOnly } from './master';
+import { RankingView } from './RankingView';
+import { randomScenario } from './randomScenario';
+import { beginRun, queueRun, type RankedRun, readLogin, syncRuns } from './rankingClient';
+import { appendReplay, SCORING_VERSION } from './replay';
+import { ScoreRules } from './ScoreRules';
+import { SHIFT_FEED, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
 import './training.css';
 import './screens.css';
 import './theme.css';
+import './community.css';
 
 const TRAINING_CLOCK_ORIGIN = Date.UTC(2026, 9, 19, 1);
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
@@ -48,17 +57,24 @@ export default function TrainingApp() {
   const [loading, setLoading] = useState(true);
   const [playing, setPlaying] = useState(false);
   const [history, setHistory] = useState(readHistory);
-  const [page, setPage] = useState<'learn' | 'game' | 'history'>('learn');
+  const [page, setPage] = useState<'learn' | 'game' | 'history' | 'ranking'>('learn');
   const [lessonIndex, setLessonIndex] = useState<number | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [completed, setCompleted] = useState(readCourse);
   const [storageError, setStorageError] = useState('');
+  const [login, setLogin] = useState(readLogin);
+  const [rankedRun, setRankedRun] = useState<RankedRun | null>(null);
+  const [customScenario, setCustomScenario] = useState(false);
+  const [localSeed, setLocalSeed] = useState(1);
+  const [starting, setStarting] = useState(false);
+  const [sharingStatus, setSharingStatus] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError('');
     setScenario(null);
+    setCustomScenario(false);
     fetch(scenarioUrl(mode), { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error('シナリオを読み込めませんでした');
@@ -73,11 +89,52 @@ export default function TrainingApp() {
       });
     return () => controller.abort();
   }, [mode]);
-  const saveResult = (state: GameState) => {
+  const saveResult = (state: GameState, actions: GameAction[]) => {
     const saved = persistResult(createResult(state));
     setHistory(saved.entries);
     setStorageError(saved.saved ? '' : '保存できません。結果JSONを保存してください。');
+    if (login && rankedRun) {
+      try {
+        queueRun(login, rankedRun.id, actions);
+        setSharingStatus('ランキングに送信中…');
+        void syncRuns(login)
+          .then(({ skipped }) =>
+            setSharingStatus(
+              skipped ? '共有できない記録があります。端末の履歴で確認できます。' : 'ランキングに反映しました。'
+            )
+          )
+          .catch((cause) => setSharingStatus(`${cause.message} ランキング画面から再送できます。`));
+      } catch {
+        setSharingStatus('共有用の記録を保存できませんでした。');
+      }
+    }
   };
+  const startPlaying = async () => {
+    setStarting(true);
+    setError('');
+    setSharingStatus('');
+    try {
+      if (login && !customScenario) {
+        const run = await beginRun(login, mode);
+        setRankedRun(run);
+        setScenario(run.scenario);
+      } else {
+        setRankedRun(null);
+        const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+        setLocalSeed(seed);
+        if (scenario && !customScenario) setScenario(randomScenario(scenario, seed));
+      }
+      setPlaying(true);
+    } catch (cause) {
+      setError((cause as Error).message);
+    } finally {
+      setStarting(false);
+    }
+  };
+  if (page === 'ranking' && lessonIndex === null && !playing)
+    return (
+      <RankingView login={login} onLogin={setLogin} onBack={() => setPage('learn')} onGame={() => setPage('game')} />
+    );
   if (lessonIndex !== null)
     return (
       <GameSession
@@ -109,6 +166,12 @@ export default function TrainingApp() {
         scenario={scenario}
         onBack={() => setPlaying(false)}
         onFinish={saveResult}
+        seed={rankedRun?.seed ?? localSeed}
+        sharingStatus={sharingStatus}
+        onRanking={() => {
+          setPlaying(false);
+          setPage('ranking');
+        }}
         storageError={storageError}
         onHistory={() => {
           setPlaying(false);
@@ -134,6 +197,9 @@ export default function TrainingApp() {
             <h1>マスターシート練習室</h1>
             <p>操作を覚える → ゲームに挑戦 → 記録を見る</p>
           </header>
+          <button type="button" className="training-ranking-entry" onClick={() => setPage('ranking')}>
+            みんなのランキング
+          </button>
           <section className="training-course-intro training-panel">
             <div>
               <h2>
@@ -223,6 +289,9 @@ export default function TrainingApp() {
             <ArrowLeft size={16} />
             メニュー
           </button>
+          <button type="button" className="training-secondary" onClick={() => setPage('ranking')}>
+            ランキング
+          </button>
           <button type="button" className="training-secondary" onClick={() => setPage('history')}>
             <Trophy size={16} />
             スコア履歴
@@ -245,7 +314,9 @@ export default function TrainingApp() {
         <div className="training-mode-grid" role="group" aria-label="ゲームモード">
           {(Object.keys(MODES) as GameMode[]).map((key, index) => {
             const config = MODES[key];
-            const attempts = history.filter((entry) => entry.mode === key);
+            const attempts = history.filter(
+              (entry) => entry.mode === key && entry.detail?.result.rulesVersion === SCORING_VERSION
+            );
             const best = Math.max(0, ...attempts.map((entry) => entry.score));
             return (
               <button
@@ -285,7 +356,7 @@ export default function TrainingApp() {
             <div className="training-data-actions">
               <a href={scenarioUrl(mode)} download={`${mode}-orders.json`}>
                 <Download size={16} />
-                標準JSON
+                注文JSONの見本
               </a>
               <button type="button" onClick={() => fileRef.current?.click()}>
                 <FileJson size={16} />
@@ -301,6 +372,12 @@ export default function TrainingApp() {
             </div>
             {scenario && (
               <p className="training-data-mix">
+                {!customScenario && (
+                  <>
+                    注文内容・到着時刻は毎回抽選。
+                    <br />
+                  </>
+                )}
                 指名 {scenario.orders.filter((order) => order.items.some((item) => item.nominee)).length}件 · 上級生限定{' '}
                 {scenario.orders.filter((order) => order.items.some((item) => seniorOnly(item.name))).length}件 ·
                 コメント {scenario.orders.filter((order) => order.comments?.length).length}件
@@ -354,6 +431,7 @@ export default function TrainingApp() {
                   const parsed = parseScenario(JSON.parse(await file.text()));
                   if (parsed.mode !== mode) throw new Error('選択したモードとJSONのmodeを合わせてください');
                   setScenario(parsed);
+                  setCustomScenario(true);
                   setError('');
                 } catch (cause) {
                   setError(cause instanceof Error ? cause.message : 'JSONを確認してください');
@@ -371,21 +449,44 @@ export default function TrainingApp() {
               <Trophy size={18} />
               80点の基準
             </h2>
-            <p>完了45点・速さ25点・品質20点・同時仕上げ10点。</p>
-            <p className="training-criteria">完了90%以上・時間を守った杯95%以上・条件違反なし・緊急対応完了。</p>
+            <p>完了35・速さ25・品質20・同時10・アイス配分10。</p>
+            <p className="training-criteria">
+              完了90%以上・品質95%以上・違反なし・緊急完了。アイス1杯は余裕のある上級生へ。
+            </p>
             <p>未到着も採点対象。総合練習はフル。</p>
+            <ScoreRules />
+            <p>
+              {login && !customScenario
+                ? `${login.player.displayName}でランキングに参加`
+                : customScenario
+                  ? '持込JSONは、この端末に記録します。'
+                  : 'ランキングへの参加は名前の登録から。'}
+            </p>
           </section>
         </div>
+        {error && login && !starting && (
+          <button
+            type="button"
+            className="training-secondary"
+            onClick={() => {
+              setRankedRun(null);
+              setSharingStatus('端末に記録します。');
+              setPlaying(true);
+            }}
+          >
+            端末だけで練習
+          </button>
+        )}
         <footer className="training-start-row training-actionbar" aria-label="ゲームの開始">
           <p>カードを選ぶ → 担当へ割当 → 時間を見て完了。</p>
           <button
             type="button"
             className="training-primary"
-            disabled={loading || !scenario}
-            onClick={() => setPlaying(true)}
+            disabled={loading || !scenario || starting}
+            onClick={() => void startPlaying()}
           >
             <Play size={18} />
-            {MODES[mode].label}を始める
+            {starting ? '準備中…' : `${MODES[mode].label}を始める`}
           </button>
         </footer>
       </div>
@@ -403,10 +504,16 @@ function GameSession({
   onRetry,
   onHistory,
   storageError,
+  seed,
+  sharingStatus,
+  onRanking,
 }: {
   scenario: Scenario;
   onBack: () => void;
-  onFinish: (state: GameState) => void;
+  onFinish: (state: GameState, actions: GameAction[]) => void;
+  seed?: number;
+  sharingStatus?: string;
+  onRanking?: () => void;
   lesson?: Lesson;
   lessonNumber?: number;
   onLessonNext?: () => void;
@@ -414,9 +521,14 @@ function GameSession({
   onHistory?: () => void;
   storageError?: string;
 }) {
-  const [state, dispatch] = useReducer(gameReducer, scenario, (input) =>
-    lesson ? lesson.setup() : startGame(input, crypto.getRandomValues(new Uint32Array(1))[0])
+  const [state, reduce] = useReducer(gameReducer, scenario, (input) =>
+    lesson ? lesson.setup() : startGame(input, seed ?? crypto.getRandomValues(new Uint32Array(1))[0])
   );
+  const trace = useRef<GameAction[]>([]);
+  const dispatch = useCallback((action: GameAction) => {
+    appendReplay(trace.current, action);
+    reduce(action);
+  }, []);
   const [interactions, setInteractions] = useState<string[]>([]);
   const interact = (kind: string) => setInteractions((old) => (old.includes(kind) ? old : [...old, kind]));
   const [speed, setSpeed] = useState(2);
@@ -446,13 +558,15 @@ function GameSession({
       }
     }, 100);
     return () => window.clearInterval(timer);
-  }, [state.status, state.paused, speed, endOpen, lesson]);
+  }, [state.status, state.paused, speed, endOpen, lesson, dispatch]);
   useEffect(() => {
     if (!lesson && state.status === 'finished' && !saved.current) {
       saved.current = true;
-      onFinish(state);
+      onFinish(state, trace.current);
     }
   }, [state, onFinish, lesson]);
+  const shiftLesson = lesson?.id === 'shift';
+  const boardClockOrigin = shiftLesson ? SHIFT_ORIGIN_MS : TRAINING_CLOCK_ORIGIN;
   const result = scoreGame(state);
   const pendingEmergencies = state.emergencies.filter((trial) => trial.status === 'pending');
   const occurredEmergencies = state.emergencies.filter((trial) => trial.triggeredAtSec !== undefined);
@@ -496,13 +610,38 @@ function GameSession({
             {MODES[scenario.mode].label} / RESULT
           </span>
           <h1>結果</h1>
+          <div className="training-result-links">
+            <ScoreRules />
+            {onRanking && (
+              <button type="button" onClick={onRanking}>
+                みんなのランキング
+              </button>
+            )}
+          </div>
+          {sharingStatus && <p role="status">{sharingStatus}</p>}
           <div className={`training-score ${result.passed ? 'passed' : ''}`}>
             <strong>
+              <small>マスター評価 </small>
               {result.score}
               <small> / 100</small>
             </strong>
             <span>{result.label}</span>
           </div>
+          <section className="training-business-summary" aria-label="営業スコアの内訳">
+            <div>
+              <span>営業スコア</span>
+              <strong>
+                {result.business.score.toLocaleString()}
+                <small> pt</small>
+              </strong>
+            </div>
+            <p>コーヒー売上 ¥{result.business.revenue.toLocaleString()}（1円＝1pt）</p>
+            <p>
+              {result.business.bonuses
+                .map((b) => `${b.label} ${b.count}${b.label === '2杯統合' ? '組' : '杯'} ＋${b.points}pt`)
+                .join(' / ')}
+            </p>
+          </section>
           <p>
             経過 {clock(state.nowSec)} / {clock(scenario.durationSec)} · 完了 {result.done}/{result.total}杯 · 品質OK{' '}
             {result.quality}杯
@@ -608,7 +747,11 @@ function GameSession({
         </nav>
         <div className="training-countdown">
           <small>{lesson ? '練習' : '残り'}</small>
-          <b>{clock(lesson ? state.nowSec : scenario.durationSec - state.nowSec)}</b>
+          <b>
+            {shiftLesson
+              ? shiftClock(state.nowSec)
+              : clock(lesson ? state.nowSec : scenario.durationSec - state.nowSec)}
+          </b>
         </div>
         {viewMode === 'current' && (
           <button
@@ -647,6 +790,16 @@ function GameSession({
         {state.notice && pendingEmergencies.length === 0 && (
           <div className="training-session-notice" role="status">
             {state.notice}
+          </div>
+        )}
+        {shiftLesson && shiftReminder(boardClockOrigin + state.nowSec * 1000) && (
+          <div
+            data-tour-shift-notice
+            role="status"
+            className={`training-shift-reminder inline-flex max-w-full items-center gap-2 whitespace-nowrap rounded-lg border-2 px-4 py-1 text-[18px] shadow-md ${new Date(boardClockOrigin + state.nowSec * 1000).getUTCMinutes() >= 55 ? 'border-red-600 bg-red-100 text-red-800' : 'border-amber-900 bg-yellow-300 text-slate-950 ring-2 ring-white/90'}`}
+          >
+            <BellRing size={20} aria-hidden="true" />
+            {shiftReminder(boardClockOrigin + state.nowSec * 1000)}
           </div>
         )}
         {lesson ? (
@@ -693,6 +846,11 @@ function GameSession({
           mode={viewMode}
           onNext={() => onLessonNext?.()}
           onAdvanceTime={() => {
+            if (shiftLesson) {
+              const next = [60, 360, 660, 1260].find((at) => at > state.nowSec);
+              if (next !== undefined) dispatch({ type: 'tick', seconds: next - state.nowSec });
+              return;
+            }
             const remaining = state.bays.flatMap((bay) =>
               bay.queue[0]?.status === 'brewing' && bay.queue[0].trainingCupIds?.length
                 ? [Math.max(1, bay.queue[0].timeRemainingSec ?? 300)]
@@ -740,6 +898,30 @@ function GameSession({
       <div className="training-board">
         <ControlWorkspace
           mode={viewMode}
+          shift={
+            shiftLesson
+              ? {
+                  feed: SHIFT_FEED,
+                  onPick: (id, name, senior) => {
+                    const current = state.bays.find((bay) => bay.id === id)?.name;
+                    interact(
+                      !name
+                        ? 'shift:clear'
+                        : !current
+                          ? 'shift:restore'
+                          : name === '田中'
+                            ? 'shift:typed'
+                            : 'shift:scheduled'
+                    );
+                    dispatch({ type: 'set-lane', bayId: id, name, senior });
+                  },
+                  onSwap: (first, second) => {
+                    interact('shift:swap');
+                    dispatch({ type: 'swap-lanes', first, second });
+                  },
+                }
+              : undefined
+          }
           emptyBay={emptyBay}
           onCloseEmptySlot={() => setEmptyBay(null)}
           searchOpen={searchOpen}
@@ -770,8 +952,8 @@ function GameSession({
           baristas={state.bays}
           unassignedOrders={state.unassigned}
           currentTimeSec={state.nowSec}
-          clockOriginMs={TRAINING_CLOCK_ORIGIN}
-          orderComments={trainingComments(state, TRAINING_CLOCK_ORIGIN)}
+          clockOriginMs={boardClockOrigin}
+          orderComments={trainingComments(state, boardClockOrigin)}
           onInteraction={interact}
           onDiscard={(key, cupIds) => {
             dispatch({ type: 'discard', key, cupIds });

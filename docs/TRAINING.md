@@ -13,7 +13,7 @@ cafeore-pos `173c9f18b71a4435fd967916378ed4df06efdbc4` の `services/pos/app/cao
 
 ## モードとデータ
 
-同梱マスターは `src/data/training-master.json`。営業10/20/30分、6/12/20件（抽出10/23/39杯）。架空シナリオは `public/training/{fast,middle,full}.json`。生成元は `scripts/generate-training.ts`。注文列は固定の架空データ。緊急イベントの抽選だけを開始時の乱数で決め、結果JSONにシードと抽選・発生・対応の状態を記録する。
+同梱マスターは `src/data/training-master.json`。営業10/20/30分、6/12/20件（抽出10/23/39杯）。架空シナリオは `public/training/{fast,middle,full}.json`。生成元は `scripts/generate-training.ts`。標準JSONは注文のテンプレート。開始時のシードで、杯数・制約が同じ注文内容と到着時刻を抽選する。指名・限定の枠と総杯数・商品構成・売上上限は保つ。緊急イベントも抽選し、結果JSONにシードと抽選・発生・対応の状態を記録する。
 
 | モード | 注文 | 指名あり | 上級生限定あり | コメントあり |
 | --- | --- | --- | --- | --- |
@@ -74,10 +74,12 @@ A/Cの切替は表示状態だけを変更し、ゲームのカップ台帳・�
 
 | 評価 | 配点 | 計算 |
 | --- | --- | --- |
-| 完了 | 45 | 完了杯数 / シナリオの抽出総杯数 |
+| 完了 | 35 | 完了杯数 / シナリオの抽出総杯数 |
 | 提供準備 | 25 | 到着から480秒以内に、品質基準を満たして完了した杯数 / 総杯数 |
 | 抽出品質 | 20 | 予定抽出時間の90%以上で完了した杯数 / 総杯数 |
 | 同一注文の仕上がり | 10 | 全抽出杯が品質基準を満たし、完了時刻の差が60秒以内の注文件数 / 抽出が必要な注文件数 |
+
+| アイス1杯の配分 | 10 | 対象となる完了杯のうち、上級生へ割り当てた割合。指名なし・1杯抽出で、割当時に上級生の待ち時間が割当先＋60秒以内なら対象。2杯・上級生が忙しい場面は対象外。対象なしは満点（未完了のみなら0）。 |
 
 合計を四捨五入して0〜100点。指名・上級生の条件違反を試みた操作はブロックし、1回2点（最大20点）減点する。80点以上には以下をすべて満たす必要があり、満たさなければ最大79点。
 
@@ -85,16 +87,17 @@ A/Cの切替は表示状態だけを変更し、ゲームのカップ台帳・�
 2. 完了した杯の95%以上が抽出品質を満たす。
 3. 指名・上級生条件への違反がゼロ。
 4. 発生した緊急淹れ直しがすべて品質基準を満たして完了。
+5. 対象のアイス1杯の半数以上を上級生へ割当（対象なしは除外）。
 
 80点以上は「店舗運営を任せられるレベル」、60〜79点は「サポート付きで運営できるレベル」。各モードの課題内での目安とし、フルで総合確認する。
 
 現行mainと同じく抽出は商品を問わず1杯300秒・2杯360秒。空の列への配置で開始する。未着手に戻した場合は操作メニューの「始める」で再開し、「終える」で完了と次の抽出開始を行う。開始後60秒までは未着手に戻せ、60秒以降は完了・緊急の入れ直しが可能。抽出中のカードを別の列へ移す・未割当へ戻す場合は抽出時間をリセットする。
 
-開始前に全シナリオのカップ台帳を作成する。途中終了・時間切れでも未到着の注文を分母から外さない。連打による早すぎる完了は品質・提供準備・仕上がり点に入らず、全杯連打しても最大45点。
+開始前に全シナリオのカップ台帳を作成する。途中終了・時間切れでも未到着の注文を分母から外さない。連打による早すぎる完了は品質・提供準備・仕上がり点に入らず、全杯連打しても最大45点（完了35＋配分10、品質の必須条件は未達）。
 
 入れ直しは理由・杯数・担当／未割当・元抽出の中断／継続を利用者が選択する。同じ杯の完了点は一度取り消し、入れ直し完了時だけ再評価するため、二重加点しない。
 
-結果は採点内訳、未完了杯数、品質、改善点、操作記録を表示。JSON出力にはシナリオ・結果・各杯・操作イベント・乱数シード・緊急の抽選と対応状態を含む。得点履歴はこのブラウザのlocalStorageだけに保存する。
+結果は採点内訳、未完了杯数、品質、改善点、操作記録を表示。JSON出力にはシナリオ・結果・各杯・操作イベント・乱数シード・緊急の抽選と対応状態を含む。得点履歴はこのブラウザのlocalStorageに保存する。登録後の標準ゲームは共有ランキングにも送信する。営業スコアは品質OKのコーヒー売上（マスター価格、1円＝1pt）＋指名100pt/杯＋限定150pt/杯＋実際の2杯統合100pt/組。淹れ直しは元の杯IDで一度だけ計上し、統合は同じ抽出で2杯を適切に完了した場合に加算する。営業点はマスターの合格条件を置き換えない。
 
 ## 検証
 
@@ -104,17 +107,17 @@ A/Cの切替は表示状態だけを変更し、ゲームのカップ台帳・�
 
 ## Learning flow and browser history (2026-10-25)
 
-`#training` opens a learning menu: tutorial → game → review. Nine interactive lessons cover A/C and order highlighting, number lookup/order tabs/comments and replies, assignment, nomination/senior requirements, undo/start/move/return, merge/split, timed completion, guaranteed emergency handling, and original-brew discard confirmation. Tasks advance only after the relevant interaction or reducer state; the tutorial clock advances only through its practice control. Lessons can be replayed, and experienced operators can open the game directly. Tutorial progress is browser-local and tutorial activity never creates a scored result.
+`#training` opens a learning menu: tutorial → game → review. Ten interactive lessons cover A/C and order highlighting, number lookup/order tabs/comments and replies, assignment, nomination/senior requirements, undo/start/move/return, merge/split, timed completion, guaranteed emergency handling, and original-brew discard confirmation, and normal/manual shift handoff. Tasks advance only after the relevant interaction or reducer state; the tutorial clock advances only through its practice control. Lessons can be replayed, and experienced operators can open the game directly. Tutorial progress is browser-local and tutorial activity never creates a scored result.
 
 The game retains its three modes, sparse special orders, independent emergency probabilities and 80-point criteria. Continuing an original brew leaves it on the board with current main's discard suggestion, while only the remake retains credit for the replaced cup. A partial discard cannot delete unrelated cups. Queued merged cards can split one cup to unassigned while leaving the other in place.
 
-Finished games are stored in `localStorage` under `caos-training-results-v2` (latest 100 attempts): timestamp, mode, score, category details, feedback, violations, seed, emergency outcomes, cups and action log. The history screen filters by mode, shows best/pass counts and per-attempt details, and exports JSON. `caos-training-results-v1` score/date entries are migrated without inventing unavailable details. Reads validate stored data; denied storage or quota failures leave the current result visible and offer JSON export. Site-data deletion removes this device/browser's results; there is no account or cross-device sync. Course progress uses `caos-training-course-v1`.
+Finished games are stored in `localStorage` under `caos-training-results-v2` (latest 100 attempts): timestamp, mode, score, category details, feedback, violations, seed, emergency outcomes, cups and action log. The history screen filters by mode, shows best/pass counts and per-attempt details, and exports JSON. `caos-training-results-v1` score/date entries are migrated without inventing unavailable details. Reads validate stored data; denied storage or quota failures leave the current result visible and offer JSON export. Site-data deletion removes this device/browser's results; registered server-issued standard games additionally synchronize to the shared ranking; custom JSON and historical browser-only attempts stay local. Course progress uses `caos-training-course-v1`.
 
 Current source reference: `cafeore-pos/main@173c9f18b71a4435fd967916378ed4df06efdbc4`. See `src/current-caos/UPSTREAM.md` for integration boundaries.
 
 ## Floating tutorial guidance
 
-All nine lessons use a non-modal floating guide rendered outside the board layout. The guide follows the first unfinished task and resolves actual visible controls: A/C switches, order lookup/tabs/comments, card bodies and assignment numbers, card action trays, individual rebrew fields, and discard confirmation. A red outline and an animated dashed arrow identify the target without intercepting pointer input. Only the guide itself takes input, and it can be collapsed.
+All ten lessons use a non-modal floating guide rendered outside the board layout. The guide follows the first unfinished task and resolves actual visible controls: A/C switches, order lookup/tabs/comments, card bodies and assignment numbers, card action trays, individual rebrew fields, and discard confirmation. A red outline and an animated dashed arrow identify the target without intercepting pointer input. Only the guide itself takes input, and it can be collapsed.
 
 Position is recalculated after scroll, resize and DOM/form changes, avoiding the current target, input panels and confirmation dialogs. A native discard confirmation hosts the guide in the same top layer so it remains visible and interactive. Tutorial descriptions reserve zero board space; the normal and tutorial board start at the same vertical position. The practice clock control appears within the guide only for timed completion tasks. Both pulse and arrow motion honor `prefers-reduced-motion`.
 
@@ -126,8 +129,14 @@ The guide uses a short action title and one instruction (at most 48 characters).
 
 ## Persistent controls outside the board
 
-Learning, setup, results and history use a viewport-height shell. Primary actions remain outside the scrollable lesson/detail areas. The desktop curriculum shows nine lessons in a 3×3 grid; setup keeps all modes and the selected start action visible. Result details and history panes scroll independently from the footer. History can open game setup directly. Primary actions use 64px minimum height and 20px text; results emphasize the score at 96px. `screens.css` scopes these screen changes without modifying production board components or geometry. Tutorial time/next and game pause/finish controls have larger touch targets too.
+Learning, setup, results and history use a viewport-height shell. Primary actions remain outside the scrollable lesson/detail areas. The desktop curriculum shows ten lessons, including the final shift-handoff lesson; setup keeps all modes and the selected start action visible. Result details and history panes scroll independently from the footer. History can open game setup directly. Primary actions use 64px minimum height and 20px text; results emphasize the score at 96px. `screens.css` scopes these screen changes without modifying production board components or geometry. Tutorial time/next and game pause/finish controls have larger touch targets too.
 
 ## Coffee-club visual theme
 
 `theme.css` confines the palette to training menus, setup, results, history and coach controls. Cream paper, espresso text, forest green, ink blue, brick and ochre use solid fills and crisp borders. Each game mode has a consistent accent, an explicit selected label/check, and a matching start button. The course progress bar derives solely from completed lessons. Production board colors and geometry are unchanged; urgent targets retain red arrows. The coach uses a book icon. Copy clarifies manual practice time and the timing requirement for a passing score.
+
+## シフト交代と共有ランキング（2026-10-26）
+
+シフト交代は最後の10番目。10時〜11時の1時間コマを使い、10:50の予告と次の担当名、10:55の強調、11:00の手動交代、11:10の予告なしでの名前入力、他レーンとの交換、空きと候補復帰を教える。本家の交代パネル・候補ロジックを使用し、ガイドはフローティング表示。通常のシフトデータは30分が既定で、レッスンのフィードだけ60分コマを指定する。実店舗の担当者・シフトAPIには書き込まない。
+
+Cloudflare Workerと専用D1を使用。ユーザー名・表示名・パスワードで登録し、モード別かつマスター／営業別の自己ベストを共有する。上位100件ごとにページ切替。画面・APIとも採点ルール `2026-10-v2` を使用し、旧版は順位比較に混ぜない。サーバー発行のシードと共有エンジンで注文・操作を再生する。詳細は `worker/README.md`。

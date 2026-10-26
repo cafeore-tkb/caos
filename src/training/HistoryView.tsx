@@ -81,7 +81,9 @@ export function HistoryView({
                 <h2>
                   {MODES[entry.mode].label} · {entry.score}点
                 </h2>
-                <p>{new Date(entry.at).toLocaleString('ja-JP')}</p>
+                <p>
+                  {new Date(entry.at).toLocaleString('ja-JP')} · {detail?.result.rulesVersion ?? '旧ルール'}
+                </p>
                 {detail ? (
                   <>
                     <p>
@@ -89,6 +91,13 @@ export function HistoryView({
                       {detail.result.quality}杯 · 条件違反 {detail.violations}回
                     </p>
                     <p className="training-criteria">{detail.result.label}</p>
+                    {detail.result.business && (
+                      <p>
+                        営業 {detail.result.business.score.toLocaleString()}pt · コーヒー売上 ¥
+                        {detail.result.business.revenue.toLocaleString()} · ボーナス ＋
+                        {detail.result.business.bonuses.reduce((sum, b) => sum + b.points, 0)}pt
+                      </p>
+                    )}
                     {detail.result.categories.map((c) => (
                       <div className="training-history-category" key={c.label}>
                         <b>{c.label}</b>

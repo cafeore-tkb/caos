@@ -1,0 +1,21 @@
+{
+  "name": "caos-training-ranking",
+  "main": "index.ts",
+  "account_id": "73a9d402347fe3116740cf17b66236bc",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://cafeore-tkb.github.io"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "caos-training-ranking",
+      "database_id": "55ad46ed-c7a1-42ba-9713-34237c122667",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": ["17 18 * * *"]
+  }
+}
