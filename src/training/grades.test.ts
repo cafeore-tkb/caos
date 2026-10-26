@@ -4,10 +4,10 @@ import { parseScenario, startGame } from './engine';
 import { absoluteGrade, assessGrade } from './grades';
 import { createResult, readHistory, saveResult } from './history';
 
-test('grade boundaries use the requested 95-point A+ and step down through D', () => {
+test('point-only grades stop at A without cohort confirmation and step down through D', () => {
   for (const [score, grade] of [
-    [100, 'A+'],
-    [95, 'A+'],
+    [100, 'A'],
+    [95, 'A'],
     [94, 'A'],
     [80, 'A'],
     [79, 'B'],
@@ -22,44 +22,52 @@ test('grade boundaries use the requested 95-point A+ and step down through D', (
 });
 test('the relative A+ quota is strictly less than ten percent and includes the full tie group', () => {
   assert.equal(
-    assessGrade(90, [
-      { score: 90, count: 1 },
+    assessGrade(95, [
+      { score: 95, count: 1 },
       { score: 80, count: 9 },
     ]).grade,
     'A'
   );
   assert.equal(
-    assessGrade(90, [
-      { score: 90, count: 1 },
+    assessGrade(95, [
+      { score: 95, count: 1 },
       { score: 80, count: 10 },
     ]).grade,
     'A+'
   );
   assert.equal(
-    assessGrade(90, [
-      { score: 90, count: 2 },
+    assessGrade(95, [
+      { score: 95, count: 2 },
       { score: 80, count: 18 },
     ]).grade,
     'A'
   );
   assert.equal(
-    assessGrade(90, [
-      { score: 90, count: 2 },
+    assessGrade(95, [
+      { score: 95, count: 2 },
       { score: 80, count: 19 },
     ]).grade,
     'A+'
   );
-  assert.equal(assessGrade(90, [{ score: 90, count: 1 }]).grade, 'A');
-  assert.equal(assessGrade(90, []).grade, 'A');
+  assert.equal(assessGrade(95, [{ score: 95, count: 1 }]).grade, 'A');
+  assert.equal(assessGrade(95, []).grade, 'A');
 });
-test('95 points qualifies without a cohort; a low-score top rank cannot bypass readiness', () => {
-  assert.equal(assessGrade(95, []).grade, 'A+');
+test('A+ requires BOTH 95 points and a strictly qualifying cohort', () => {
+  assert.equal(assessGrade(95, []).grade, 'A');
+  assert.equal(
+    assessGrade(94, [
+      { score: 94, count: 1 },
+      { score: 0, count: 20 },
+    ]).grade,
+    'A'
+  );
+  assert.equal(assessGrade(100, [{ score: 100, count: 1 }]).grade, 'A');
   assert.equal(
     assessGrade(95, [
       { score: 100, count: 50 },
       { score: 95, count: 50 },
     ]).grade,
-    'A+'
+    'A'
   );
   assert.equal(
     assessGrade(79, [
@@ -98,4 +106,18 @@ test('browser history preserves the shared grade snapshot and ignores damaged gr
   store.setItem('caos-training-results-v2', JSON.stringify([damaged]));
   assert.equal(readHistory(store)[0].detail?.assessment, undefined);
   assert.equal(readHistory(store)[0].score, 0);
+  store.setItem(
+    'caos-training-results-v2',
+    JSON.stringify([
+      {
+        ...entry,
+        detail: { ...entry.detail, assessment: { ...entry.detail.assessment, policy: 'old-or-rule', grade: 'A+' } },
+      },
+    ])
+  );
+  assert.equal(
+    readHistory(store)[0].detail?.assessment,
+    undefined,
+    'old OR-based grades must not survive the policy correction'
+  );
 });
