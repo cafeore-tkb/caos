@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import test from 'node:test';
-import { allowedBay, gameReducer, scoreGame, startGame } from '../src/training/engine';
+import { allowedBay, type GameAction, gameReducer, scoreGame, startGame } from '../src/training/engine';
 
 const base = process.env.TEST_API_URL ?? 'http://localhost:8787';
 const nonce = process.env.TEST_NONCE ?? crypto.randomUUID().replaceAll('-', '').slice(0, 9);
@@ -144,4 +144,32 @@ test('public rankings accept a display name only after scoring, group names acro
   assert.equal(grade.status, 200);
   assert.equal(grade.data.assessment.grade, 'D');
   assert.equal(grade.data.assessment.population, final.data.totalPlayers);
+  const fullRun = await request('/runs', { mode: 'full' }, a.data.token);
+  assert.equal(fullRun.status, 200);
+  assert.equal(fullRun.data.scenario.scoring, 'forecast');
+  assert.equal(fullRun.data.scenario.orders.length, 44);
+  let full = startGame(fullRun.data.scenario, fullRun.data.seed);
+  assert.equal(full.arrived.length, 8);
+  assert.equal(Object.keys(full.cups).length, 66);
+  const fullActions: GameAction[] = [];
+  for (const card of [...full.unassigned]) {
+    const bay = full.bays.filter((b) => allowedBay(card, b)).sort((a, b) => a.queue.length - b.queue.length)[0];
+    assert.ok(bay);
+    const action = { type: 'assign' as const, key: card.ticketUid ?? '', bayId: bay.id };
+    fullActions.push(action);
+    full = gameReducer(full, action);
+  }
+  fullActions.push({ type: 'finish' });
+  full = gameReducer(full, { type: 'finish' });
+  const forecast = await request(
+    `/runs/${fullRun.data.id}/submit`,
+    { displayName: nameA, actions: fullActions },
+    a.data.token
+  );
+  assert.equal(forecast.status, 200, JSON.stringify(forecast.data));
+  assert.deepEqual(forecast.data.result, scoreGame(full));
+  assert.equal(forecast.data.result.forecast.actualDone, 0);
+  assert.equal(forecast.data.result.forecast.projectedDone, 12);
+  assert.equal(forecast.data.result.total, 66);
+  assert.ok(forecast.data.result.score <= 79, 'unarrived cups cannot earn a passing score through forecasts');
 });

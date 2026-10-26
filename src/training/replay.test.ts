@@ -49,6 +49,7 @@ test('canonical service including emergency remakes replays identically in every
     let state = startGame(input, 1);
     const trace: GameAction[] = [];
     const dispatch = (action: GameAction) => {
+      if (state.status === 'finished') return;
       state = gameReducer(state, action);
       appendReplay(trace, action);
     };

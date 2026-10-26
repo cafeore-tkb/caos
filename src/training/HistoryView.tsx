@@ -89,16 +89,25 @@ export function HistoryView({
                 {detail ? (
                   <>
                     <p>
-                      {detail.title} · 完了 {detail.result.done}/{detail.result.total}杯 · 品質OK{' '}
-                      {detail.result.quality}杯 · 条件違反 {detail.violations}回
+                      {detail.title} · {detail.result.forecast ? '完了見込み' : '完了'} {detail.result.done}/
+                      {detail.result.total}杯 · 品質OK {detail.result.quality}杯 · 条件違反 {detail.violations}回
                     </p>
+                    {detail.result.forecast && (
+                      <p>
+                        完了予測{' '}
+                        {detail.result.forecast.endSec === null
+                          ? '—'
+                          : `${Math.floor(detail.result.forecast.endSec / 60)}分${detail.result.forecast.endSec % 60}秒`}{' '}
+                        · 実際の完了 {detail.result.forecast.actualDone}杯
+                      </p>
+                    )}
                     <p>{detail.assessment ? '保存時の共有評定' : '点数評定（A+は共有順位で判定）'}</p>
                     <p className="training-criteria">{detail.result.label}</p>
                     {detail.result.business && (
                       <p>
-                        営業 {detail.result.business.score.toLocaleString()}pt · コーヒー売上 ¥
-                        {detail.result.business.revenue.toLocaleString()} · ボーナス ＋
-                        {detail.result.business.bonuses.reduce((sum, b) => sum + b.points, 0)}pt
+                        営業 {detail.result.business.score.toLocaleString()}pt · コーヒー売上
+                        {detail.result.forecast ? '見込み' : ''} ¥{detail.result.business.revenue.toLocaleString()} ·
+                        ボーナス ＋{detail.result.business.bonuses.reduce((sum, b) => sum + b.points, 0)}pt
                       </p>
                     )}
                     {detail.result.categories.map((c) => (

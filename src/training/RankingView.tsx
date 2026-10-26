@@ -140,7 +140,7 @@ export function RankingView({
                   <th>名前</th>
                   <th>マスター</th>
                   <th>営業</th>
-                  <th>完了</th>
+                  <th>{mode === 'full' ? '完了見込' : '完了'}</th>
                   <th>挑戦</th>
                 </tr>
               </thead>

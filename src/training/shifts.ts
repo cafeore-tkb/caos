@@ -2,11 +2,12 @@ import type { ShiftFeed } from '../current-caos/common';
 import { upcomingLaneCandidate } from '../current-caos/common/lib/caosShiftFeed';
 
 export const SHIFT_ORIGIN_MS = Date.UTC(2026, 9, 19, 1, 49);
+export const SHIFT_NEXT = ['佐藤', '鈴木', '高橋', '渡辺', '伊藤', '山本'];
 export const SHIFT_FEED: ShiftFeed = {
   slotMinutes: 60,
   drippers: {
     '2026-10-19 10:00': ['担当A', '担当B', '担当C', '担当D', '担当E', '担当F'],
-    '2026-10-19 11:00': ['佐藤', '鈴木', '高橋', '渡辺', '伊藤', '山本'],
+    '2026-10-19 11:00': SHIFT_NEXT,
   },
   drills: [],
   seniors: ['担当A', '担当F', '佐藤', '山本', '田中'],

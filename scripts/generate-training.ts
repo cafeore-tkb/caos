@@ -6,7 +6,7 @@ import { seniorOnly, TRAINING_MASTER } from '../src/training/master';
 const MIX = {
   fast: { nominated: [4], limited: [4], commented: [0] },
   middle: { nominated: [1, 9], limited: [7], commented: [0, 9] },
-  full: { nominated: [1, 9, 17], limited: [7, 17], commented: [0, 9, 17] },
+  full: { nominated: [3, 21, 37], limited: [15, 37], commented: [0, 21, 37] },
 } satisfies Record<GameMode, { nominated: number[]; limited: number[]; commented: number[] }>;
 const brewNames = TRAINING_MASTER.items
   .filter((item) => TRAINING_MASTER.item_types.find((type) => type.name === item.item_type)?.needs_brew)
@@ -38,7 +38,7 @@ for (const mode of Object.keys(MODES) as GameMode[]) {
     const items: ScenarioOrder['items'] = [
       {
         name,
-        quantity: i % 5 === 3 ? 3 : i % 3 === 1 ? 2 : 1,
+        quantity: mode === 'full' ? (i % 4 === 3 ? 2 : 1) : i % 5 === 3 ? 3 : i % 3 === 1 ? 2 : 1,
         ...(nominee ? { nominee } : {}),
       },
     ];
@@ -61,7 +61,11 @@ for (const mode of Object.keys(MODES) as GameMode[]) {
     // Full mode has paired arrivals (a short rush), followed by room to recover.
     const atSec =
       mode === 'full'
-        ? Math.floor(i / 2) * Math.floor((config.durationSec - 420) / Math.ceil(config.count / 2)) + (i % 2) * 8
+        ? i < 8
+          ? 0
+          : 60 +
+            Math.floor((i - 8) / 2) * Math.floor((config.durationSec - 480) / Math.ceil((config.count - 8) / 2)) +
+            (i % 2) * 8
         : Math.floor((i * (config.durationSec - (mode === 'middle' ? 480 : 420))) / (config.count - 1));
     return { orderId: i + 1, atSec, items, ...(mix.commented.includes(i) ? { comments: [comment] } : {}) };
   });
@@ -71,6 +75,7 @@ for (const mode of Object.keys(MODES) as GameMode[]) {
     mode,
     title: `${config.label}・架空の営業シナリオ`,
     durationSec: config.durationSec,
+    ...(mode === 'full' ? { scoring: 'forecast' } : {}),
     orders,
   });
   writeFileSync(new URL(`../public/training/${mode}.json`, import.meta.url), `${JSON.stringify(scenario, null, 2)}\n`);

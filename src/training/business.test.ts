@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { type GameState, gameReducer, parseScenario, scoreGame, startGame } from './engine';
-import { itemPrice } from './master';
+import { itemPrice, needsBrew, seniorOnly } from './master';
 import { randomScenario } from './randomScenario';
 import { appendReplay, replayRun } from './replay';
 
@@ -104,23 +104,29 @@ test('seeded orders vary while preserving mode workload, revenue ceiling and rar
     const template = parseScenario(
       JSON.parse(readFileSync(new URL(`../../public/training/${mode}.json`, import.meta.url), 'utf8'))
     );
-    const basket = (input: typeof template) =>
-      input.orders
-        .map((o) =>
-          JSON.stringify({
-            ...o,
-            atSec: 0,
-            orderId: 0,
-            items: o.items.map((i) => ({ ...i, nominee: i.nominee ? true : undefined })),
-          })
-        )
-        .sort();
+    const inventory = (input: typeof template) =>
+      input.orders.flatMap((o) => o.items.map((i) => `${i.name}:${i.quantity}`)).sort();
+    const slots = (input: typeof template) =>
+      input.orders.map((o) => ({
+        id: o.orderId,
+        comments: o.comments,
+        items: o.items.map((i) => [i.quantity, i.nominee, needsBrew(i.name), seniorOnly(i.name)]),
+      }));
     const a = randomScenario(template, 1),
       b = randomScenario(template, 2);
     assert.deepEqual(a, randomScenario(template, 1));
     assert.notDeepEqual(a.orders, b.orders);
-    assert.deepEqual(basket(a), basket(template));
-    assert.deepEqual(basket(b), basket(template));
+    assert.deepEqual(inventory(a), inventory(template));
+    assert.deepEqual(inventory(b), inventory(template));
+    assert.deepEqual(slots(a), slots(template));
+    assert.deepEqual(slots(b), slots(template));
+    const coffeeOrder = (input: typeof template) =>
+      input.orders.map((o) => o.items.filter((i) => needsBrew(i.name)).map((i) => i.name));
+    assert.notDeepEqual(coffeeOrder(a), coffeeOrder(b), `${mode}: coffee changes, not just arrival times`);
+    const sequences = new Set(
+      Array.from({ length: 20 }, (_, seed) => JSON.stringify(coffeeOrder(randomScenario(template, seed))))
+    );
+    assert.ok(sequences.size >= (mode === 'fast' ? 4 : 10), `${mode}: repeated play offers varied coffee sequences`);
     const trace: Parameters<typeof appendReplay>[0] = [];
     let state = startGame(a, 1);
     const action = { type: 'finish' } as const;
