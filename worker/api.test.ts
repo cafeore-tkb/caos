@@ -99,6 +99,8 @@ test('shared rankings authenticate, recompute, deduplicate and isolate player id
     business.data.players.find((r: { player_id: string }) => r.player_id === a.data.player.id).business_score,
     0
   );
+  assert.equal(rowA.assessment.grade, 'D');
+  assert.equal(rowA.assessment.population, rankA.data.totalPlayers);
   assert.equal(rowA.score, 0);
   assert.equal(rowA.rank, rowB.rank);
   assert.equal(rowA.attempts, 1);
@@ -121,6 +123,19 @@ test('shared rankings authenticate, recompute, deduplicate and isolate player id
   await new Promise((resolve) => setTimeout(resolve, 20500));
   const paid = await request(`/runs/${paidRun.data.id}/submit`, { actions }, a.data.token);
   assert.equal(paid.status, 200, JSON.stringify(paid.data));
+  const grade = await request(`/runs/${paidRun.data.id}/grade`, undefined, a.data.token);
+  assert.equal(grade.status, 200);
+  assert.equal(grade.data.assessment.grade, 'D');
+  assert.equal(
+    grade.data.assessment.population,
+    rankA.data.totalPlayers,
+    'repeat attempts cannot inflate the class size'
+  );
+  assert.equal((await request(`/runs/${paidRun.data.id}/grade`, undefined, b.data.token)).status, 404);
+  assert.equal(
+    (await request('/runs/00000000-0000-0000-0000-000000000000/grade', undefined, a.data.token)).status,
+    404
+  );
   assert.deepEqual(paid.data.result, scoreGame(state));
   assert.ok(paid.data.result.business.revenue > 0);
   const paidRanking = await request('/rankings?mode=fast&metric=business', undefined, b.data.token);
@@ -130,6 +145,7 @@ test('shared rankings authenticate, recompute, deduplicate and isolate player id
   );
   const me = await request('/me', undefined, a.data.token);
   assert.equal(me.data.stats.find((s: { mode: string }) => s.mode === 'fast').attempts, 2);
+  assert.equal(me.data.stats.find((s: { mode: string }) => s.mode === 'fast').assessment.grade, 'D');
   assert.equal((await request('/logout', {}, a.data.token)).status, 200);
   assert.equal((await request('/me', undefined, a.data.token)).status, 401);
   assert.equal((await request('/me', undefined, restored.data.token)).status, 200);

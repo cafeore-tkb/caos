@@ -323,3 +323,47 @@
 .training-rules-content {
   padding: 0 24px 16px;
 }
+
+.training-grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.5em;
+  padding: 0.15em 0.5em;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  background: #edf2e5;
+  color: #28553d;
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1.3;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.training-grade[data-grade="A+"] {
+  background: #f3cf6e;
+  color: #55391a;
+}
+.training-grade[data-grade="B"] {
+  background: #e4edf1;
+  color: #284b61;
+}
+.training-grade[data-grade="C"] {
+  background: #eee4cd;
+  color: #66502c;
+}
+.training-grade[data-grade="D"] {
+  background: #f4ddd6;
+  color: #873c2b;
+}
+.ranking-board .training-grade {
+  margin-left: 8px;
+}
+.training-result-screen .training-score > .training-grade {
+  font-size: 48px;
+  flex-shrink: 0;
+}
+.training-grade-caption {
+  font-size: 13px;
+  margin: 0;
+}

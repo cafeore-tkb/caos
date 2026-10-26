@@ -4,6 +4,7 @@ import fast from '../public/training/fast.json';
 import full from '../public/training/full.json';
 import middle from '../public/training/middle.json';
 import { type GameMode, parseScenario } from '../src/training/engine';
+import { assessGrade, type GradeCohort } from '../src/training/grades';
 import { randomScenario } from '../src/training/randomScenario';
 import { replayRun, SCORING_VERSION } from '../src/training/replay';
 
@@ -36,6 +37,14 @@ type Run = {
   rules_version: string;
   trace_hash: string | null;
 };
+async function gradeCohort(env: Env, mode: GameMode): Promise<GradeCohort> {
+  const groups = await env.DB.prepare(`SELECT score,COUNT(*) AS count FROM (
+    SELECT MAX(score) AS score FROM runs WHERE mode=? AND rules_version=? AND completed_at IS NOT NULL GROUP BY player_id
+  ) GROUP BY score`)
+    .bind(mode, SCORING_VERSION)
+    .all<{ score: number; count: number }>();
+  return groups.results;
+}
 const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), (v) => v.toString(16).padStart(2, '0')).join('');
 const random = () => hex(crypto.getRandomValues(new Uint8Array(32)).buffer);
 const digest = async (s: string) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
@@ -146,7 +155,13 @@ async function route(request: Request, env: Env) {
     )
       .bind(player.id, SCORING_VERSION)
       .all();
-    return reply({ player: profile(player), stats: results.results });
+    const stats = await Promise.all(
+      results.results.map(async (row) => ({
+        ...row,
+        assessment: assessGrade(Number(row.best), await gradeCohort(env, row.mode as GameMode)),
+      }))
+    );
+    return reply({ player: profile(player), stats });
   }
   if (path === '/runs' && request.method === 'POST') {
     await rateLimit(env, `start:${player.id}`, 30, 3600000);
@@ -160,6 +175,16 @@ async function route(request: Request, env: Env) {
       .bind(id, player.id, mode, seed, SCORING_VERSION, Date.now())
       .run();
     return reply({ id, seed, scenario: randomScenario(scenarios[mode], seed), rulesVersion: SCORING_VERSION });
+  }
+  const gradeRun = path.match(/^\/runs\/([a-f0-9-]{36})\/grade$/);
+  if (gradeRun && request.method === 'GET') {
+    const run = await env.DB.prepare(
+      'SELECT mode,score FROM runs WHERE id=? AND player_id=? AND rules_version=? AND completed_at IS NOT NULL'
+    )
+      .bind(gradeRun[1], player.id, SCORING_VERSION)
+      .first<{ mode: GameMode; score: number }>();
+    if (!run) throw new ApiError(404, '採点済みのゲームが見つかりません');
+    return reply({ assessment: assessGrade(run.score, await gradeCohort(env, run.mode)) });
   }
   const submit = path.match(/^\/runs\/([a-f0-9-]{36})\/submit$/);
   if (submit && request.method === 'POST') {
@@ -232,17 +257,13 @@ async function route(request: Request, env: Env) {
         RANK() OVER(ORDER BY ${column} DESC) AS rank FROM attempts WHERE best=1
     ) SELECT * FROM ranked ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,player_id ASC LIMIT 100 OFFSET ?`;
     const ranks = await env.DB.prepare(query).bind(mode, SCORING_VERSION, offset).all();
-    const count = await env.DB.prepare(
-      'SELECT COUNT(DISTINCT player_id) AS count FROM runs WHERE mode=? AND rules_version=? AND completed_at IS NOT NULL'
-    )
-      .bind(mode, SCORING_VERSION)
-      .first<{ count: number }>();
+    const cohort = await gradeCohort(env, mode);
     return reply({
       mode,
       metric,
       rulesVersion: SCORING_VERSION,
-      players: ranks.results,
-      totalPlayers: count?.count ?? 0,
+      players: ranks.results.map((row) => ({ ...row, assessment: assessGrade(Number(row.score), cohort) })),
+      totalPlayers: cohort.reduce((sum, group) => sum + group.count, 0),
       viewerId: player.id,
       offset,
     });

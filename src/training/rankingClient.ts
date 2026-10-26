@@ -1,4 +1,5 @@
 import type { GameAction, GameMode, Scenario } from './engine';
+import type { GradeAssessment } from './grades';
 import { RANKING_API } from './rankingConfig';
 import { SCORING_VERSION } from './replay';
 export interface Player {
@@ -24,6 +25,7 @@ export interface Rank {
   business_score: number;
   revenue: number;
   rank: number;
+  assessment: GradeAssessment;
   done: number;
   total: number;
   quality: number;
