@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { gameReducer } from './engine';
-import { nextShift, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
+import { nextShift, SHIFT_NEXT, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
+import { tourHint } from './tourHints';
 import { LESSONS, lessonComplete } from './tutorial';
 
 const lesson = LESSONS.find((l) => l.id === 'shift');
@@ -35,9 +36,25 @@ test('changing or swapping names preserves the drippers and their current work',
   assert.equal(state.bays[0].name, '');
   assert.equal(state.bays[0].canHandleSpecial, false);
 });
-test('shift lesson requires scheduled, unscheduled, swap, clear and restore actions', () => {
-  const state = gameReducer(lesson.setup(), { type: 'tick', seconds: 1260 });
-  const interactions = ['shift:scheduled', 'shift:typed', 'shift:swap', 'shift:clear', 'shift:restore'];
+test('all six scheduled handoffs are required, followed by grade selection and off-schedule changes', () => {
+  let state = gameReducer(lesson.setup(), { type: 'tick', seconds: 600 });
+  const scheduled = SHIFT_NEXT.map((name, index) => {
+    const next = nextShift(index + 1, state.nowSec, state.bays[index].name);
+    assert.equal(next?.name, name);
+    state = gameReducer(state, { type: 'set-lane', bayId: index + 1, name, senior: next?.senior ?? false });
+    assert.equal(nextShift(index + 1, state.nowSec, name), null, 'a second tap opens the picker');
+    return `shift:scheduled:${index + 1}`;
+  });
+  const interactions = [
+    ...scheduled,
+    'shift:grade:B4',
+    'shift:alternate',
+    'shift:typed',
+    'shift:swap',
+    'shift:clear',
+    'shift:restore',
+  ];
+  state = gameReducer(state, { type: 'tick', seconds: 660 });
   assert.ok(lessonComplete(lesson, state, interactions));
   for (const missing of interactions)
     assert.equal(
@@ -46,6 +63,17 @@ test('shift lesson requires scheduled, unscheduled, swap, clear and restore acti
         state,
         interactions.filter((s) => s !== missing)
       ),
-      false
+      false,
+      missing
     );
+});
+test('handoff guide warns of immediate change and teaches the second tap and grade picker', () => {
+  const state = lesson.setup();
+  assert.match(tourHint(lesson, 1, state, 'current').message, /誤タップ/);
+  for (let step = 3; step < 9; step++)
+    assert.equal(tourHint(lesson, step, state, 'current').queries[0].selector, `[data-change-dripper="${step - 2}"]`);
+  const alternate = tourHint(lesson, 9, state, 'current');
+  assert.match(alternate.message, /もう1回/);
+  assert.match(alternate.message, /B4/);
+  assert.equal(tourHint(lesson, 10, state, 'current').advanceTime, true);
 });

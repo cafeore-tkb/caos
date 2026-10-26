@@ -166,41 +166,47 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
       if (step < 3)
         return {
           message: [
-            '10:49。予告はまだありません。10:50へ進めます。',
-            '10分前の通知と「次：」を確認。次は10:55。',
-            '5分前は強調表示。次は11:00へ。',
+            '10:49。10:50へ進み、交代予告を確認。',
+            '「次：名前」が出たら、タップ即交代。誤タップ注意！',
+            '5分前は赤く強調。交代直前の10:59へ。',
           ][step],
-          queries: [q('[data-tour-shift-notice]'), nameButton],
+          queries:
+            step === 1 ? [nameButton, q('[data-tour-shift-notice]')] : [q('[data-tour-shift-notice]'), nameButton],
           advanceTime: true,
         };
-      if (step === 3)
+      if (step < 9)
         return {
-          message: '11時でも自動交代しません。担当名 →「佐藤」。',
-          queries: [q('[data-lane-candidate="佐藤"]'), nameButton],
+          message: `${step - 2}番の担当者枠を1回タップ。それだけで交代完了。`,
+          queries: [q(`[data-change-dripper="${step - 2}"]`)],
         };
-      if (step === 4 && state.nowSec < 1260)
+      if (step === 9)
         return {
-          message: '次は予告のない11:10で、予定外の交代を練習。',
+          message: '予定外なら交代後にもう1回タップ。「B4」→「田中」。',
+          queries: [q('[data-lane-candidate="田中"]'), button('B4'), nameButton],
+        };
+      if (step === 10 && state.nowSec < 1260)
+        return {
+          message: '予告は11:00に消えます。次は11:10の交代を練習。',
           queries: [nameButton],
           advanceTime: true,
         };
-      if (step === 4)
+      if (step === 10)
         return {
-          message: '担当名 → 名前に「田中」→「この名前にする」。',
+          message: '予告がなければ担当名 →「中村」→「この名前にする」。',
           queries: [button('この名前にする'), q('input[aria-label="担当者の名前"]'), nameButton],
         };
-      if (step === 5)
+      if (step === 11)
         return {
           message: '担当名 →「2nd」で、別レーンの人と入れ替え。',
           queries: [q('[data-lane-swap="2"]'), nameButton],
         };
-      if (step === 6)
+      if (step === 12)
         return {
-          message: '担当名 →「空きにする」。人が抜けたときに使います。',
+          message: '担当名 →「空きにする」。人が抜けたときに。',
           queries: [button('空きにする'), nameButton],
         };
       return {
-        message: '担当者なし → 予定の「佐藤」で担当を戻します。',
+        message: '担当者なし →「佐藤」で担当を戻します。',
         queries: [q('[data-lane-candidate="佐藤"]'), nameButton],
       };
     }

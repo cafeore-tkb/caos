@@ -33,3 +33,5 @@ Assignment choices use non-modal native popovers while retaining their original 
 ## 2026-10-26 shift handoff lesson
 
 Added production `LaneChangeDialog` and shift-status copy with a session-local `useCaosLanes` adapter. The last tutorial uses a fictional 10:00–11:00 / 11:00–12:00 schedule: preview begins 10 minutes before the next start; header reminders use the production 10/5-minute thresholds; names do not automatically change. It covers scheduled selection, typed names, swaps, clearing and restoring an assignee. The standalone pure `ShiftFeed` accepts optional `slotMinutes` for this 60-minute example; existing production feeds retain the original 30-minute default. Shift actions only change people and senior status, preserving dripper queues. No shift-provider credentials, schedules or production writes are used.
+
+2026-10-27: シフト交代の説明を `cafeore-pos/main@09c3603ace786119e4be24f220cdeb2dd326c2fc` の `LaneParts.tsx` と `modules/common/src/lib/caosShiftFeed.ts` で確認。予告中の担当名タップは即交代、交代後の再タップは候補選択。予告は開始10分前から開始時刻未満（時刻ちょうどには消える）。学年候補は既存の本家パネルを使用し、練習のクリック検出のみブリッジへ追加。

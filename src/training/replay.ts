@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { type GameAction, gameReducer, type Scenario, scoreGame, startGame } from './engine';
 
-export const SCORING_VERSION = '2026-10-v2';
+export { SCORING_VERSION } from './engine';
+
 const key = z.string().min(1).max(200);
 const bayId = z.number().int().min(1).max(6);
 const place = z

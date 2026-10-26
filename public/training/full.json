@@ -4,6 +4,7 @@
   "mode": "full",
   "title": "フル・架空の営業シナリオ",
   "durationSec": 1800,
+  "scoring": "forecast",
   "orders": [
     {
       "orderId": 1,
@@ -18,12 +19,11 @@
     },
     {
       "orderId": 2,
-      "atSec": 8,
+      "atSec": 0,
       "items": [
         {
           "name": "キリマン",
-          "quantity": 2,
-          "nominee": 4
+          "quantity": 1
         },
         {
           "name": "ケニア",
@@ -33,7 +33,7 @@
     },
     {
       "orderId": 3,
-      "atSec": 138,
+      "atSec": 0,
       "items": [
         {
           "name": "アイスオレ",
@@ -43,21 +43,22 @@
     },
     {
       "orderId": 4,
-      "atSec": 146,
+      "atSec": 0,
       "items": [
         {
           "name": "ケニア",
-          "quantity": 3
+          "quantity": 2,
+          "nominee": 4
         }
       ]
     },
     {
       "orderId": 5,
-      "atSec": 276,
+      "atSec": 0,
       "items": [
         {
           "name": "アイスオレ",
-          "quantity": 2
+          "quantity": 1
         },
         {
           "name": "アイスミルク",
@@ -67,7 +68,7 @@
     },
     {
       "orderId": 6,
-      "atSec": 284,
+      "atSec": 0,
       "items": [
         {
           "name": "ケニア",
@@ -85,7 +86,7 @@
     },
     {
       "orderId": 7,
-      "atSec": 414,
+      "atSec": 0,
       "items": [
         {
           "name": "アイスコーヒー",
@@ -95,10 +96,10 @@
     },
     {
       "orderId": 8,
-      "atSec": 422,
+      "atSec": 0,
       "items": [
         {
-          "name": "アロマナティーボ",
+          "name": "珈琲・俺ブレンド",
           "quantity": 2
         },
         {
@@ -109,47 +110,45 @@
     },
     {
       "orderId": 9,
-      "atSec": 552,
+      "atSec": 60,
       "items": [
         {
           "name": "アイスコーヒー",
-          "quantity": 3
+          "quantity": 1
         }
       ]
     },
     {
       "orderId": 10,
-      "atSec": 560,
+      "atSec": 68,
       "items": [
         {
           "name": "珈琲・俺ブレンド",
-          "quantity": 1,
-          "nominee": 2
+          "quantity": 1
         },
         {
           "name": "余音ブレンド",
           "quantity": 1
         }
-      ],
-      "comments": ["2番の方への指名です。少し待てる旨はお伝え済みです。"]
+      ]
     },
     {
       "orderId": 11,
-      "atSec": 690,
+      "atSec": 133,
       "items": [
         {
           "name": "ブラジル",
-          "quantity": 2
+          "quantity": 1
         }
       ]
     },
     {
       "orderId": 12,
-      "atSec": 698,
+      "atSec": 141,
       "items": [
         {
           "name": "余音ブレンド",
-          "quantity": 1
+          "quantity": 2
         },
         {
           "name": "アイスミルク",
@@ -159,7 +158,7 @@
     },
     {
       "orderId": 13,
-      "atSec": 828,
+      "atSec": 206,
       "items": [
         {
           "name": "ブラジル",
@@ -169,11 +168,11 @@
     },
     {
       "orderId": 14,
-      "atSec": 836,
+      "atSec": 214,
       "items": [
         {
           "name": "余音ブレンド",
-          "quantity": 3
+          "quantity": 1
         },
         {
           "name": "キリマン",
@@ -183,7 +182,7 @@
     },
     {
       "orderId": 15,
-      "atSec": 966,
+      "atSec": 279,
       "items": [
         {
           "name": "キリマン",
@@ -197,47 +196,45 @@
     },
     {
       "orderId": 16,
-      "atSec": 974,
+      "atSec": 287,
       "items": [
         {
-          "name": "アイスオレ",
-          "quantity": 1
-        }
-      ]
-    },
-    {
-      "orderId": 17,
-      "atSec": 1104,
-      "items": [
-        {
-          "name": "キリマン",
+          "name": "アロマナティーボ",
           "quantity": 2
         }
       ]
     },
     {
-      "orderId": 18,
-      "atSec": 1112,
+      "orderId": 17,
+      "atSec": 352,
       "items": [
         {
-          "name": "チロソ",
-          "quantity": 1,
-          "nominee": 6
-        },
+          "name": "キリマン",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 18,
+      "atSec": 360,
+      "items": [
         {
           "name": "アイスオレ",
           "quantity": 1
+        },
+        {
+          "name": "ブラジル",
+          "quantity": 1
         }
-      ],
-      "comments": ["6番の方への指名です。少し待てる旨はお伝え済みです。"]
+      ]
     },
     {
       "orderId": 19,
-      "atSec": 1242,
+      "atSec": 425,
       "items": [
         {
           "name": "ケニア",
-          "quantity": 3
+          "quantity": 1
         },
         {
           "name": "アイスミルク",
@@ -251,10 +248,310 @@
     },
     {
       "orderId": 20,
-      "atSec": 1250,
+      "atSec": 433,
       "items": [
         {
           "name": "アイスコーヒー",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "orderId": 21,
+      "atSec": 498,
+      "items": [
+        {
+          "name": "ケニア",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 22,
+      "atSec": 506,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1,
+          "nominee": 2
+        },
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ],
+      "comments": ["2番の方への指名です。少し待てる旨はお伝え済みです。"]
+    },
+    {
+      "orderId": 23,
+      "atSec": 571,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 24,
+      "atSec": 579,
+      "items": [
+        {
+          "name": "ブラジル",
+          "quantity": 2
+        },
+        {
+          "name": "コースター",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 25,
+      "atSec": 644,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 26,
+      "atSec": 652,
+      "items": [
+        {
+          "name": "ブラジル",
+          "quantity": 1
+        },
+        {
+          "name": "ケニア",
+          "quantity": 1
+        },
+        {
+          "name": "アイスミルク",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 27,
+      "atSec": 717,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 28,
+      "atSec": 725,
+      "items": [
+        {
+          "name": "キリマン",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "orderId": 29,
+      "atSec": 790,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 30,
+      "atSec": 798,
+      "items": [
+        {
+          "name": "キリマン",
+          "quantity": 1
+        },
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        },
+        {
+          "name": "缶バッジ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 31,
+      "atSec": 863,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 32,
+      "atSec": 871,
+      "items": [
+        {
+          "name": "ケニア",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "orderId": 33,
+      "atSec": 936,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        },
+        {
+          "name": "アイスミルク",
+          "quantity": 1
+        },
+        {
+          "name": "コースター",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 34,
+      "atSec": 944,
+      "items": [
+        {
+          "name": "ケニア",
+          "quantity": 1
+        },
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 35,
+      "atSec": 1009,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 36,
+      "atSec": 1017,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "orderId": 37,
+      "atSec": 1082,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 38,
+      "atSec": 1090,
+      "items": [
+        {
+          "name": "チロソ",
+          "quantity": 1,
+          "nominee": 6
+        },
+        {
+          "name": "ブラジル",
+          "quantity": 1
+        }
+      ],
+      "comments": ["6番の方への指名です。少し待てる旨はお伝え済みです。"]
+    },
+    {
+      "orderId": 39,
+      "atSec": 1155,
+      "items": [
+        {
+          "name": "ブラジル",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 40,
+      "atSec": 1163,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 2
+        },
+        {
+          "name": "アイスミルク",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 41,
+      "atSec": 1228,
+      "items": [
+        {
+          "name": "ブラジル",
+          "quantity": 1
+        },
+        {
+          "name": "缶バッジ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 42,
+      "atSec": 1236,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        },
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        },
+        {
+          "name": "コースター",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 43,
+      "atSec": 1301,
+      "items": [
+        {
+          "name": "キリマン",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 44,
+      "atSec": 1309,
+      "items": [
+        {
+          "name": "アイスオレ",
           "quantity": 2
         }
       ]

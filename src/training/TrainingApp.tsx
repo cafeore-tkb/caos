@@ -38,7 +38,7 @@ import { beginRun, publishRun, type RankedRun, rankingApi, readSession, storeDis
 import { appendReplay, SCORING_VERSION } from './replay';
 import { ScorePublisher } from './ScorePublisher';
 import { ScoreRules } from './ScoreRules';
-import { SHIFT_FEED, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
+import { SHIFT_FEED, SHIFT_NEXT, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
 import './training.css';
 import './screens.css';
 import './theme.css';
@@ -352,7 +352,7 @@ export default function TrainingApp() {
                 <strong>{config.label}</strong>
                 <p>{config.description}</p>
                 <span className="training-mode-meta">
-                  営業 {config.durationSec / 60}分 · {config.count}件 · 標準2倍速
+                  営業 {config.durationSec / 60}分 · {config.count}件 · 標準{config.defaultSpeed}倍速
                 </span>
                 <small>{attempts.length > 0 ? `自己ベスト ${best}点` : '未挑戦'}</small>
               </button>
@@ -461,11 +461,19 @@ export default function TrainingApp() {
               <Trophy size={18} />
               80点の基準
             </h2>
-            <p>完了35・速さ25・品質20・同時10・アイス配分10。</p>
+            <p>
+              {mode === 'full'
+                ? '割当35・完了予測25・抽出時間20・同時10・アイス配分10。'
+                : '完了35・速さ25・品質20・同時10・アイス配分10。'}
+            </p>
             <p className="training-criteria">
               完了90%以上・品質95%以上・違反なし・緊急完了。アイス1杯は余裕のある上級生へ。
             </p>
-            <p>未到着も採点対象。総合練習はフル。</p>
+            <p>
+              {mode === 'full'
+                ? '開始時8件。全割当・緊急手配後に、完了予測で自動採点。営業30分・延長なし。'
+                : '未到着も採点対象。総合練習はフル。'}
+            </p>
             <ScoreRules />
             <p>
               {customScenario
@@ -548,7 +556,7 @@ function GameSession({
   }, []);
   const [interactions, setInteractions] = useState<string[]>([]);
   const interact = (kind: string) => setInteractions((old) => (old.includes(kind) ? old : [...old, kind]));
-  const [speed, setSpeed] = useState(2);
+  const [speed, setSpeed] = useState<number>(MODES[scenario.mode].defaultSpeed);
   const [viewMode, setViewMode] = useState<ControlViewMode>('current');
   const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(
     null
@@ -651,13 +659,15 @@ function GameSession({
           </p>
           <section className="training-business-summary" aria-label="営業スコアの内訳">
             <div>
-              <span>営業スコア</span>
+              <span>営業スコア{result.forecast ? '（見込み）' : ''}</span>
               <strong>
                 {result.business.score.toLocaleString()}
                 <small> pt</small>
               </strong>
             </div>
-            <p>コーヒー売上 ¥{result.business.revenue.toLocaleString()}（1円＝1pt）</p>
+            <p>
+              コーヒー売上{result.forecast ? '見込み' : ''} ¥{result.business.revenue.toLocaleString()}（1円＝1pt）
+            </p>
             <p>
               {result.business.bonuses
                 .map((b) => `${b.label} ${b.count}${b.label === '2杯統合' ? '組' : '杯'} ＋${b.points}pt`)
@@ -665,16 +675,29 @@ function GameSession({
             </p>
           </section>
           <p>
-            経過 {clock(state.nowSec)} / {clock(scenario.durationSec)} · 完了 {result.done}/{result.total}杯 · 品質OK{' '}
-            {result.quality}杯
+            {result.forecast ? (
+              <>
+                開始から {result.forecast.endSec === null ? '—' : clock(result.forecast.endSec)} で完了予測 / 営業終了{' '}
+                {clock(scenario.durationSec)} · 超過 {clock(result.forecast.overtimeSec)} · 実際の完了{' '}
+                {result.forecast.actualDone}杯 / 見込み {result.forecast.projectedDone}杯
+              </>
+            ) : (
+              <>
+                経過 {clock(state.nowSec)} / {clock(scenario.durationSec)} · 完了 {result.done}/{result.total}杯 ·
+                品質OK {result.quality}杯
+              </>
+            )}
           </p>
           {MODES[scenario.mode].emergencyChances > 0 && (
             <p>
-              緊急淹れ直し：発生 {occurredEmergencies.length}件 · 完了{' '}
+              緊急淹れ直し：発生 {occurredEmergencies.length}件 · 実際の完了{' '}
               {state.emergencies.filter((trial) => trial.status === 'resolved').length}件
+              {result.forecast &&
+                ` · 手配済み ${state.emergencies.filter((trial) => trial.status === 'rebrewing').length}件（完了予測に含む）`}
             </p>
           )}
           <div className="training-result-body" aria-label="採点の詳細">
+            {result.forecast && <p>割当時点の予測で採点。未完了分の売上・品質・淹れ直しは見込みです。</p>}
             {onPublish && <ScorePublisher onPublish={onPublish} />}
             <div className="training-result-grid">
               {result.categories.map((category) => (
@@ -843,19 +866,24 @@ function GameSession({
             >
               {state.paused ? <Play size={18} /> : <Pause size={18} />}
             </button>
-            <label>
-              速度
-              <select aria-label="ゲーム速度" value={speed} onChange={(event) => setSpeed(Number(event.target.value))}>
-                {[1, 2, 5, 10].map((value) => (
-                  <option key={value} value={value}>
-                    {value}倍
-                  </option>
-                ))}
-              </select>
+            <label className="training-speed">
+              <span>
+                速度 <output>{speed}倍</output>
+              </span>
+              <input
+                type="range"
+                aria-label="ゲーム速度"
+                aria-valuetext={`${speed}倍`}
+                min={1}
+                max={10}
+                step={0.5}
+                value={speed}
+                onChange={(event) => setSpeed(Number(event.target.value))}
+              />
             </label>
             <button type="button" className="training-finish-button" onClick={() => setEndOpen(true)}>
               <Flag size={16} />
-              終了・採点
+              {scenario.scoring === 'forecast' ? '割当を採点' : '終了・採点'}
             </button>
           </div>
         )}
@@ -870,7 +898,7 @@ function GameSession({
           onNext={() => onLessonNext?.()}
           onAdvanceTime={() => {
             if (shiftLesson) {
-              const next = [60, 360, 660, 1260].find((at) => at > state.nowSec);
+              const next = [60, 360, 600, 1260].find((at) => at > state.nowSec);
               if (next !== undefined) dispatch({ type: 'tick', seconds: next - state.nowSec });
               return;
             }
@@ -933,9 +961,13 @@ function GameSession({
                         : !current
                           ? 'shift:restore'
                           : name === '田中'
-                            ? 'shift:typed'
-                            : 'shift:scheduled'
+                            ? 'shift:alternate'
+                            : name === '中村'
+                              ? 'shift:typed'
+                              : 'shift:scheduled'
                     );
+                    if (name === SHIFT_NEXT[id - 1] && state.nowSec >= 60 && state.nowSec < 660)
+                      interact(`shift:scheduled:${id}`);
                     dispatch({ type: 'set-lane', bayId: id, name, senior });
                   },
                   onSwap: (first, second) => {
@@ -1025,7 +1057,9 @@ function GameSession({
           <section role="dialog" aria-modal="true" aria-labelledby="finish-title" className="training-dialog">
             <h2 id="finish-title">終了して採点？</h2>
             <p>
-              完了 {result.done}/{result.total}杯。残りは0点。
+              {scenario.scoring === 'forecast'
+                ? '今のタイムラインで採点。未割当・未到着は0点。'
+                : `完了 ${result.done}/${result.total}杯。残りは0点。`}
             </p>
             <div>
               <button type="button" onClick={() => setEndOpen(false)}>

@@ -1,7 +1,7 @@
 import type { Scenario } from './engine';
 import { needsBrew, seniorOnly } from './master';
 
-/** Shuffle whole baskets: every seed has the same total cups, prices and rare-order frequency. */
+/** Swap coffee names, preserving quantities, restricted slots, inventory and revenue per seed. */
 export function randomScenario(template: Scenario, seed: number): Scenario {
   let value = (seed ^ 0x9e3779b9) >>> 0;
   const random = () => {
@@ -11,13 +11,15 @@ export function randomScenario(template: Scenario, seed: number): Scenario {
     n ^= n + Math.imul(n ^ (n >>> 7), n | 61);
     return ((n ^ (n >>> 14)) >>> 0) / 4294967296;
   };
-  // Keep the size and restricted-order slots: a short course must not become impossible through a late two-cup draw.
-  const signature = (order: Scenario['orders'][number]) =>
-    JSON.stringify(
-      order.items.map((item) => [item.quantity, item.nominee ?? 0, seniorOnly(item.name), needsBrew(item.name)])
-    );
-  const pools = new Map<string, Scenario['orders']>();
-  for (const order of template.orders) pools.set(signature(order), [...(pools.get(signature(order)) ?? []), order]);
+  // Equal quantities keep product totals and revenue equal. Limited coffee stays in senior-only slots.
+  const signature = (item: Scenario['orders'][number]['items'][number]) => `${item.quantity}:${seniorOnly(item.name)}`;
+  const pools = new Map<string, string[]>();
+  for (const order of template.orders)
+    for (const item of order.items) {
+      if (!needsBrew(item.name)) continue;
+      const key = signature(item);
+      pools.set(key, [...(pools.get(key) ?? []), item.name]);
+    }
   for (const pool of pools.values())
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(random() * (i + 1));
@@ -26,14 +28,14 @@ export function randomScenario(template: Scenario, seed: number): Scenario {
   return {
     ...template,
     orders: template.orders.map((slot, index) => {
-      const pool = pools.get(signature(slot));
-      const order = pool?.pop() ?? slot;
       const previous = template.orders[index - 1]?.atSec ?? 0;
       const jitter = index === 0 ? 0 : Math.floor(random() * Math.min(16, Math.max(1, slot.atSec - previous)));
       return {
-        ...order,
-        items: order.items.map((item) => ({ ...item })),
-        orderId: slot.orderId,
+        ...slot,
+        items: slot.items.map((item) => ({
+          ...item,
+          name: needsBrew(item.name) ? (pools.get(signature(item))?.pop() ?? item.name) : item.name,
+        })),
         atSec: slot.atSec - jitter,
       };
     }),

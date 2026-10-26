@@ -187,7 +187,7 @@ export const LESSONS: Lesson[] = [
   {
     id: 'shift',
     title: 'シフトを交代する',
-    description: '通知・予定の交代・予定外の交代',
+    description: 'ワンタップ交代・誤タップ注意・学年で選ぶ',
     setup: () => {
       const state = prepare(base(), []);
       return { ...state, scenario: { ...state.scenario, durationSec: 2400 } };
@@ -195,9 +195,17 @@ export const LESSONS: Lesson[] = [
     steps: [
       { label: '10分前の通知', done: (state) => state.nowSec >= 60 },
       { label: '5分前の通知', done: (state) => state.nowSec >= 360 },
-      { label: '11時へ進む', done: (state) => state.nowSec >= 660 },
-      { label: '予定の人へ交代', done: ui('shift:scheduled') },
-      { label: '予定外の人へ交代', done: ui('shift:typed') },
+      { label: '交代直前の10:59へ', done: (state) => state.nowSec >= 600 },
+      ...[1, 2, 3, 4, 5, 6].map((id) => ({
+        label: `${id}番をワンタップ交代`,
+        done: ui(`shift:scheduled:${id}`),
+      })),
+      {
+        label: '予定外の人を学年で選ぶ',
+        done: (_state, interactions) =>
+          interactions.includes('shift:grade:B4') && interactions.includes('shift:alternate'),
+      },
+      { label: '予告がない時は名前を入力', done: ui('shift:typed') },
       { label: '別の担当者と入れ替える', done: ui('shift:swap') },
       { label: '担当を空きにする', done: ui('shift:clear') },
       { label: '候補から担当を戻す', done: ui('shift:restore') },

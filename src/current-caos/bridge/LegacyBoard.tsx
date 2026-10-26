@@ -112,6 +112,8 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
       onClickCapture={(event) => {
         if (event.target instanceof Element) {
           if (event.target.closest('[data-order-highlight-card]')) props.onInteraction?.('highlight');
+          if (event.target.closest('[aria-label="候補者の学年"] button')?.textContent?.trim() === 'B4')
+            props.onInteraction?.('shift:grade:B4');
           if (event.target.closest('[role="tab"]')?.textContent?.includes('一覧')) props.onInteraction?.('all');
         }
       }}

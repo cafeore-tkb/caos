@@ -3,12 +3,14 @@ import type { Barista, OrderTicket, UnassignedOrder } from '../types';
 import { insertTicket, mergeBoardCards } from '../utils/orderQueue';
 import { itemAbbr, itemCode, itemPrice, itemType, masterItem, needsBrew, seniorOnly } from './master';
 
+export const SCORING_VERSION = '2026-10-v3';
 export type GameMode = 'fast' | 'middle' | 'full';
 export const MODES = {
   fast: {
     label: 'ファスト',
     durationSec: 600,
     count: 6,
+    defaultSpeed: 2,
     emergencyChances: 0,
     description: '少量の注文で基本操作。',
     target: '基本操作',
@@ -17,6 +19,7 @@ export const MODES = {
     label: 'ミドル',
     durationSec: 1200,
     count: 12,
+    defaultSpeed: 3,
     emergencyChances: 1,
     description: '指名・限定豆を並行して対応。',
     target: '並行判断',
@@ -24,7 +27,8 @@ export const MODES = {
   full: {
     label: 'フル',
     durationSec: 1800,
-    count: 20,
+    count: 44,
+    defaultSpeed: 4,
     emergencyChances: 2,
     description: '混雑・緊急対応まで総合練習。',
     target: '店舗運営',
@@ -43,6 +47,7 @@ export interface Scenario {
   title: string;
   durationSec: number;
   orders: ScenarioOrder[];
+  scoring?: 'forecast';
 }
 export interface CupResult {
   id: string;
@@ -125,6 +130,7 @@ export function parseScenario(input: unknown): Scenario {
     !Object.hasOwn(MODES, value.mode) ||
     !Number.isInteger(value.durationSec) ||
     value.durationSec !== MODES[value.mode].durationSec ||
+    (value.scoring !== undefined && (value.scoring !== 'forecast' || value.mode !== 'full')) ||
     typeof value.title !== 'string' ||
     !Array.isArray(value.orders) ||
     value.orders.length === 0 ||
@@ -377,6 +383,23 @@ const pendingFor = (state: GameState, ticket: OrderTicket | UnassignedOrder) =>
   );
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
+  const next = reduceGame(state, action);
+  if (
+    next !== state &&
+    next.status === 'active' &&
+    next.scenario.scoring === 'forecast' &&
+    next.arrived.length === next.scenario.orders.length &&
+    next.unassigned.length === 0 &&
+    next.emergencies.every((trial) => trial.status !== 'pending')
+  )
+    return withEvent(
+      { ...next, status: 'finished', paused: false },
+      'finish',
+      '全注文の割当完了。タイムラインの完了予測で採点しました'
+    );
+  return next;
+}
+function reduceGame(state: GameState, action: GameAction): GameState {
   if (state.status === 'finished') return state;
   if (action.type === 'finish')
     return withEvent({ ...state, status: 'finished', paused: false }, 'finish', '採点しました');
@@ -974,8 +997,30 @@ function recordIceDecision(state: GameState, card: UnassignedOrder | OrderTicket
   return cups;
 }
 
+/** Read the same start/end times displayed on the timeline; never mutate actual cup records. */
+export function forecastCups(state: GameState) {
+  const cups = Object.fromEntries(Object.entries(state.cups).map(([id, cup]) => [id, { ...cup }]));
+  for (const bay of state.bays)
+    for (const ticket of bay.queue) {
+      const start = ticket.startTimeSec ?? state.nowSec + 10;
+      const end = Math.max(state.nowSec, start + ticket.totalDurationSec);
+      for (const id of ticket.trainingCupIds ?? []) {
+        if (!cups[id] || cups[id].completedSec !== undefined || pendingFor(state, ticket)) continue;
+        cups[id] = {
+          ...cups[id],
+          completedSec: end,
+          completedBayId: bay.id,
+          completedBatch: ticket.ticketUid ?? ticket.id,
+          brewRatio: Math.min(1, (end - Math.max(start, cups[id].joinedAtSec ?? start)) / ticket.totalDurationSec),
+        };
+      }
+    }
+  return Object.values(cups);
+}
 export function scoreGame(state: GameState) {
-  const cups = Object.values(state.cups);
+  const forecastMode = state.scenario.scoring === 'forecast' && state.status === 'finished';
+  const actualDone = Object.values(state.cups).filter((cup) => cup.completedSec !== undefined).length;
+  const cups = forecastMode ? forecastCups(state) : Object.values(state.cups);
   const total = cups.length;
   const done = cups.filter((cup) => cup.completedSec !== undefined);
   const good = done.filter((cup) => (cup.brewRatio ?? 0) >= 0.9);
@@ -992,19 +1037,38 @@ export function scoreGame(state: GameState) {
   const iceChoices = done.filter((cup) => cup.iceDecision?.opportunity);
   const seniorIce = iceChoices.filter((cup) => cup.iceDecision?.senior);
   const iceRatio = iceChoices.length ? seniorIce.length / iceChoices.length : done.length ? 1 : 0;
+  const endSec = cups.some((cup) => cup.completedSec !== undefined)
+    ? Math.max(...cups.map((cup) => cup.completedSec ?? 0))
+    : null;
+  const overtimeSec = Math.max(0, (endSec ?? state.scenario.durationSec) - state.scenario.durationSec);
+  // With six drippers and 360-second double batches, 66 cups require at least 33 minutes.
+  const forecastTargetSec = Math.max(state.scenario.durationSec, ((total / 2) * 360) / state.bays.length);
   const categories = [
-    { label: '仕上げた杯数', points: 35 * ratio(done.length), max: 35, detail: `${done.length} / ${total}杯` },
     {
-      label: '8分以内の提供準備',
-      points: 25 * ratio(timely.length),
-      max: 25,
-      detail: `${timely.length} / ${total}杯（品質を満たした杯のみ）`,
+      label: forecastMode ? '仕上がる見込みの杯数' : '仕上げた杯数',
+      points: 35 * ratio(done.length),
+      max: 35,
+      detail: `${done.length} / ${total}杯`,
     },
     {
-      label: '抽出品質',
+      label: forecastMode ? '完了予測の速さ' : '8分以内の提供準備',
+      points: forecastMode
+        ? endSec === null
+          ? 0
+          : 25 * Math.max(0, 1 - Math.max(0, endSec - forecastTargetSec) / 900)
+        : 25 * ratio(timely.length),
+      max: 25,
+      detail: forecastMode
+        ? endSec === null
+          ? '割当がありません'
+          : `終了予測 ${Math.floor(endSec / 60)}分${endSec % 60}秒 / 超過 ${Math.floor(overtimeSec / 60)}分${overtimeSec % 60}秒`
+        : `${timely.length} / ${total}杯（品質を満たした杯のみ）`,
+    },
+    {
+      label: forecastMode ? '抽出時間の確保' : '抽出品質',
       points: 20 * ratio(good.length),
       max: 20,
-      detail: `${good.length} / ${total}杯（予定時間の90%以上）`,
+      detail: `${good.length} / ${total}杯（${forecastMode ? '未完了分は予定抽出時間で計算' : '予定時間の90%以上'}）`,
     },
     {
       label: '同一注文の仕上がり',
@@ -1023,7 +1087,9 @@ export function scoreGame(state: GameState) {
   ];
   const penalties = Math.min(20, state.violations * 2);
   const emergencyPending = state.emergencies.filter(
-    (trial) => trial.status === 'pending' || trial.status === 'rebrewing'
+    (trial) =>
+      trial.status === 'pending' ||
+      (trial.status === 'rebrewing' && !(forecastMode && good.some((cup) => cup.id === trial.cupId)))
   ).length;
   const ready =
     ratio(done.length) >= 0.9 &&
@@ -1037,17 +1103,25 @@ export function scoreGame(state: GameState) {
   );
   const score = ready ? raw : Math.min(79, raw);
   const feedback = [
-    done.length < total ? `残り${total - done.length}杯。空いている担当へ分散。` : '全杯完了。',
+    done.length < total
+      ? `残り${total - done.length}杯。空いている担当へ分散。`
+      : forecastMode
+        ? '全杯の割当を確保。'
+        : '全杯完了。',
     done.length === 0
       ? 'まず抽出を完了しましょう。'
       : good.length < done.length
         ? '完了が早すぎます。残り時間を確認。'
         : '抽出時間は適切。',
-    good.length === 0
-      ? '品質を守り、8分以内に準備。'
-      : timely.length < good.length
-        ? '8分超過あり。古い注文を優先。'
-        : '品質を守り、全杯8分以内。',
+    forecastMode
+      ? overtimeSec > 0
+        ? `完了予測は営業終了から${Math.ceil(overtimeSec / 60)}分超過。同じ豆を統合し、空いた担当へ。`
+        : '営業終了までに全割当分が仕上がる見込み。'
+      : good.length === 0
+        ? '品質を守り、8分以内に準備。'
+        : timely.length < good.length
+          ? '8分超過あり。古い注文を優先。'
+          : '品質を守り、全杯8分以内。',
     together.length < groups.size ? '同じ注文は60秒差以内に仕上げる。' : '同じ注文をそろえて完了。',
     ...(emergencyPending ? [`緊急${emergencyPending}件が未完了。淹れ直しを完了。`] : []),
     ...(state.violations ? ['指名先と★を確認。'] : []),
@@ -1077,7 +1151,10 @@ export function scoreGame(state: GameState) {
   ];
   const business = { revenue, bonuses, score: revenue + bonuses.reduce((sum, bonus) => sum + bonus.points, 0) };
   return {
-    rulesVersion: '2026-10-v2',
+    rulesVersion: SCORING_VERSION,
+    forecast: forecastMode
+      ? { endSec, overtimeSec, actualDone, projectedDone: done.length - actualDone, targetSec: forecastTargetSec }
+      : null,
     business,
     iceAllocation: { opportunities: iceChoices.length, senior: seniorIce.length },
     score,
