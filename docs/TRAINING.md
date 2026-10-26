@@ -97,7 +97,7 @@ A/Cの切替は表示状態だけを変更し、ゲームのカップ台帳・�
 
 入れ直しは理由・杯数・担当／未割当・元抽出の中断／継続を利用者が選択する。同じ杯の完了点は一度取り消し、入れ直し完了時だけ再評価するため、二重加点しない。
 
-結果は採点内訳、未完了杯数、品質、改善点、操作記録を表示。JSON出力にはシナリオ・結果・各杯・操作イベント・乱数シード・緊急の抽選と対応状態を含む。得点履歴はこのブラウザのlocalStorageに保存する。登録後の標準ゲームは共有ランキングにも送信する。営業スコアは品質OKのコーヒー売上（マスター価格、1円＝1pt）＋指名100pt/杯＋限定150pt/杯＋実際の2杯統合100pt/組。淹れ直しは元の杯IDで一度だけ計上し、統合は同じ抽出で2杯を適切に完了した場合に加算する。営業点はマスターの合格条件を置き換えない。
+結果は採点内訳、未完了杯数、品質、改善点、操作記録を表示。JSON出力にはシナリオ・結果・各杯・操作イベント・乱数シード・緊急の抽選と対応状態を含む。得点履歴はこのブラウザのlocalStorageに保存する。表示名で掲載した標準ゲームは共有ランキングにも送信する。営業スコアは品質OKのコーヒー売上（マスター価格、1円＝1pt）＋指名100pt/杯＋限定150pt/杯＋実際の2杯統合100pt/組。淹れ直しは元の杯IDで一度だけ計上し、統合は同じ抽出で2杯を適切に完了した場合に加算する。営業点はマスターの合格条件を置き換えない。
 
 ## 検証
 
@@ -111,7 +111,7 @@ A/Cの切替は表示状態だけを変更し、ゲームのカップ台帳・�
 
 The game retains its three modes, sparse special orders, independent emergency probabilities and 80-point criteria. Continuing an original brew leaves it on the board with current main's discard suggestion, while only the remake retains credit for the replaced cup. A partial discard cannot delete unrelated cups. Queued merged cards can split one cup to unassigned while leaving the other in place.
 
-Finished games are stored in `localStorage` under `caos-training-results-v2` (latest 100 attempts): timestamp, mode, score, category details, feedback, violations, seed, emergency outcomes, cups and action log. The history screen filters by mode, shows best/pass counts and per-attempt details, and exports JSON. `caos-training-results-v1` score/date entries are migrated without inventing unavailable details. Reads validate stored data; denied storage or quota failures leave the current result visible and offer JSON export. Site-data deletion removes this device/browser's results; registered server-issued standard games additionally synchronize to the shared ranking; custom JSON and historical browser-only attempts stay local. Course progress uses `caos-training-course-v1`.
+Finished games are stored in `localStorage` under `caos-training-results-v2` (latest 100 attempts): timestamp, mode, score, category details, feedback, violations, seed, emergency outcomes, cups and action log. The history screen filters by mode, shows best/pass counts and per-attempt details, and exports JSON. `caos-training-results-v1` score/date entries are migrated without inventing unavailable details. Reads validate stored data; denied storage or quota failures leave the current result visible and offer JSON export. Site-data deletion removes this device/browser's results; explicitly published server-issued standard games additionally synchronize to the shared ranking; custom JSON and historical browser-only attempts stay local. Course progress uses `caos-training-course-v1`.
 
 Current source reference: `cafeore-pos/main@173c9f18b71a4435fd967916378ed4df06efdbc4`. See `src/current-caos/UPSTREAM.md` for integration boundaries.
 
@@ -139,7 +139,7 @@ Learning, setup, results and history use a viewport-height shell. Primary action
 
 シフト交代は最後の10番目。10時〜11時の1時間コマを使い、10:50の予告と次の担当名、10:55の強調、11:00の手動交代、11:10の予告なしでの名前入力、他レーンとの交換、空きと候補復帰を教える。本家の交代パネル・候補ロジックを使用し、ガイドはフローティング表示。通常のシフトデータは30分が既定で、レッスンのフィードだけ60分コマを指定する。実店舗の担当者・シフトAPIには書き込まない。
 
-Cloudflare Workerと専用D1を使用。ユーザー名・表示名・パスワードで登録し、モード別かつマスター／営業別の自己ベストを共有する。上位100件ごとにページ切替。画面・APIとも採点ルール `2026-10-v2` を使用し、旧版は順位比較に混ぜない。サーバー発行のシードと共有エンジンで注文・操作を再生する。詳細は `worker/README.md`。
+Cloudflare Workerと専用D1を使用。結果で表示名だけを入力して掲載し、モード別かつマスター／営業別の自己ベストを共有する。上位100件ごとにページ切替。画面・APIとも採点ルール `2026-10-v2` を使用し、旧版は順位比較に混ぜない。サーバー発行のシードと共有エンジンで注文・操作を再生する。詳細は `worker/README.md`。
 
 ## 5段階の評定（2026-10-26）
 
@@ -150,3 +150,9 @@ Cloudflare Workerと専用D1を使用。ユーザー名・表示名・パスワ�
 端末のみはAまで。サーバー採点後は本人専用APIで共有評定を取得し、結果と端末履歴へスナップショットを保存する。ランキングは現在の人数・記録から再計算する。旧OR基準のメタデータは評定ポリシーIDで除き、元の得点・履歴を残す。
 
 評語は[筑波大学GPA制度](https://www.tsukuba.ac.jp/education/ug-courses-gpa/)を参考とし、本ツールの95点基準と相対評価は独自設定である。
+
+## 表示名だけで掲載（2026-10-27）
+
+事前入力なしで標準ゲームを開始し、結果で表示名を入力して「ランキングに載せる」を押す。押さない場合も端末履歴は保存し、共有には送らない。ランキング・表示名ごとのプロフィールは入力なしで閲覧可能。表示名は前回分を端末に覚えて次の結果に補完する。
+
+表示名を1人分の共有記録として扱い、複数端末の同名スコアを集約する。共有端末で別の人の名前を入れても既存の名前・スコアは変更しない。評定の母集団も掲載済みの表示名1件につき1人。ゲーム開始用の匿名セッションや未掲載の結果で人数を水増ししない。ゲームの所有確認だけは端末内の自動トークンで維持し、点数の自己申告は採用しない。

@@ -34,8 +34,9 @@ import type { GradeAssessment } from './grades';
 import { itemAbbr, needsBrew, seniorOnly } from './master';
 import { RankingView } from './RankingView';
 import { randomScenario } from './randomScenario';
-import { beginRun, queueRun, type RankedRun, rankingApi, readLogin, syncRuns } from './rankingClient';
+import { beginRun, publishRun, type RankedRun, rankingApi, readSession, storeDisplayName } from './rankingClient';
 import { appendReplay, SCORING_VERSION } from './replay';
+import { ScorePublisher } from './ScorePublisher';
 import { ScoreRules } from './ScoreRules';
 import { SHIFT_FEED, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
 import './training.css';
@@ -64,7 +65,8 @@ export default function TrainingApp() {
   const [attempt, setAttempt] = useState(0);
   const [completed, setCompleted] = useState(readCourse);
   const [storageError, setStorageError] = useState('');
-  const [login, setLogin] = useState(readLogin);
+  const [session, setSession] = useState(readSession);
+  const finished = useRef<{ entry: ReturnType<typeof createResult>; actions: GameAction[] } | null>(null);
   const [rankedRun, setRankedRun] = useState<RankedRun | null>(null);
   const [customScenario, setCustomScenario] = useState(false);
   const [localSeed, setLocalSeed] = useState(1);
@@ -97,44 +99,35 @@ export default function TrainingApp() {
     const saved = persistResult(entry);
     setHistory(saved.entries);
     setStorageError(saved.saved ? '' : '保存できません。結果JSONを保存してください。');
-    if (login && rankedRun) {
-      try {
-        queueRun(login, rankedRun.id, actions);
-        setSharingStatus('ランキングに送信中…');
-        void syncRuns(login)
-          .then(async ({ skipped }) => {
-            setSharingStatus(
-              skipped ? '共有できない記録があります。端末の履歴で確認できます。' : 'ランキングに反映しました。'
-            );
-            try {
-              const { assessment } = await rankingApi<{ assessment: GradeAssessment }>(
-                `/runs/${rankedRun.id}/grade`,
-                login
-              );
-              setAssessments((old) => ({ ...old, [rankedRun.id]: assessment }));
-              if (entry.detail) {
-                const updated = persistResult({ ...entry, detail: { ...entry.detail, assessment } });
-                setHistory(updated.entries);
-                if (!updated.saved) setStorageError('共有評定を端末に保存できませんでした。');
-              }
-            } catch {
-              // A saved game remains valid when the additional cohort lookup is temporarily unavailable.
-              setSharingStatus('記録を送信しました。共有評定はランキングで確認できます。');
-            }
-          })
-          .catch((cause) => setSharingStatus(`${cause.message} ランキング画面から再送できます。`));
-      } catch {
-        setSharingStatus('共有用の記録を保存できませんでした。');
+    finished.current = { entry, actions };
+  };
+  const publishScore = async (name: string) => {
+    if (!session || !rankedRun || !finished.current)
+      throw new Error('この記録は端末のみです。新しくゲームを始めてください。');
+    const { entry, actions } = finished.current;
+    await publishRun(session, rankedRun.id, actions, name);
+    storeDisplayName(name);
+    try {
+      const { assessment } = await rankingApi<{ assessment: GradeAssessment }>(`/runs/${rankedRun.id}/grade`, session);
+      setAssessments((old) => ({ ...old, [rankedRun.id]: assessment }));
+      if (entry.detail) {
+        const updated = persistResult({ ...entry, detail: { ...entry.detail, assessment } });
+        setHistory(updated.entries);
+        if (!updated.saved) setStorageError('共有評定を端末に保存できませんでした。');
       }
+    } catch {
+      setSharingStatus('共有評定はランキングで確認できます。');
     }
   };
   const startPlaying = async () => {
     setStarting(true);
     setError('');
     setSharingStatus('');
+    finished.current = null;
     try {
-      if (login && !customScenario) {
-        const run = await beginRun(login, mode);
+      if (!customScenario) {
+        const { run, session: currentSession } = await beginRun(mode, session);
+        setSession(currentSession);
         setRankedRun(run);
         setScenario(run.scenario);
       } else {
@@ -151,9 +144,7 @@ export default function TrainingApp() {
     }
   };
   if (page === 'ranking' && lessonIndex === null && !playing)
-    return (
-      <RankingView login={login} onLogin={setLogin} onBack={() => setPage('learn')} onGame={() => setPage('game')} />
-    );
+    return <RankingView session={session} onBack={() => setPage('learn')} onGame={() => setPage('game')} />;
   if (lessonIndex !== null)
     return (
       <GameSession
@@ -187,6 +178,7 @@ export default function TrainingApp() {
         onFinish={saveResult}
         seed={rankedRun?.seed ?? localSeed}
         sharingStatus={sharingStatus}
+        onPublish={rankedRun ? publishScore : undefined}
         assessment={rankedRun ? assessments[rankedRun.id] : null}
         onRanking={() => {
           setPlaying(false);
@@ -476,15 +468,13 @@ export default function TrainingApp() {
             <p>未到着も採点対象。総合練習はフル。</p>
             <ScoreRules />
             <p>
-              {login && !customScenario
-                ? `${login.player.displayName}でランキングに参加`
-                : customScenario
-                  ? '持込JSONは、この端末に記録します。'
-                  : 'ランキングへの参加は名前の登録から。'}
+              {customScenario
+                ? '持込JSONは、この端末に記録します。'
+                : '結果で表示名を入力すると、ランキングに載せられます。'}
             </p>
           </section>
         </div>
-        {error && login && !starting && (
+        {error && scenario && !starting && (
           <button
             type="button"
             className="training-secondary"
@@ -529,6 +519,7 @@ function GameSession({
   storageError,
   seed,
   sharingStatus,
+  onPublish,
   assessment,
   onRanking,
 }: {
@@ -537,6 +528,7 @@ function GameSession({
   onFinish: (state: GameState, actions: GameAction[]) => void;
   seed?: number;
   sharingStatus?: string;
+  onPublish?: (name: string) => Promise<void>;
   assessment?: GradeAssessment | null;
   onRanking?: () => void;
   lesson?: Lesson;
@@ -683,6 +675,7 @@ function GameSession({
             </p>
           )}
           <div className="training-result-body" aria-label="採点の詳細">
+            {onPublish && <ScorePublisher onPublish={onPublish} />}
             <div className="training-result-grid">
               {result.categories.map((category) => (
                 <section className="training-panel" key={category.label}>

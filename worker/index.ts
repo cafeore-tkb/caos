@@ -14,18 +14,8 @@ export interface Env {
 }
 const scenarios = { fast: parseScenario(fast), middle: parseScenario(middle), full: parseScenario(full) };
 const modeSchema = z.enum(['fast', 'middle', 'full']);
-const credentials = z.object({
-  username: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z0-9_]{3,20}$/, 'ユーザー名は半角英数・_で3〜20文字'),
-  password: z.string().min(8, 'パスワードは8文字以上').max(128),
-});
-const registration = credentials
-  .extend({ displayName: z.string().trim().min(1, '表示名を入力してください').max(30, '表示名は30文字まで') })
-  .strict();
-type Player = { id: string; username: string; display_name: string; password_hash: string; salt: string };
+const displayNameSchema = z.string().trim().min(1, '表示名を入力してください').max(30, '表示名は30文字まで');
+type Player = { id: string; display_name: string };
 type Run = {
   id: string;
   player_id: string;
@@ -39,7 +29,7 @@ type Run = {
 };
 async function gradeCohort(env: Env, mode: GameMode): Promise<GradeCohort> {
   const groups = await env.DB.prepare(`SELECT score,COUNT(*) AS count FROM (
-    SELECT MAX(score) AS score FROM runs WHERE mode=? AND rules_version=? AND completed_at IS NOT NULL GROUP BY player_id
+    SELECT MAX(score) AS score FROM runs WHERE mode=? AND rules_version=? AND completed_at IS NOT NULL AND participant_id IS NOT NULL GROUP BY participant_id
   ) GROUP BY score`)
     .bind(mode, SCORING_VERSION)
     .all<{ score: number; count: number }>();
@@ -48,17 +38,6 @@ async function gradeCohort(env: Env, mode: GameMode): Promise<GradeCohort> {
 const hex = (bytes: ArrayBuffer) => Array.from(new Uint8Array(bytes), (v) => v.toString(16).padStart(2, '0')).join('');
 const random = () => hex(crypto.getRandomValues(new Uint8Array(32)).buffer);
 const digest = async (s: string) => hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)));
-async function passwordHash(password: string, salt: string) {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
-  return hex(
-    await crypto.subtle.deriveBits(
-      { name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: 100000, hash: 'SHA-256' },
-      key,
-      256
-    )
-  );
-}
-const profile = (p: Player) => ({ id: p.id, username: p.username, displayName: p.display_name });
 const reply = (data: unknown, status = 200) =>
   Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
 class ApiError extends Error {
@@ -90,57 +69,89 @@ async function rateLimit(env: Env, key: string, max: number, period = 60000) {
 }
 async function authenticated(request: Request, env: Env) {
   const token = request.headers.get('Authorization')?.match(/^Bearer ([a-f0-9]{64})$/)?.[1];
-  if (!token) throw new ApiError(401, 'ログインしてください');
+  if (!token) throw new ApiError(401, 'このゲームの保存期限が切れました。新しく始めてください');
   const p = await env.DB.prepare(
     'SELECT p.* FROM players p JOIN sessions s ON s.player_id=p.id WHERE s.token_hash=? AND s.expires_at>?'
   )
     .bind(await digest(token), Date.now())
     .first<Player>();
-  if (!p) throw new ApiError(401, 'もう一度ログインしてください');
+  if (!p) throw new ApiError(401, 'このゲームの保存期限が切れました。新しく始めてください');
   return p;
 }
 async function issueSession(env: Env, player: Player) {
   const token = random();
   await env.DB.prepare('INSERT INTO sessions(token_hash,player_id,expires_at) VALUES(?,?,?)')
-    .bind(await digest(token), player.id, Date.now() + 30 * 86400000)
+    .bind(await digest(token), player.id, Date.now() + 45 * 86400000)
     .run();
-  return reply({ token, player: profile(player) });
+  return reply({ token, player: { id: player.id } });
 }
 async function route(request: Request, env: Env) {
   const url = new URL(request.url),
     path = url.pathname;
   if (path === '/health' && request.method === 'GET') return reply({ status: 'ok', rulesVersion: SCORING_VERSION });
-  if ((path === '/register' || path === '/login') && request.method === 'POST') {
-    await rateLimit(env, `auth:${await digest(request.headers.get('CF-Connecting-IP') ?? 'local')}`, 15);
-    const input =
-      path === '/register' ? registration.parse(await body(request)) : credentials.strict().parse(await body(request));
-    if (path === '/register') {
-      if (await env.DB.prepare('SELECT id FROM players WHERE username=?').bind(input.username).first())
-        throw new ApiError(409, 'そのユーザー名は使用中です');
-      const player: Player = {
-        id: crypto.randomUUID(),
-        username: input.username,
-        display_name: (input as z.infer<typeof registration>).displayName,
-        salt: random(),
-        password_hash: '',
-      };
-      player.password_hash = await passwordHash(input.password, player.salt);
-      try {
-        await env.DB.prepare(
-          'INSERT INTO players(id,username,display_name,password_hash,salt,created_at) VALUES(?,?,?,?,?,?)'
-        )
-          .bind(player.id, player.username, player.display_name, player.password_hash, player.salt, Date.now())
-          .run();
-      } catch (error) {
-        if (String(error).includes('UNIQUE')) throw new ApiError(409, 'そのユーザー名は使用中です');
-        throw error;
-      }
-      return issueSession(env, player);
-    }
-    const player = await env.DB.prepare('SELECT * FROM players WHERE username=?').bind(input.username).first<Player>();
-    const hash = await passwordHash(input.password, player?.salt ?? 'missing-user');
-    if (!player || hash !== player.password_hash) throw new ApiError(401, 'ユーザー名かパスワードが違います');
-    return issueSession(env, player);
+  if (path === '/session' && request.method === 'POST') {
+    await rateLimit(env, `device:${await digest(request.headers.get('CF-Connecting-IP') ?? 'local')}`, 120, 3600000);
+    z.object({})
+      .strict()
+      .parse(await body(request));
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      'INSERT INTO players(id,username,display_name,password_hash,salt,created_at) VALUES(?,?,?,?,?,?)'
+    )
+      .bind(id, `device_${id}`, '', '', '', Date.now())
+      .run();
+    return issueSession(env, { id, display_name: '' });
+  }
+  if (path === '/profile' && request.method === 'GET') {
+    const displayName = displayNameSchema.parse(url.searchParams.get('name'));
+    const results =
+      await env.DB.prepare(`SELECT r.mode,MAX(r.score) AS best,MAX(r.business_score) AS business_best,COUNT(*) AS attempts,SUM(r.passed) AS passed
+      FROM runs r JOIN participants p ON p.id=r.participant_id WHERE p.display_name=? AND r.completed_at IS NOT NULL AND r.rules_version=? GROUP BY r.mode`)
+        .bind(displayName, SCORING_VERSION)
+        .all();
+    const stats = await Promise.all(
+      results.results.map(async (row) => ({
+        ...row,
+        assessment: assessGrade(Number(row.best), await gradeCohort(env, row.mode as GameMode)),
+      }))
+    );
+    return reply({ displayName, stats });
+  }
+  if (path === '/rankings' && request.method === 'GET') {
+    const mode = modeSchema.parse(url.searchParams.get('mode') ?? 'fast');
+    const offset = z.coerce
+      .number()
+      .int()
+      .min(0)
+      .max(100000)
+      .parse(url.searchParams.get('offset') ?? 0);
+    const metric = z.enum(['master', 'business']).parse(url.searchParams.get('metric') ?? 'master');
+    const column = metric === 'business' ? 'business_score' : 'score';
+    const query = `WITH attempts AS (
+      SELECT r.*,p.display_name,COUNT(*) OVER(PARTITION BY r.participant_id) AS attempts,
+        ROW_NUMBER() OVER(PARTITION BY r.participant_id ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,r.id ASC) AS best
+      FROM runs r JOIN participants p ON p.id=r.participant_id WHERE mode=? AND rules_version=? AND completed_at IS NOT NULL
+    ), ranked AS (
+      SELECT participant_id AS player_id,display_name,score,business_score,revenue,done,total,quality,elapsed_sec,passed,completed_at,attempts,
+        RANK() OVER(ORDER BY ${column} DESC) AS rank FROM attempts WHERE best=1
+    ) SELECT * FROM ranked ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,player_id ASC LIMIT 100 OFFSET ?`;
+    const ranks = await env.DB.prepare(query).bind(mode, SCORING_VERSION, offset).all();
+    const cohort = await gradeCohort(env, mode);
+    const name = url.searchParams.get('name');
+    const viewer = name
+      ? await env.DB.prepare('SELECT id FROM participants WHERE display_name=?')
+          .bind(displayNameSchema.parse(name))
+          .first<{ id: string }>()
+      : null;
+    return reply({
+      mode,
+      metric,
+      rulesVersion: SCORING_VERSION,
+      players: ranks.results.map((row) => ({ ...row, assessment: assessGrade(Number(row.score), cohort) })),
+      totalPlayers: cohort.reduce((sum, group) => sum + group.count, 0),
+      viewerId: viewer?.id ?? '',
+      offset,
+    });
   }
   const player = await authenticated(request, env);
   if (path === '/logout' && request.method === 'POST') {
@@ -161,7 +172,7 @@ async function route(request: Request, env: Env) {
         assessment: assessGrade(Number(row.best), await gradeCohort(env, row.mode as GameMode)),
       }))
     );
-    return reply({ player: profile(player), stats });
+    return reply({ player: { id: player.id }, stats });
   }
   if (path === '/runs' && request.method === 'POST') {
     await rateLimit(env, `start:${player.id}`, 30, 3600000);
@@ -195,11 +206,12 @@ async function route(request: Request, env: Env) {
     if (!run) throw new ApiError(404, 'ゲームが見つかりません');
     if (run.rules_version !== SCORING_VERSION)
       throw new ApiError(409, '採点ルールが更新されました。新しく挑戦してください');
-    const { actions } = z
-      .object({ actions: z.unknown() })
+    const { actions, displayName: enteredName } = z
+      .object({ actions: z.unknown(), displayName: displayNameSchema.optional() })
       .strict()
       .parse(await body(request));
-    const traceHash = await digest(JSON.stringify(actions));
+    const displayName = displayNameSchema.parse(enteredName ?? player.display_name);
+    const traceHash = await digest(JSON.stringify({ displayName, actions }));
     if (run.completed_at) {
       if (run.trace_hash !== traceHash) throw new ApiError(409, 'このゲームは登録済みです');
       return reply({ result: JSON.parse(run.result_json ?? '{}'), alreadySaved: true });
@@ -215,9 +227,19 @@ async function route(request: Request, env: Env) {
       throw new ApiError(400, 'ゲーム時間が一致しません');
     const r = replay.result;
     await env.DB.prepare(
-      'UPDATE runs SET completed_at=?,score=?,business_score=?,revenue=?,done=?,total=?,quality=?,elapsed_sec=?,passed=?,result_json=?,trace_hash=? WHERE id=? AND player_id=? AND completed_at IS NULL'
+      'INSERT INTO participants(id,display_name,created_at) VALUES(?,?,?) ON CONFLICT(display_name) DO NOTHING'
+    )
+      .bind(crypto.randomUUID(), displayName, Date.now())
+      .run();
+    const participant = await env.DB.prepare('SELECT id FROM participants WHERE display_name=?')
+      .bind(displayName)
+      .first<{ id: string }>();
+    if (!participant) throw new ApiError(500, '表示名を保存できませんでした');
+    await env.DB.prepare(
+      'UPDATE runs SET participant_id=?,completed_at=?,score=?,business_score=?,revenue=?,done=?,total=?,quality=?,elapsed_sec=?,passed=?,result_json=?,trace_hash=? WHERE id=? AND player_id=? AND completed_at IS NULL'
     )
       .bind(
+        participant.id,
         Date.now(),
         r.score,
         r.business.score,
@@ -237,36 +259,6 @@ async function route(request: Request, env: Env) {
     const saved = await env.DB.prepare('SELECT trace_hash,result_json FROM runs WHERE id=?').bind(run.id).first<Run>();
     if (saved?.trace_hash !== traceHash) throw new ApiError(409, 'このゲームは登録済みです');
     return reply({ result: JSON.parse(saved?.result_json ?? '{}') });
-  }
-  if (path === '/rankings' && request.method === 'GET') {
-    const mode = modeSchema.parse(url.searchParams.get('mode') ?? 'fast');
-    const offset = z.coerce
-      .number()
-      .int()
-      .min(0)
-      .max(100000)
-      .parse(url.searchParams.get('offset') ?? 0);
-    const metric = z.enum(['master', 'business']).parse(url.searchParams.get('metric') ?? 'master');
-    const column = metric === 'business' ? 'business_score' : 'score';
-    const query = `WITH attempts AS (
-      SELECT r.*,p.username,p.display_name,COUNT(*) OVER(PARTITION BY r.player_id) AS attempts,
-        ROW_NUMBER() OVER(PARTITION BY r.player_id ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,r.id ASC) AS best
-      FROM runs r JOIN players p ON p.id=r.player_id WHERE mode=? AND rules_version=? AND completed_at IS NOT NULL
-    ), ranked AS (
-      SELECT player_id,username,display_name,score,business_score,revenue,done,total,quality,elapsed_sec,passed,completed_at,attempts,
-        RANK() OVER(ORDER BY ${column} DESC) AS rank FROM attempts WHERE best=1
-    ) SELECT * FROM ranked ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,player_id ASC LIMIT 100 OFFSET ?`;
-    const ranks = await env.DB.prepare(query).bind(mode, SCORING_VERSION, offset).all();
-    const cohort = await gradeCohort(env, mode);
-    return reply({
-      mode,
-      metric,
-      rulesVersion: SCORING_VERSION,
-      players: ranks.results.map((row) => ({ ...row, assessment: assessGrade(Number(row.score), cohort) })),
-      totalPlayers: cohort.reduce((sum, group) => sum + group.count, 0),
-      viewerId: player.id,
-      offset,
-    });
   }
   throw new ApiError(404, 'ページが見つかりません');
 }
