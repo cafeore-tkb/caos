@@ -654,8 +654,8 @@ function GameSession({
             <span>{result.label}</span>
           </div>
           <p className="training-grade-caption">
-            {assessment ? '共有評定' : '点数評定（相対評価なし）'} · {result.score >= 60 ? '評定は合格' : 'D：不合格'} ·
-            店舗運営の目安は80点以上
+            {assessment ? '共有評定' : '点数評定（A+は共有順位で判定）'} ·{' '}
+            {result.score >= 60 ? '評定は合格' : 'D：不合格'} · 店舗運営の目安は80点以上
           </p>
           <section className="training-business-summary" aria-label="営業スコアの内訳">
             <div>

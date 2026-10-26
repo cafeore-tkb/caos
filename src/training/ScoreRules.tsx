@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { GradeBadge } from './GradeBadge';
+import { GradeMark } from './GradeBadge';
 import { SCORING_VERSION } from './replay';
 export function ScoreRules() {
   const [open, setOpen] = useState(false);
@@ -26,41 +26,41 @@ export function ScoreRules() {
               <tbody>
                 <tr>
                   <th>
-                    <GradeBadge score={95} />
+                    <GradeMark grade="A+" />
                   </th>
-                  <td>95点以上、または80点以上で上位10％未満</td>
+                  <td>95点以上、かつ上位10％未満</td>
                 </tr>
                 <tr>
                   <th>
-                    <GradeBadge score={80} />
+                    <GradeMark grade="A" />
                   </th>
-                  <td>80〜94点</td>
+                  <td>80点以上 / A+以外</td>
                 </tr>
                 <tr>
                   <th>
-                    <GradeBadge score={70} />
+                    <GradeMark grade="B" />
                   </th>
                   <td>70〜79点</td>
                 </tr>
                 <tr>
                   <th>
-                    <GradeBadge score={60} />
+                    <GradeMark grade="C" />
                   </th>
                   <td>60〜69点</td>
                 </tr>
                 <tr>
                   <th>
-                    <GradeBadge score={0} />
+                    <GradeMark grade="D" />
                   </th>
                   <td>60点未満 / 不合格</td>
                 </tr>
               </tbody>
             </table>
             <p>
-              相対評価は、同じモード・現行ルールの挑戦者1人につき自己ベスト1件。同点者全員を含め、10％ちょうどは対象外。95点以上は人数に関係なくA+です。
+              相対評価は、同じモード・現行ルールの挑戦者1人につき自己ベスト1件。同点者全員を含め、10％ちょうどは対象外。95点以上でも、順位条件を満たさなければAです。
             </p>
             <p>
-              端末だけの評定は点数で判定。履歴の共有評定は保存時点の記録です。ランキングの評定は人数と記録に応じて変わります。店舗運営の目安は引き続き80点以上です。
+              端末だけの評定はAまで。A+は共有ランキングで確定。履歴の共有評定は保存時点の記録です。ランキングの評定は人数と記録に応じて変わります。店舗運営の目安は引き続き80点以上です。
             </p>
             <h3>マスター評価 / 100点</h3>
             <table>

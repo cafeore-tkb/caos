@@ -1,5 +1,7 @@
+export const GRADE_POLICY = '95-and-top10-v1';
 export type Grade = 'A+' | 'A' | 'B' | 'C' | 'D';
 export interface GradeAssessment {
+  policy: typeof GRADE_POLICY;
   grade: Grade;
   absolute: Grade;
   population: number;
@@ -9,7 +11,6 @@ export interface GradeAssessment {
 export type GradeCohort = { score: number; count: number }[];
 export function absoluteGrade(score: number): Grade {
   if (!Number.isFinite(score) || score < 60) return 'D';
-  if (score >= 95) return 'A+';
   if (score >= 80) return 'A';
   if (score >= 70) return 'B';
   return 'C';
@@ -19,9 +20,9 @@ export function assessGrade(score: number, cohort: GradeCohort): GradeAssessment
   const population = cohort.reduce((sum, group) => sum + group.count, 0);
   const atOrAbove = cohort.filter((group) => group.score >= score).reduce((sum, group) => sum + group.count, 0);
   const absolute = absoluteGrade(score);
-  // Relative distinction never bypasses the operational readiness threshold.
-  const relative = score >= 80 && population > 0 && atOrAbove > 0 && atOrAbove * 10 < population;
-  return { grade: absolute === 'A+' || relative ? 'A+' : absolute, absolute, population, atOrAbove, relative };
+  // Both the minimum score and the strict cohort limit are required.
+  const relative = score >= 95 && population > 0 && atOrAbove > 0 && atOrAbove * 10 < population;
+  return { policy: GRADE_POLICY, grade: relative ? 'A+' : absolute, absolute, population, atOrAbove, relative };
 }
 
 export function isGradeAssessment(value: unknown): value is GradeAssessment {
@@ -29,6 +30,7 @@ export function isGradeAssessment(value: unknown): value is GradeAssessment {
   const v = value as GradeAssessment;
   const valid = (g: unknown) => ['A+', 'A', 'B', 'C', 'D'].includes(g as string);
   return (
+    v.policy === GRADE_POLICY &&
     valid(v.grade) &&
     valid(v.absolute) &&
     Number.isInteger(v.population) &&

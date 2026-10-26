@@ -100,6 +100,7 @@ test('shared rankings authenticate, recompute, deduplicate and isolate player id
     0
   );
   assert.equal(rowA.assessment.grade, 'D');
+  assert.equal(rowA.assessment.policy, '95-and-top10-v1');
   assert.equal(rowA.assessment.population, rankA.data.totalPlayers);
   assert.equal(rowA.score, 0);
   assert.equal(rowA.rank, rowB.rank);

@@ -92,7 +92,7 @@ export function HistoryView({
                       {detail.title} · 完了 {detail.result.done}/{detail.result.total}杯 · 品質OK{' '}
                       {detail.result.quality}杯 · 条件違反 {detail.violations}回
                     </p>
-                    <p>{detail.assessment ? '保存時の共有評定' : '点数評定（相対評価なし）'}</p>
+                    <p>{detail.assessment ? '保存時の共有評定' : '点数評定（A+は共有順位で判定）'}</p>
                     <p className="training-criteria">{detail.result.label}</p>
                     {detail.result.business && (
                       <p>
