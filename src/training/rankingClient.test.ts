@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
-import { beginRun, publishRun, readDisplayName, readPending, syncRuns } from './rankingClient';
+import { beginNamedRun, beginRun, publishRun, readDisplayName, readPending, syncRuns } from './rankingClient';
 import { SCORING_VERSION } from './replay';
 
 const originalFetch = globalThis.fetch;
@@ -93,4 +93,29 @@ test('online publication still works when browser storage is blocked', async () 
   };
   await publishRun(session, 'run-a', [{ type: 'finish' }], '当日マスター');
   assert.ok(submitted);
+});
+
+test('player name is required before creating a named game, without creating unused runs', async () => {
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests++;
+    return Response.json({});
+  };
+  for (const name of ['', '  ', 'あ'.repeat(31)])
+    await assert.rejects(beginNamedRun('fast', null, name), /プレイヤー名/);
+  assert.equal(requests, 0);
+});
+test('a named game keeps its trimmed player name and prefills the next play', async () => {
+  const paths: string[] = [];
+  globalThis.fetch = async (input) => {
+    const path = new URL(String(input)).pathname;
+    paths.push(path);
+    return path === '/session'
+      ? Response.json(session)
+      : Response.json({ id: 'run-a', seed: 42, rulesVersion: SCORING_VERSION, scenario: {} });
+  };
+  const game = await beginNamedRun('middle', null, '  珈琲係  ');
+  assert.equal(game.displayName, '珈琲係');
+  assert.equal(readDisplayName(), '珈琲係');
+  assert.deepEqual(paths, ['/session', '/runs']);
 });

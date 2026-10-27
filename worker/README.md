@@ -18,7 +18,7 @@ Use Node 22. `npm install`, then:
 
 ## Display-name-only participation
 
-No registration or login is shown. The frontend silently creates a random device session when starting a standard game; its bearer token only protects that run's ownership. Sessions last 45 days. There is no password processing and no credential-entry endpoint. Legacy columns/records remain for migration compatibility.
+No registration or login is shown. Players enter only a display name before playing; the frontend automatically publishes the replay under that frozen name after scoring. The frontend silently creates a random device session when starting a standard game; its bearer token only protects that run's ownership. Sessions last 45 days. There is no password processing and no credential-entry endpoint. Legacy columns/records remain for migration compatibility.
 
 Rankings and name-based profiles are public. After local scoring, the user explicitly chooses a display name and presses the publish button. Unpublished games do not count toward rankings or grade cohorts. Equal trimmed display names identify one participant across devices; changing the name on a shared device creates an independent participant without renaming prior scores. Use distinct display names for different people. No names are required to play or keep a local history.
 

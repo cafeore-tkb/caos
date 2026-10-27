@@ -331,31 +331,16 @@
 }
 
 .training-score-publisher {
-  display: grid;
-  grid-template-columns: minmax(200px, 1fr) auto;
-  align-items: end;
-  gap: 6px 16px;
-  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 16px;
   border: 2px solid #497154;
   border-radius: 8px;
   background: #f5f3df;
   flex-shrink: 0;
-}
-.training-score-publisher label {
-  display: grid;
-  gap: 4px;
-  font-size: 13px;
-  font-weight: 800;
-}
-.training-score-publisher input {
-  width: 100%;
-  min-height: 46px;
-  padding: 8px 12px;
-  background: #fffcf4;
-  color: #241f1a;
-  border: 1px solid #a39177;
-  border-radius: 6px;
-  font-size: 18px;
 }
 .training-score-publisher .training-primary {
   min-height: 48px;
@@ -364,9 +349,40 @@
 }
 .training-score-publisher small,
 .training-score-publisher p {
-  grid-column: 1 / -1;
+  width: 100%;
   margin: 0;
   font-size: 12px;
+}
+.training-player-name {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.training-player-name input {
+  width: 100%;
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 2px solid #a39177;
+  border-radius: 6px;
+  background: #fffcf4;
+  color: #241f1a;
+  font-size: 18px;
+}
+.training-player-name input:focus-visible {
+  outline: 2px solid #497154;
+  outline-offset: 2px;
+}
+.training-player-name small {
+  font-size: 11px;
+  font-weight: 500;
+}
+@media (max-width: 620px) {
+  .training-player-name {
+    width: 100%;
+  }
 }
 .training-publish-done {
   color: #28553d;

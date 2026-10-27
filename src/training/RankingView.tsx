@@ -75,7 +75,7 @@ export function RankingView({
         <header className="training-title">
           <span className="training-eyebrow">COFFEE LEAGUE</span>
           <h1>みんなのランキング</h1>
-          <p>ゲームの結果で表示名を入力すると、ここに載ります。</p>
+          <p>プレイ前に名前を入力すると、結果が自動で載ります。</p>
         </header>
         <div className="ranking-account">
           <span>{lastName ? `前回の表示名：${lastName}` : '表示名だけで参加できます。'}</span>

@@ -1,59 +1,31 @@
-import { useState } from 'react';
-import { readDisplayName } from './rankingClient';
-export function ScorePublisher({ onPublish }: { onPublish: (name: string) => Promise<void> }) {
-  const [name, setName] = useState(readDisplayName);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [published, setPublished] = useState(false);
-  if (published)
-    return (
-      <p className="training-publish-done" role="status">
-        {name.trim()}の記録を載せました。
-      </p>
-    );
+export type PublicationStatus = { status: 'sending' | 'sent' | 'failed'; error?: string };
+export function ScorePublisher({
+  name,
+  publication,
+  onRetry,
+}: {
+  name: string;
+  publication?: PublicationStatus | null;
+  onRetry: () => Promise<void>;
+}) {
   return (
-    <form
-      className="training-score-publisher"
-      aria-label="ランキングに載せる"
-      onSubmit={async (event) => {
-        event.preventDefault();
-        if (!name.trim()) {
-          setError('表示名を入力してください');
-          return;
-        }
-        setBusy(true);
-        setError('');
-        try {
-          await onPublish(name.trim());
-          setPublished(true);
-        } catch (cause) {
-          setError((cause as Error).message);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      <label>
-        表示名
-        <input
-          required
-          maxLength={30}
-          autoComplete="nickname"
-          placeholder="ランキングに載せる名前"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          disabled={busy}
-        />
-      </label>
-      <button type="submit" className="training-primary" disabled={busy}>
-        {busy ? '送信中…' : 'ランキングに載せる'}
-      </button>
-      <small>同じ表示名で記録をまとめます。載せずに終えても、端末に記録は残ります。</small>
-      {error && (
-        <p role="alert" className="training-error">
-          {error}
-        </p>
+    <section className="training-score-publisher" aria-label="ランキングへの自動掲載" role="status">
+      <strong className={publication?.status === 'sent' ? 'training-publish-done' : ''}>
+        {publication?.status === 'sent'
+          ? `${name}のスコアをランキングに載せました。`
+          : publication?.status === 'failed'
+            ? `${name}のスコアを送れませんでした。`
+            : `${name}のスコアを自動掲載中…`}
+      </strong>
+      {publication?.status === 'failed' && (
+        <>
+          <button type="button" className="training-primary" onClick={() => void onRetry()}>
+            再送する
+          </button>
+          <p className="training-error">{publication.error}</p>
+          <small>保存済みの記録はランキング画面からも再送できます。</small>
+        </>
       )}
-    </form>
+    </section>
   );
 }
