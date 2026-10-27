@@ -114,6 +114,14 @@ export async function beginRun(mode: GameMode, existing: DeviceSession | null) {
     throw new RankingError('採点ルールが更新されました。画面を再読み込みしてください。');
   return { run, session };
 }
+export async function beginNamedRun(mode: GameMode, existing: DeviceSession | null, name: string) {
+  const displayName = name.trim();
+  if (!displayName || displayName.length > 30) throw new RankingError('プレイヤー名を1〜30文字で入力してください');
+  const game = await beginRun(mode, existing);
+  storeDisplayName(displayName);
+  return { ...game, displayName };
+}
+
 interface Pending {
   runId: string;
   playerId: string;

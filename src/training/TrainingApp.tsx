@@ -34,9 +34,18 @@ import type { GradeAssessment } from './grades';
 import { itemAbbr, needsBrew, seniorOnly } from './master';
 import { RankingView } from './RankingView';
 import { randomScenario } from './randomScenario';
-import { beginRun, publishRun, type RankedRun, rankingApi, readSession, storeDisplayName } from './rankingClient';
+import {
+  beginNamedRun,
+  type DeviceSession,
+  publishRun,
+  type RankedRun,
+  rankingApi,
+  readDisplayName,
+  readSession,
+  storeDisplayName,
+} from './rankingClient';
 import { appendReplay, SCORING_VERSION } from './replay';
-import { ScorePublisher } from './ScorePublisher';
+import { type PublicationStatus, ScorePublisher } from './ScorePublisher';
 import { ScoreRules } from './ScoreRules';
 import { SHIFT_FEED, SHIFT_NEXT, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
 import './training.css';
@@ -66,7 +75,18 @@ export default function TrainingApp() {
   const [completed, setCompleted] = useState(readCourse);
   const [storageError, setStorageError] = useState('');
   const [session, setSession] = useState(readSession);
-  const finished = useRef<{ entry: ReturnType<typeof createResult>; actions: GameAction[] } | null>(null);
+  const [playerName, setPlayerName] = useState(readDisplayName);
+  const [runPlayerName, setRunPlayerName] = useState('');
+  const [publication, setPublication] = useState<PublicationStatus | null>(null);
+  const publishing = useRef(new Set<string>());
+  type Finished = {
+    entry: ReturnType<typeof createResult>;
+    actions: GameAction[];
+    run: RankedRun | null;
+    session: DeviceSession | null;
+    displayName: string;
+  };
+  const finished = useRef<Finished | null>(null);
   const [rankedRun, setRankedRun] = useState<RankedRun | null>(null);
   const [customScenario, setCustomScenario] = useState(false);
   const [localSeed, setLocalSeed] = useState(1);
@@ -94,44 +114,61 @@ export default function TrainingApp() {
       });
     return () => controller.abort();
   }, [mode]);
+  const publishScore = async (record: Finished | null) => {
+    if (!record?.run || !record.session || publishing.current.has(record.run.id)) return;
+    const { entry, actions, run, session: owner, displayName } = record;
+    publishing.current.add(run.id);
+    if (finished.current === record) setPublication({ status: 'sending' });
+    try {
+      await publishRun(owner, run.id, actions, displayName);
+      if (finished.current === record) setPublication({ status: 'sent' });
+      try {
+        const { assessment } = await rankingApi<{ assessment: GradeAssessment }>(`/runs/${run.id}/grade`, owner);
+        setAssessments((old) => ({ ...old, [run.id]: assessment }));
+        if (entry.detail) {
+          const updated = persistResult({ ...entry, detail: { ...entry.detail, assessment } });
+          setHistory(updated.entries);
+          if (!updated.saved && finished.current === record) setStorageError('共有評定を端末に保存できませんでした。');
+        }
+      } catch {
+        if (finished.current === record) setSharingStatus('共有評定はランキングで確認できます。');
+      }
+    } catch (cause) {
+      if (finished.current === record) setPublication({ status: 'failed', error: (cause as Error).message });
+    } finally {
+      publishing.current.delete(run.id);
+    }
+  };
   const saveResult = (state: GameState, actions: GameAction[]) => {
     const entry = createResult(state);
     const saved = persistResult(entry);
     setHistory(saved.entries);
     setStorageError(saved.saved ? '' : '保存できません。結果JSONを保存してください。');
-    finished.current = { entry, actions };
-  };
-  const publishScore = async (name: string) => {
-    if (!session || !rankedRun || !finished.current)
-      throw new Error('この記録は端末のみです。新しくゲームを始めてください。');
-    const { entry, actions } = finished.current;
-    await publishRun(session, rankedRun.id, actions, name);
-    storeDisplayName(name);
-    try {
-      const { assessment } = await rankingApi<{ assessment: GradeAssessment }>(`/runs/${rankedRun.id}/grade`, session);
-      setAssessments((old) => ({ ...old, [rankedRun.id]: assessment }));
-      if (entry.detail) {
-        const updated = persistResult({ ...entry, detail: { ...entry.detail, assessment } });
-        setHistory(updated.entries);
-        if (!updated.saved) setStorageError('共有評定を端末に保存できませんでした。');
-      }
-    } catch {
-      setSharingStatus('共有評定はランキングで確認できます。');
-    }
+    const record = { entry, actions, run: rankedRun, session, displayName: runPlayerName };
+    finished.current = record;
+    if (record.run) void publishScore(record);
   };
   const startPlaying = async () => {
+    if (!playerName.trim()) {
+      setError('プレイヤー名を入力してください');
+      return;
+    }
     setStarting(true);
+    setPublication(null);
     setError('');
     setSharingStatus('');
     finished.current = null;
     try {
       if (!customScenario) {
-        const { run, session: currentSession } = await beginRun(mode, session);
+        const { run, session: currentSession, displayName } = await beginNamedRun(mode, session, playerName);
+        setRunPlayerName(displayName);
         setSession(currentSession);
         setRankedRun(run);
         setScenario(run.scenario);
       } else {
         setRankedRun(null);
+        setRunPlayerName(playerName.trim());
+        storeDisplayName(playerName.trim());
         const seed = crypto.getRandomValues(new Uint32Array(1))[0];
         setLocalSeed(seed);
         if (scenario && !customScenario) setScenario(randomScenario(scenario, seed));
@@ -178,7 +215,9 @@ export default function TrainingApp() {
         onFinish={saveResult}
         seed={rankedRun?.seed ?? localSeed}
         sharingStatus={sharingStatus}
-        onPublish={rankedRun ? publishScore : undefined}
+        playerName={runPlayerName}
+        publication={publication}
+        onPublish={rankedRun ? () => publishScore(finished.current) : undefined}
         assessment={rankedRun ? assessments[rankedRun.id] : null}
         onRanking={() => {
           setPlaying(false);
@@ -478,7 +517,7 @@ export default function TrainingApp() {
             <p>
               {customScenario
                 ? '持込JSONは、この端末に記録します。'
-                : '結果で表示名を入力すると、ランキングに載せられます。'}
+                : 'プレイヤー名を入力して開始。終了後はランキングへ自動掲載。'}
             </p>
           </section>
         </div>
@@ -487,7 +526,11 @@ export default function TrainingApp() {
             type="button"
             className="training-secondary"
             onClick={() => {
+              if (!playerName.trim()) return;
               setRankedRun(null);
+              setRunPlayerName(playerName.trim());
+              storeDisplayName(playerName.trim());
+              setPublication(null);
               const seed = crypto.getRandomValues(new Uint32Array(1))[0];
               setLocalSeed(seed);
               if (scenario && !customScenario) setScenario(randomScenario(scenario, seed));
@@ -499,11 +542,23 @@ export default function TrainingApp() {
           </button>
         )}
         <footer className="training-start-row training-actionbar" aria-label="ゲームの開始">
-          <p>カードを選ぶ → 担当へ割当 → 時間を見て完了。</p>
+          <label className="training-player-name">
+            プレイヤー名
+            <input
+              aria-label="プレイヤー名"
+              autoComplete="nickname"
+              maxLength={30}
+              placeholder="ランキングに載る名前"
+              value={playerName}
+              onChange={(event) => setPlayerName(event.target.value)}
+              disabled={starting}
+            />
+            <small>{customScenario ? '持込JSONは端末のみ' : '終了後にランキングへ自動掲載'}</small>
+          </label>
           <button
             type="button"
             className="training-primary"
-            disabled={loading || !scenario || starting}
+            disabled={loading || !scenario || starting || !playerName.trim()}
             onClick={() => void startPlaying()}
           >
             <Play size={18} />
@@ -527,6 +582,8 @@ function GameSession({
   storageError,
   seed,
   sharingStatus,
+  playerName = '',
+  publication,
   onPublish,
   assessment,
   onRanking,
@@ -536,7 +593,9 @@ function GameSession({
   onFinish: (state: GameState, actions: GameAction[]) => void;
   seed?: number;
   sharingStatus?: string;
-  onPublish?: (name: string) => Promise<void>;
+  playerName?: string;
+  publication?: PublicationStatus | null;
+  onPublish?: () => Promise<void>;
   assessment?: GradeAssessment | null;
   onRanking?: () => void;
   lesson?: Lesson;
@@ -698,7 +757,7 @@ function GameSession({
           )}
           <div className="training-result-body" aria-label="採点の詳細">
             {result.forecast && <p>割当時点の予測で採点。未完了分の売上・品質・淹れ直しは見込みです。</p>}
-            {onPublish && <ScorePublisher onPublish={onPublish} />}
+            {onPublish && <ScorePublisher name={playerName} publication={publication} onRetry={onPublish} />}
             <div className="training-result-grid">
               {result.categories.map((category) => (
                 <section className="training-panel" key={category.label}>
