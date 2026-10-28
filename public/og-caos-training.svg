@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <title>CaOS — コーヒーの現場を、ゲームで練習。</title>
+  <desc>マスターシート練習ゲーム。注文の割り当てと抽出を練習し、注文ごとのふり返りで上達。ぶっちー・しょーんなど5つのモード。</desc>
+  <rect width="1200" height="630" fill="#efe8d5"/>
+  <rect x="0" y="0" width="1200" height="12" fill="#315b49"/>
+  <g font-family="'Hiragino Sans','Noto Sans CJK JP',sans-serif" fill="#30271f">
+    <g stroke="#503528" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M66 59H100V76Q100 92 83 92Q66 92 66 76Z"/>
+      <path d="M101 63H108Q119 63 119 73Q119 83 100 83M71 47V42M83 47V39M95 47V42"/>
+    </g>
+    <text x="137" y="91" font-size="64" font-weight="800" letter-spacing="-3">CaOS</text>
+    <text x="1136" y="76" text-anchor="end" font-size="21" font-weight="700" fill="#655848">珈琲・俺 / マスターシート練習室</text>
+    <text x="64" y="226" font-size="58" font-weight="800" letter-spacing="-2">コーヒーの現場を、</text>
+    <text x="64" y="306" font-size="70" font-weight="800" letter-spacing="-2" fill="#315b49">ゲームで練習。</text>
+    <text x="66" y="376" font-size="25" font-weight="600">注文を割り当て、タイミングを見て淹れる。</text>
+    <text x="66" y="419" font-size="25" font-weight="600">点を落とした理由が、注文ごとに分かる。</text>
+
+    <rect x="64" y="474" width="230" height="56" rx="6" fill="#e3bd64" stroke="#503528" stroke-width="2"/>
+    <text x="179" y="510" text-anchor="middle" font-size="23" font-weight="800">5つのゲームモード</text>
+    <rect x="308" y="474" width="294" height="56" rx="6" fill="#fffaf0" stroke="#a89a81" stroke-width="2"/>
+    <text x="455" y="510" text-anchor="middle" font-size="23" font-weight="700">ぶっちー / しょーん</text>
+
+    <rect x="756" y="157" width="382" height="376" rx="12" fill="#d3c5aa"/>
+    <rect x="748" y="149" width="382" height="376" rx="12" fill="#fffaf0" stroke="#a89a81" stroke-width="2"/>
+    <path d="M760 149H1118Q1130 149 1130 161V209H748V161Q748 149 760 149" fill="#503528"/>
+    <text x="774" y="188" fill="#fffaf0" font-size="23" font-weight="700">注文のタイムライン</text>
+    <g stroke="#dfd5c3" stroke-width="1.5">
+      <path d="M810 229V446M904 229V446M998 229V446M1092 229V446M766 293H1112M766 363H1112M766 433H1112"/>
+    </g>
+    <g font-size="19" font-weight="800" fill="#655848">
+      <text x="771" y="271">1</text><text x="771" y="341">2</text><text x="771" y="411">3</text>
+    </g>
+    <path d="M854 233V436" stroke="#c64937" stroke-width="3"/>
+    <circle cx="854" cy="232" r="5" fill="#c64937"/>
+    <text x="854" y="226" text-anchor="middle" fill="#c64937" font-size="14" font-weight="800">いま</text>
+    <rect x="828" y="247" width="231" height="39" rx="5" fill="#fff1c8" stroke="#b89a48" stroke-width="1.5"/>
+    <text x="840" y="273" font-size="18" font-weight="700">#101　よいん　2杯</text>
+    <rect x="871" y="317" width="242" height="39" rx="5" fill="#e2eef3" stroke="#7c9ca7" stroke-width="1.5"/>
+    <text x="883" y="343" font-size="18" font-weight="700">#102　アイス　1杯</text>
+    <rect x="847" y="387" width="238" height="39" rx="5" fill="#e5ecdf" stroke="#76917a" stroke-width="1.5"/>
+    <text x="859" y="413" font-size="18" font-weight="700">#103　ケニア　2杯</text>
+    <rect x="771" y="458" width="336" height="45" rx="5" fill="#315b49"/>
+    <text x="939" y="488" text-anchor="middle" fill="#fffaf0" font-size="22" font-weight="800">80点を目指そう</text>
+
+    <path d="M64 568H1136" stroke="#b6a78b" stroke-width="1.5"/>
+    <text x="64" y="605" font-size="20" font-weight="600" fill="#655848">cafeore-tkb.github.io/caos</text>
+    <text x="1136" y="605" text-anchor="end" font-size="21" font-weight="700" fill="#503528">割り当てる → 淹れる → ふり返る</text>
+  </g>
+</svg>
