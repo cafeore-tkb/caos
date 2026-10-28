@@ -24,6 +24,7 @@ export interface ControlViewProps {
   onCancelEmergency?: (key: string) => void;
   currentTimeSec: number;
   clockOriginMs?: number;
+  onFollowNowChange?: (following: boolean) => void;
   orderComments?: readonly BoardComment[];
   onInteraction?: (kind: string) => void;
   onDiscard?: (key: string, cupIds: string[]) => boolean;

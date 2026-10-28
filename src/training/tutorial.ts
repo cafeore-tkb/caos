@@ -42,10 +42,10 @@ export const LESSONS: Lesson[] = [
   {
     id: 'overview',
     title: '表示を切り替える',
-    description: '時間軸・待ち列・注文番号',
+    description: '抽出の予定と待ち列を確認する',
     setup: () => prepare(base(), []),
     steps: [
-      { label: 'キューに切替', done: ui('view:c') },
+      { label: '待ち列に切り替える', done: ui('view:c') },
       { label: 'タイムラインに切替', done: ui('view:current') },
       { label: '注文番号を押す', done: ui('highlight') },
       { label: '担当番号を押す', done: ui('lane') },
@@ -113,10 +113,10 @@ export const LESSONS: Lesson[] = [
   {
     id: 'merge',
     title: 'まとめる・分ける',
-    description: '同じ商品の1杯を統合・分離',
+    description: '同じ商品を2杯まとめて淹れる・1杯ずつに戻す',
     setup: () => prepare(base(undefined, 2), []),
     steps: [
-      { label: '1杯ずつを統合', done: event('merge') },
+      { label: '1杯ずつのカードをまとめる', done: event('merge') },
       { label: '1杯ずつに分ける', done: event('split') },
     ],
   },
@@ -139,7 +139,7 @@ export const LESSONS: Lesson[] = [
   {
     id: 'emergency',
     title: '緊急で淹れ直す',
-    description: 'カップ・理由を選び、担当へ割当',
+    description: '淹れ直すカップと理由を選び、担当を決める',
     setup: () => {
       const state = base();
       let prepared = prepare(state, [assign(state, 0, 2)]);

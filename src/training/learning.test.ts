@@ -78,6 +78,18 @@ test('malformed detail falls back to a score-only history entry', () => {
   assert.equal(parsed[0].score, entry.score);
   assert.equal(parsed[0].detail, undefined);
 });
+test('old results remain readable and a damaged score review does not remove the saved score or action log', () => {
+  const entry = createResult(lesson('assign').setup(), '2026-10-29T01:00:00Z', 'review');
+  const old = JSON.parse(JSON.stringify(entry));
+  delete old.detail.result.review;
+  assert.ok(parseHistory(JSON.stringify([old]))[0].detail);
+  const damaged = JSON.parse(JSON.stringify(entry));
+  damaged.detail.result.review.deductions = [{ timeline: 'broken' }];
+  const restored = parseHistory(JSON.stringify([damaged]))[0];
+  assert.equal(restored.score, entry.score);
+  assert.deepEqual(restored.detail?.events, entry.detail?.events);
+  assert.equal(restored.detail?.result.review, undefined);
+});
 test('tutorial states are fresh, never auto-complete and only observed interactions unlock the first steps', () => {
   for (const item of LESSONS) {
     assert.equal(lessonComplete(item, item.setup(), []), false, item.id);

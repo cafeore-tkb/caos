@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ControlViewMode, ControlViewProps } from '../../components/ControlWorkspace';
 import type { OrderTicket, UnassignedOrder } from '../../types';
 import type { CaosCard } from '../common';
@@ -13,6 +13,7 @@ import { useCardMenu } from '../hooks/useCardMenu';
 import type { CommentAnchor } from '../hooks/useCommentPopupPosition';
 import { OrderHighlightsContext, useOrderHighlightState } from '../hooks/useOrderHighlights';
 import { useOrderSearch } from '../hooks/useOrderSearch';
+import type { TimelineCommand } from '../hooks/useTimelineScroll';
 import { selectedComments } from '../logic/cards';
 import type { BoardComment } from '../logic/comments';
 import { nextAvailableBays } from '../logic/queue';
@@ -28,16 +29,28 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
     () => convertBoard({ ...props, orderComments: [...(props.orderComments ?? []), ...replies] }, firstSeen.current),
     [props, replies]
   );
-  const highlight = useOrderHighlightState(board.cards, 'standalone', (key) => scrollCardIntoView(key));
   const latestCards = useRef(board.cards);
   latestCards.current = board.cards;
+  const [timelineRequest, setTimelineRequest] = useState<TimelineCommand | null>(null);
+  const nextCommandId = useRef(0);
+  useEffect(() => {
+    if (props.timelineCommand?.direction === 'now')
+      setTimelineRequest({ direction: 'now', id: ++nextCommandId.current });
+  }, [props.timelineCommand]);
+  const revealCard = useCallback(
+    (key: string) => {
+      const card = latestCards.current.find((card) => card.key === key);
+      // The timeline owns its scroll position. Native scrollIntoView fights NOW following.
+      if (props.mode === 'current' && card && card.status !== 'unassigned')
+        setTimelineRequest({ direction: 'card', cardKey: key, id: ++nextCommandId.current });
+      else scrollCardIntoView(key);
+    },
+    [props.mode]
+  );
+  const highlight = useOrderHighlightState(board.cards, 'standalone', revealCard);
   useEffect(() => {
     if (!props.selectedOrderId) return;
     highlight.selectLabel(props.selectedOrderId);
-    for (const card of latestCards.current.filter((card) =>
-      card.cups.some((cup) => props.selectedOrderId?.split('+').includes(`#${String(cup.orderNo).padStart(3, '0')}`))
-    ))
-      scrollCardIntoView(card.key);
   }, [props.selectedOrderId, highlight.selectLabel]);
   const [tab, setTab] = useState<'unassigned' | 'unfinished'>('unassigned');
   const [changingLane, setChangingLane] = useState<number | null>(null);
@@ -67,6 +80,7 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
     selectOrder: (label) => {
       props.onSelectOrder(label ?? '');
     },
+    showOnTimeline: props.mode === 'current' ? revealCard : undefined,
     keyboardEnabled: Boolean(props.onOpenSearch),
     view: props.mode,
     orders: board.orders,
@@ -179,11 +193,8 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
                     nextAvailable={nextAvailableBays(board.lanes, board.nowMs)}
                     nowMs={board.nowMs}
                     selectedOrderId={props.selectedOrderId}
-                    timelineCommand={
-                      props.timelineCommand?.direction === 'now'
-                        ? { direction: 'now', id: props.timelineCommand.id }
-                        : null
-                    }
+                    timelineCommand={timelineRequest}
+                    onFollowNowChange={props.onFollowNowChange}
                     onSelectOrder={(label) => props.onSelectOrder(label ?? '')}
                     cardMenu={cardMenu}
                     onHoldCard={(card) => {
@@ -229,7 +240,7 @@ export function LegacyBoard(props: ControlViewProps & { mode: ControlViewMode })
                       rows: board.rows,
                       badge: board.rows.filter((row) => row.late).length,
                       selectedOrderId: props.selectedOrderId,
-                      onSelectOrder: (no) => props.onSelectOrder(`#${String(no).padStart(3, '0')}`),
+                      onSelectOrder: (no) => search.select(no),
                     }}
                   />
                   {viewingComments && props.mode === 'current' && (

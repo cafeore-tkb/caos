@@ -1,4 +1,5 @@
 import { type GameMode, type GameState, MODES, scoreGame } from './engine';
+import { isScoreReview, type ScoreReview } from './feedback';
 import { type GradeAssessment, isGradeAssessment } from './grades';
 
 export const HISTORY_KEY = 'caos-training-results-v2';
@@ -11,7 +12,7 @@ export interface ResultEntry {
   at: string;
   detail?: {
     assessment?: GradeAssessment;
-    result: ReturnType<typeof scoreGame>;
+    result: Omit<ReturnType<typeof scoreGame>, 'review'> & { review?: ScoreReview };
     title: string;
     elapsedSec: number;
     randomSeed: number;
@@ -81,6 +82,10 @@ export function parseHistory(raw: string | null): ResultEntry[] {
           Array.isArray(d.emergencies) &&
           d.emergencies.every((e: { status: unknown }) => e && typeof e.status === 'string');
         const detail = hasDetail ? { ...d } : null;
+        if (detail && !isScoreReview(detail.result.review)) {
+          detail.result = { ...detail.result };
+          delete detail.result.review;
+        }
         if (detail && !isGradeAssessment(detail.assessment)) delete detail.assessment;
         return {
           id: entry.id,
