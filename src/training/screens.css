@@ -429,3 +429,19 @@
     font-size: 20px;
   }
 }
+
+/* Keep the player name usable when the start button fills its column. */
+.training-setup-screen .training-start-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: end;
+}
+.training-setup-screen .training-start-row > .training-primary {
+  min-width: 0;
+  width: 100%;
+}
+@media (max-width: 480px) {
+  .training-setup-screen .training-start-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
