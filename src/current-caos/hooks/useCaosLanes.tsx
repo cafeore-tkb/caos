@@ -11,7 +11,7 @@ export const CurrentLanesContext = createContext({
 export function useCaosLanes() {
   const { bays, onOpen, editable, feed, nowMs, onChange, onPick } = useContext(CurrentLanesContext);
   return {
-    editable, lanes: bays.map((bay) => ({ dripper: bay.id, name: bay.name, senior: Boolean(bay.canHandleSpecial) })),
+    editable, lanes: bays.map((bay) => ({ dripper: bay.id, name: bay.name, senior: Boolean(bay.canHandleSpecial), hotOnly: Boolean(bay.hotOnly) })),
     upcomingOf: (id: number) => upcomingLaneCandidate(feed, id, nowMs, bays.find((bay) => bay.id === id)?.name ?? ''),
     changeToNext: (id: number, next?: { name: string; senior: boolean }) => next && onPick ? onPick(id, next.name, next.senior) : (onChange ?? onOpen)(id),
     openChange: onChange ?? onOpen, openSettings: () => onOpen(1),

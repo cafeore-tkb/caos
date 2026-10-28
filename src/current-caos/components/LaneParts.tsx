@@ -44,6 +44,7 @@ export const LaneName: React.FC<{
     >
       <span className={nameClass(lane.name, wrap)}>{lane.name}</span>
       {lane.senior && <SeniorMark />}
+      {lane.hotOnly && <span className="rounded bg-orange-100 px-1 text-[10px] font-bold text-orange-900">ホットのみ</span>}
     </span>
   );
 };
@@ -56,7 +57,7 @@ export const LaneAbility: React.FC<{ dripper: number }> = ({ dripper }) => {
     <span
       className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 font-bold text-[11px] leading-none ${lane.senior ? "bg-amber-100 text-amber-900" : "bg-slate-100 text-slate-500"}`}
     >
-      {lane.senior ? "上級生のみも可" : "上級生のみは ⚠"}
+      {lane.hotOnly ? "ホットのみ" : lane.senior ? "上級生のみも可" : "上級生のみは ⚠"}
     </span>
   );
 };

@@ -3,7 +3,7 @@ import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { GameState } from './engine';
 import { placeTour, type TourRect, tourArrow } from './tourGeometry';
-import { findTourTarget, tourHint } from './tourHints';
+import { findTourTarget, type TourHint, tourHint } from './tourHints';
 import { LESSONS, type Lesson } from './tutorial';
 
 type Layout = { panel: TourRect; target: TourRect | null; portal: HTMLElement; fallback: boolean };
@@ -24,7 +24,9 @@ export function TutorialOverlay({
   mode,
   onNext,
   onAdvanceTime,
+  guidance,
 }: {
+  guidance?: TourHint & { title: string };
   lesson: Lesson;
   lessonNumber: number;
   state: GameState;
@@ -38,9 +40,9 @@ export function TutorialOverlay({
   const popup = useRef<HTMLDivElement>(null);
   const lastRevealed = useRef<HTMLElement | null>(null);
   const id = useId().replace(/:/g, '');
-  const stepIndex = lesson.steps.findIndex((step) => !step.done(state, interactions));
+  const stepIndex = guidance ? 0 : lesson.steps.findIndex((step) => !step.done(state, interactions));
   const complete = stepIndex < 0;
-  const hint = complete ? null : tourHint(lesson, stepIndex, state, mode);
+  const hint = guidance ?? (complete ? null : tourHint(lesson, stepIndex, state, mode));
   const portalHost = layout?.portal ?? document.body;
 
   useLayoutEffect(() => {
@@ -50,16 +52,16 @@ export function TutorialOverlay({
     const resize = new ResizeObserver(() => schedule());
     const measure = () => {
       if (disposed || !popup.current) return;
-      const hint = complete ? null : tourHint(lesson, stepIndex, state, mode);
+      const hint = guidance ?? (complete ? null : tourHint(lesson, stepIndex, state, mode));
       let element = hint ? findTourTarget(hint.queries) : null;
       const fallback = !complete && !element;
-      if (fallback) element = document.querySelector('[data-tour-retry]');
+      if (fallback) element = document.querySelector(guidance ? '[data-emergency-notice]' : '[data-tour-retry]');
       if (element !== observed) {
         if (observed) resize.unobserve(observed);
         if (element) resize.observe(element);
         observed = element;
       }
-      if (element && element !== lastRevealed.current) {
+      if (!guidance && element && element !== lastRevealed.current) {
         lastRevealed.current = element;
         const bounds = element.getBoundingClientRect();
         if (
@@ -134,12 +136,14 @@ export function TutorialOverlay({
       window.removeEventListener('resize', schedule);
       window.visualViewport?.removeEventListener('resize', schedule);
     };
-  }, [lesson, stepIndex, complete, state, mode, portalHost]);
+  }, [lesson, stepIndex, complete, state, mode, portalHost, guidance]);
 
   const arrow = layout?.target ? tourArrow(layout.panel, layout.target) : null;
   const inConfirmation = Boolean(layout && layout.portal !== document.body && lesson.id === 'discard');
   const message = layout?.fallback
-    ? '対象が変わりました。「やり直す」で再開。'
+    ? guidance
+      ? '対象カードの「緊急（淹れ直し）」から手配してください。'
+      : '対象が変わりました。「やり直す」で再開。'
     : inConfirmation
       ? '元の1杯を確認して破棄。淹れ直しは残ります。'
       : hint?.message;
@@ -176,7 +180,7 @@ export function TutorialOverlay({
         aria-modal="false"
         aria-labelledby={`${id}-title`}
         aria-describedby={`${id}-instruction`}
-        aria-label="レッスンのガイド"
+        aria-label={guidance ? '緊急のガイド' : 'レッスンのガイド'}
         className={`tutorial-popup ${expanded ? '' : 'is-collapsed'} ${complete ? 'is-complete' : ''}`}
         style={{ left: layout?.panel.x ?? 12, top: layout?.panel.y ?? 90, visibility: layout ? 'visible' : 'hidden' }}
         onKeyDown={(event) => {
@@ -186,7 +190,7 @@ export function TutorialOverlay({
         <header className="tutorial-popup-header">
           <span>
             <BookOpen size={15} />
-            練習 {lessonNumber} / {LESSONS.length}
+            {guidance ? '緊急の案内' : `練習 ${lessonNumber} / ${LESSONS.length}`}
           </span>
           <button
             type="button"
@@ -197,9 +201,13 @@ export function TutorialOverlay({
           </button>
         </header>
         <div className="tutorial-popup-content">
-          <div className="tutorial-step-count">{complete ? '完了' : `${stepIndex + 1} / ${lesson.steps.length}`}</div>
+          <div className="tutorial-step-count">
+            {guidance ? '該当カードから操作' : complete ? '完了' : `${stepIndex + 1} / ${lesson.steps.length}`}
+          </div>
           <h2 id={`${id}-title`}>
-            {complete ? (
+            {guidance ? (
+              guidance.title
+            ) : complete ? (
               <>
                 <CheckCircle2 size={21} />
                 できました！
@@ -213,7 +221,7 @@ export function TutorialOverlay({
           <p id={`${id}-instruction`} aria-live="polite">
             {complete ? '次へ進みましょう。' : message}
           </p>
-          {expanded && (
+          {expanded && !guidance && (
             <>
               <div className="tutorial-step-track" aria-hidden="true">
                 {lesson.steps.map((step, index) => (

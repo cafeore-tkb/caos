@@ -18,6 +18,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { CONTROL_VIEWS, type ControlViewMode, ControlWorkspace } from '../components/ControlWorkspace';
 import type { OrderTicket } from '../types';
 import { trainingComments } from './comments';
+import { emergencyGuidance } from './emergencyGuidance';
 import {
   type GameAction,
   type GameMode,
@@ -657,7 +658,7 @@ function GameSession({
   const recreatedStartMinutes = scenario.mode === 'butchi' ? 90 : scenario.mode === 'shawn' ? 360 : 0;
   const boardClockOrigin = shiftLesson ? SHIFT_ORIGIN_MS : TRAINING_CLOCK_ORIGIN + recreatedStartMinutes * 60_000;
   const result = scoreGame(state);
-  const pendingEmergencies = state.emergencies.filter((trial) => trial.status === 'pending');
+  const emergencyGuide = emergencyGuidance(state);
   const occurredEmergencies = state.emergencies.filter((trial) => trial.triggeredAtSec !== undefined);
   const downloadResult = () => {
     try {
@@ -903,7 +904,7 @@ function GameSession({
             完了 {result.done}/{result.total}杯
           </span>
         </div>
-        {state.notice && pendingEmergencies.length === 0 && (
+        {state.notice && !emergencyGuide && (
           <div className="training-session-notice" role="status">
             {state.notice}
           </div>
@@ -916,6 +917,14 @@ function GameSession({
           >
             <BellRing size={20} aria-hidden="true" />
             {shiftReminder(boardClockOrigin + state.nowSec * 1000)}
+          </div>
+        )}
+        {emergencyGuide && (
+          <div data-emergency-notice role="alert" className="training-emergency-notice">
+            <BellRing size={20} aria-hidden="true" />
+            <span>
+              <strong>{emergencyGuide.title}</strong>　該当カードの「緊急（淹れ直し）」を押してください。
+            </span>
           </div>
         )}
         {lesson ? (
@@ -988,33 +997,17 @@ function GameSession({
       <div className="training-progress">
         <div style={{ width: `${(100 * state.nowSec) / scenario.durationSec}%` }} />
       </div>
-      {pendingEmergencies.length > 0 && (
-        <aside className="training-emergencies" aria-label="緊急淹れ直しの通知">
-          {pendingEmergencies.map((trial) => {
-            const source = state.bays
-              .flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])
-              .find((ticket) => ticket.ticketUid === trial.sourceKey);
-            const waiting = state.unassigned.find((card) => card.ticketUid === trial.sourceKey);
-            return (
-              <div role="alert" key={trial.id}>
-                <strong>緊急淹れ直し {source?.id ?? waiting?.id}</strong>
-                <p>{waiting ? '対象カードを担当へ割当。' : '抽出トラブル。淹れ直してください。'}</p>
-                <button
-                  type="button"
-                  disabled={!source}
-                  onClick={() => {
-                    if (source) {
-                      setEmptyBay(null);
-                      openDetail(source);
-                    }
-                  }}
-                >
-                  淹れ直しを手配
-                </button>
-              </div>
-            );
-          })}
-        </aside>
+      {!lesson && emergencyGuide && (
+        <TutorialOverlay
+          lesson={LESSONS.find((entry) => entry.id === 'emergency') ?? LESSONS[0]}
+          lessonNumber={8}
+          state={state}
+          interactions={interactions}
+          mode={viewMode}
+          onNext={() => {}}
+          onAdvanceTime={() => {}}
+          guidance={emergencyGuide}
+        />
       )}
       <div className="training-board">
         <ControlWorkspace

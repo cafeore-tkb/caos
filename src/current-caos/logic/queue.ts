@@ -13,7 +13,7 @@ const SOON_SEC = 15;
 const START_SOON_SEC = 10;
 
 // カードの抽出時間（ミリ秒）
-const brewMs = (card: CaosCard) => caosBrewSec(card.cups.length) * 1000;
+const brewMs = (card: CaosCard) => (card.brewDurationSec ?? caosBrewSec(card.cups.length)) * 1000;
 
 // 抽出中のカードの開始（開始の時刻はサーバーが付ける）
 const brewStartMs = (card: CaosCard, nowMs: number) =>

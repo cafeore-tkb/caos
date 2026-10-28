@@ -102,27 +102,28 @@ function runService(mode: GameMode, seed = 1, variedSeed?: number) {
       if (bay.queue[0]?.timeRemainingSec === 0) state = gameReducer(state, { type: 'complete', bayId: bay.id });
     }
     for (const card of state.unassigned) {
-      const bay = state.bays
-        .filter((entry) => allowedBay(card, entry))
-        .sort(
-          (a, b) =>
-            a.queue.reduce((sum, ticket) => sum + (ticket.timeRemainingSec ?? ticket.totalDurationSec), 0) +
-            (a.canHandleSpecial
+      const workload = (entry: GameState['bays'][number]) =>
+        entry.queue.reduce((sum, ticket) => sum + (ticket.timeRemainingSec ?? ticket.totalDurationSec), 0);
+      let eligible = state.bays.filter((entry) => allowedBay(card, entry));
+      if (mode === 'full' && itemType(card.beanName)?.iced_brew && card.cupCount === 1 && !card.preferredBaristaId) {
+        const shortest = Math.min(...eligible.map(workload));
+        const seniors = eligible.filter((entry) => entry.canHandleSpecial && workload(entry) <= shortest + 60);
+        if (seniors.length) eligible = seniors;
+      }
+      const duration = (entry: GameState['bays'][number]) =>
+        (card.cupCount > 1 ? 360 : 300) * (entry.trainingBrewFactors?.[card.cupCount > 1 ? 'two' : 'one'] ?? 1);
+      const priority = (bay: GameState['bays'][number]) =>
+        mode === 'full'
+          ? workload(bay) + duration(bay)
+          : workload(bay) +
+            (bay.canHandleSpecial
               ? itemType(card.beanName)?.iced_brew && card.cupCount === 1
                 ? -60
                 : !seniorOnly(card.beanName)
                   ? 150
                   : 0
-              : 0) -
-            b.queue.reduce((sum, ticket) => sum + (ticket.timeRemainingSec ?? ticket.totalDurationSec), 0) -
-            (b.canHandleSpecial
-              ? itemType(card.beanName)?.iced_brew && card.cupCount === 1
-                ? -60
-                : !seniorOnly(card.beanName)
-                  ? 150
-                  : 0
-              : 0)
-        )[0];
+              : 0);
+      const bay = eligible.sort((a, b) => priority(a) - priority(b))[0];
       state = gameReducer(state, { type: 'assign', key: card.ticketUid ?? '', bayId: bay.id });
     }
     state = gameReducer(state, { type: 'tick', seconds: 1 });
@@ -636,7 +637,10 @@ test('every incident draw outcome still permits a competent operator to pass the
     assert.equal(choices.size, mode === 'middle' ? 2 : 4);
     for (const [draw, seed] of choices) {
       const state = runService(mode, seed);
-      assert.ok(scoreGame(state).score >= 80, `${mode} ${draw}: ${scoreGame(state).score}`);
+      assert.ok(
+        scoreGame(state).score >= 80,
+        `${mode} ${draw}: ${JSON.stringify({ score: scoreGame(state).score, quality: scoreGame(state).quality, total: scoreGame(state).total, ice: scoreGame(state).iceAllocation, notices: scoreGame(state).feedback })}`
+      );
       assert.ok(
         state.emergencies
           .filter((trial) => trial.willOccur)

@@ -55,7 +55,15 @@ test('all assigned orders finish the run with timeline predictions without waiti
   assert.ok(Object.values(state.cups).every((cup) => cup.completedSec === undefined));
   const result = scoreGame(state);
   assert.equal(result.rulesVersion, SCORING_VERSION);
-  assert.deepEqual(result.forecast, { endSec: 300, overtimeSec: 0, actualDone: 0, projectedDone: 2, targetSec: 1800 });
+  assert.deepEqual(result.forecast, {
+    endSec: Math.max(
+      ...state.bays.flatMap((bay) => bay.queue.map((ticket) => (ticket.startTimeSec ?? 0) + ticket.totalDurationSec))
+    ),
+    overtimeSec: 0,
+    actualDone: 0,
+    projectedDone: 2,
+    targetSec: 1800,
+  });
   assert.equal(result.score, 100);
   assert.deepEqual(replayRun(input(), 5, trace).result, result);
 });

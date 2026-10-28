@@ -531,7 +531,7 @@ export const BayPad: React.FC<{
             <button
               key={bayId}
               type="button"
-              disabled={disabled}
+              disabled={disabled || Boolean(lanes.find((lane) => lane.dripper === bayId)?.hotOnly && card.cups.some((cup) => cup.item.item_type.iced_brew))}
               data-bay-target={bayId}
               title={
                 !disabled && unsupported(bayId)
