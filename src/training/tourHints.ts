@@ -50,11 +50,11 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
     case 'overview':
       return [
         {
-          message: '「キュー」で担当別の待ち列を確認。',
+          message: '「待ち列」で、担当ごとに淹れる順番を確認できます。',
           queries: [view('c')],
         },
         {
-          message: '「タイムライン」で時間軸を確認。',
+          message: '「タイムライン」で、いつ淹れ終わるかを確認できます。',
           queries: [view('current')],
         },
         {
@@ -81,7 +81,8 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
           queries: [tab('未提供')],
         },
         {
-          message: mode === 'c' ? '「一覧」で全注文を確認。' : '「キュー」→「一覧」。',
+          message:
+            mode === 'c' ? '「一覧」で全注文を確認しましょう。' : '「待ち列」を押し、次に「一覧」を開きましょう。',
           queries: mode === 'c' ? [tab('一覧')] : [view('c')],
         },
         {

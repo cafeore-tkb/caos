@@ -1208,10 +1208,10 @@
     min-height: 56px;
   }
   .training-board > .caos-root {
-    min-width: 900px;
+    min-width: 0;
   }
   .training-board {
-    overflow-x: auto;
+    overflow-x: hidden;
   }
 }
 

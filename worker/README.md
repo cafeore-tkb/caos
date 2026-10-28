@@ -44,3 +44,6 @@ Grades are presentation metadata; the v2 scoring formula and existing records re
 Ranking rows and public `/profile?name=...` statistics contain current `assessment` metadata. `GET /runs/:id/grade` returns an owner's verified completed run's current assessment. The result screen saves a snapshot in browser history. Rankings may change as people join/improve. The grading policy identifier `95-and-top10-v1` prevents old OR-based snapshots from being interpreted as current grades; original scores and history remain intact.
 
 Full v3 evaluates queued work using the same timeline start and end times, without advancing the actual clock. The canonical replay automatically finishes once all orders are assigned and emergencies are handled; projected cups and revenue are explicitly marked as estimates. Actual short extractions and unassigned/unarrived cups cannot be repaired by forecasting.
+
+
+Rule v4 adds per-order score explanations and fixes merge/split cup preservation and remake registration timestamps. Deploy the Worker and UI from the same revision. Existing v3 results remain stored and are excluded from the v4 ranking cohort.
