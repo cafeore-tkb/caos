@@ -10,7 +10,7 @@ CaOSの`main`を更新すると、[Build and deploy Pages](../.github/workflows/
 
 公開先は[CaOS](https://cafeore-tkb.github.io/digital-master-sheet-pages/)。[Pagesの公開履歴](https://github.com/cafeore-tkb/digital-master-sheet-pages/deployments/github-pages)でも結果を確認できる。CaOS側のActionsの完了画面にも両方のリンクを表示する。
 
-PRでは検証とビルドだけを行う。公開用のキーとCloudflare認証は`main`の公開ジョブだけで使う。同じブランチに次の更新が入れば古い実行を止め、再実行した古いコミットからの公開も拒否する。
+PRでは検証とビルドだけを行う。公開用のトークンとCloudflare認証は`main`の公開ジョブだけで使う。同じブランチに次の更新が入れば古い実行を止め、再実行した古いコミットからの公開も拒否する。
 
 ## 認証
 
@@ -18,13 +18,15 @@ CaOSのActionsに次のシークレットを設定する。値はソースやロ
 
 | 名前 | 用途 |
 | --- | --- |
-| `PAGES_DEPLOY_KEY` | 公開用リポジトリに送る専用SSH秘密鍵 |
+| `PAGES_PUBLISH_TOKEN` | 公開用リポジトリに成果物を送る専用トークン |
 | `CLOUDFLARE_API_TOKEN` | 既存の採点APIを公開するCloudflareトークン |
 | `CLOUDFLARE_ACCOUNT_ID` | 採点APIのCloudflareアカウント |
 
-SSH公開鍵は、公開用リポジトリのDeploy keyとして書き込みを許可する。この鍵は`digital-master-sheet-pages`だけに使い、個人のGitHubトークンは保存しない。廃止するときは公開用リポジトリのDeploy keyとCaOS側の`PAGES_DEPLOY_KEY`を両方削除する。
+公開用リポジトリではDeploy keyが無効になっているため、専用のfine-grained personal access tokenを使う。作成時のResource ownerは`cafeore-tkb`、Repository accessは`digital-master-sheet-pages`だけ、Repository permissionsはContentsのRead and writeに限定する。ほかのリポジトリや管理権限は付けない。組織の承認が必要な場合は承認後に使う。
 
-GitHub標準の`GITHUB_TOKEN`は別リポジトリへの書き込みに使えないため、専用キーが必要になる。公開用リポジトリへのSSH pushが、そちらのPagesワークフローを起動する。
+この専用トークンを[CaOSのActionsシークレット](https://github.com/cafeore-tkb/CaOS/settings/secrets/actions)へ`PAGES_PUBLISH_TOKEN`という名前で登録する。普段のCLIログイン用トークンは流用しない。有効期限を付け、期限の前に更新する。廃止するときは専用トークンを失効させ、CaOS側のシークレットも削除する。
+
+GitHub標準の`GITHUB_TOKEN`は別リポジトリへの書き込みに使えないため、専用トークンが必要になる。このトークンによる公開用リポジトリへのpushが、そちらのPagesワークフローを起動する。
 
 ## 送るものと残すもの
 
