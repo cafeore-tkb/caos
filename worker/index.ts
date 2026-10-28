@@ -35,11 +35,11 @@ type Run = {
   rules_version: string;
   trace_hash: string | null;
 };
-async function gradeCohort(env: Env, mode: GameMode): Promise<GradeCohort> {
+async function gradeCohort(env: Env, mode: GameMode, rulesVersion = SCORING_VERSION): Promise<GradeCohort> {
   const groups = await env.DB.prepare(`SELECT score,COUNT(*) AS count FROM (
     SELECT MAX(score) AS score FROM runs WHERE mode=? AND rules_version=? AND completed_at IS NOT NULL AND participant_id IS NOT NULL GROUP BY participant_id
   ) GROUP BY score`)
-    .bind(mode, SCORING_VERSION)
+    .bind(mode, rulesVersion)
     .all<{ score: number; count: number }>();
   return groups.results;
 }
@@ -113,14 +113,19 @@ async function route(request: Request, env: Env) {
   if (path === '/profile' && request.method === 'GET') {
     const displayName = displayNameSchema.parse(url.searchParams.get('name'));
     const results =
-      await env.DB.prepare(`SELECT r.mode,MAX(r.score) AS best,MAX(r.business_score) AS business_best,COUNT(*) AS attempts,SUM(r.passed) AS passed
-      FROM runs r JOIN participants p ON p.id=r.participant_id WHERE p.display_name=? AND r.completed_at IS NOT NULL AND r.rules_version=? GROUP BY r.mode`)
-        .bind(displayName, SCORING_VERSION)
+      await env.DB.prepare(`SELECT r.mode,MAX(r.score) AS best,MAX(r.business_score) AS business_best,COUNT(*) AS attempts,SUM(r.passed) AS passed,
+      (SELECT b.rules_version FROM runs b WHERE b.participant_id=r.participant_id AND b.mode=r.mode AND b.completed_at IS NOT NULL ORDER BY b.score DESC,b.completed_at DESC,b.id LIMIT 1) AS bestRulesVersion,
+      (SELECT b.rules_version FROM runs b WHERE b.participant_id=r.participant_id AND b.mode=r.mode AND b.completed_at IS NOT NULL ORDER BY b.business_score DESC,b.completed_at DESC,b.id LIMIT 1) AS bestBusinessRulesVersion
+      FROM runs r JOIN participants p ON p.id=r.participant_id WHERE p.display_name=? AND r.completed_at IS NOT NULL GROUP BY r.mode`)
+        .bind(displayName)
         .all();
     const stats = await Promise.all(
       results.results.map(async (row) => ({
         ...row,
-        assessment: assessGrade(Number(row.best), await gradeCohort(env, row.mode as GameMode)),
+        assessment: assessGrade(
+          Number(row.best),
+          await gradeCohort(env, row.mode as GameMode, String(row.bestRulesVersion))
+        ),
       }))
     );
     return reply({ displayName, stats });
@@ -135,16 +140,48 @@ async function route(request: Request, env: Env) {
       .parse(url.searchParams.get('offset') ?? 0);
     const metric = z.enum(['master', 'business']).parse(url.searchParams.get('metric') ?? 'master');
     const column = metric === 'business' ? 'business_score' : 'score';
+    const stored =
+      await env.DB.prepare(`SELECT rules_version AS rulesVersion,COUNT(*) AS attempts,COUNT(DISTINCT participant_id) AS players
+      FROM runs WHERE mode=? AND completed_at IS NOT NULL AND participant_id IS NOT NULL GROUP BY rules_version`)
+        .bind(mode)
+        .all<{ rulesVersion: string; attempts: number; players: number }>();
+    const availableVersions = stored.results.slice();
+    if (!availableVersions.some((entry) => entry.rulesVersion === SCORING_VERSION))
+      availableVersions.push({ rulesVersion: SCORING_VERSION, attempts: 0, players: 0 });
+    availableVersions.sort((a, b) =>
+      a.rulesVersion === b.rulesVersion
+        ? 0
+        : a.rulesVersion === SCORING_VERSION
+          ? -1
+          : b.rulesVersion === SCORING_VERSION
+            ? 1
+            : b.rulesVersion.localeCompare(a.rulesVersion, undefined, { numeric: true })
+    );
+    const requestedVersion = url.searchParams.get('rulesVersion');
+    const rulesVersion =
+      requestedVersion === null
+        ? (availableVersions.find((entry) => entry.attempts > 0)?.rulesVersion ?? SCORING_VERSION)
+        : z
+            .string()
+            .regex(/^[A-Za-z0-9._-]{1,64}$/)
+            .parse(requestedVersion);
+
     const query = `WITH attempts AS (
-      SELECT r.*,p.display_name,COUNT(*) OVER(PARTITION BY r.participant_id) AS attempts,
-        ROW_NUMBER() OVER(PARTITION BY r.participant_id ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,r.id ASC) AS best
-      FROM runs r JOIN participants p ON p.id=r.participant_id WHERE mode=? AND rules_version=? AND completed_at IS NOT NULL
+      SELECT r.*,p.display_name,COUNT(*) OVER(PARTITION BY r.rules_version,r.participant_id) AS attempts,
+        ROW_NUMBER() OVER(PARTITION BY r.rules_version,r.participant_id ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,r.id ASC) AS best
+      FROM runs r JOIN participants p ON p.id=r.participant_id WHERE mode=? AND (?='all' OR rules_version=?) AND completed_at IS NOT NULL
     ), ranked AS (
-      SELECT participant_id AS player_id,display_name,score,business_score,revenue,done,total,quality,elapsed_sec,passed,completed_at,attempts,
-        RANK() OVER(ORDER BY ${column} DESC) AS rank FROM attempts WHERE best=1
-    ) SELECT * FROM ranked ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,player_id ASC LIMIT 100 OFFSET ?`;
-    const ranks = await env.DB.prepare(query).bind(mode, SCORING_VERSION, offset).all();
-    const cohort = await gradeCohort(env, mode);
+      SELECT rules_version AS rulesVersion,participant_id AS player_id,display_name,score,business_score,revenue,done,total,quality,elapsed_sec,passed,completed_at,attempts,
+        RANK() OVER(PARTITION BY rules_version ORDER BY ${column} DESC) AS rank FROM attempts WHERE best=1
+    ) SELECT * FROM ranked ORDER BY CASE WHEN rulesVersion=? THEN 0 ELSE 1 END,rulesVersion DESC,${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,player_id ASC LIMIT 100 OFFSET ?`;
+    const ranks = await env.DB.prepare(query).bind(mode, rulesVersion, rulesVersion, SCORING_VERSION, offset).all();
+    const cohorts = new Map(
+      await Promise.all(
+        (rulesVersion === 'all' ? availableVersions.map((entry) => entry.rulesVersion) : [rulesVersion]).map(
+          async (version) => [version, await gradeCohort(env, mode, version)] as const
+        )
+      )
+    );
     const name = url.searchParams.get('name');
     const viewer = name
       ? await env.DB.prepare('SELECT id FROM participants WHERE display_name=?')
@@ -154,9 +191,18 @@ async function route(request: Request, env: Env) {
     return reply({
       mode,
       metric,
-      rulesVersion: SCORING_VERSION,
-      players: ranks.results.map((row) => ({ ...row, assessment: assessGrade(Number(row.score), cohort) })),
-      totalPlayers: cohort.reduce((sum, group) => sum + group.count, 0),
+      rulesVersion,
+      currentRulesVersion: SCORING_VERSION,
+      availableVersions,
+      showingPreviousRules: requestedVersion === null && rulesVersion !== SCORING_VERSION,
+      players: ranks.results.map((row) => ({
+        ...row,
+        assessment: assessGrade(Number(row.score), cohorts.get(String(row.rulesVersion)) ?? []),
+      })),
+      totalPlayers: [...cohorts.values()].reduce(
+        (sum, cohort) => sum + cohort.reduce((count, group) => count + group.count, 0),
+        0
+      ),
       viewerId: viewer?.id ?? '',
       offset,
     });
@@ -170,14 +216,17 @@ async function route(request: Request, env: Env) {
   }
   if (path === '/me' && request.method === 'GET') {
     const results = await env.DB.prepare(
-      'SELECT mode,MAX(score) AS best,MAX(business_score) AS business_best,COUNT(*) AS attempts,SUM(passed) AS passed FROM runs WHERE player_id=? AND completed_at IS NOT NULL AND rules_version=? GROUP BY mode'
+      `SELECT r.mode,MAX(r.score) AS best,MAX(r.business_score) AS business_best,COUNT(*) AS attempts,SUM(r.passed) AS passed, (SELECT b.rules_version FROM runs b WHERE b.player_id=r.player_id AND b.mode=r.mode AND b.completed_at IS NOT NULL ORDER BY b.score DESC,b.completed_at DESC,b.id LIMIT 1) AS bestRulesVersion FROM runs r WHERE r.player_id=? AND r.completed_at IS NOT NULL GROUP BY r.mode`
     )
-      .bind(player.id, SCORING_VERSION)
+      .bind(player.id)
       .all();
     const stats = await Promise.all(
       results.results.map(async (row) => ({
         ...row,
-        assessment: assessGrade(Number(row.best), await gradeCohort(env, row.mode as GameMode)),
+        assessment: assessGrade(
+          Number(row.best),
+          await gradeCohort(env, row.mode as GameMode, String(row.bestRulesVersion))
+        ),
       }))
     );
     return reply({ player: { id: player.id }, stats });
@@ -198,12 +247,12 @@ async function route(request: Request, env: Env) {
   const gradeRun = path.match(/^\/runs\/([a-f0-9-]{36})\/grade$/);
   if (gradeRun && request.method === 'GET') {
     const run = await env.DB.prepare(
-      'SELECT mode,score FROM runs WHERE id=? AND player_id=? AND rules_version=? AND completed_at IS NOT NULL'
+      'SELECT mode,score,rules_version FROM runs WHERE id=? AND player_id=? AND completed_at IS NOT NULL'
     )
-      .bind(gradeRun[1], player.id, SCORING_VERSION)
-      .first<{ mode: GameMode; score: number }>();
+      .bind(gradeRun[1], player.id)
+      .first<{ mode: GameMode; score: number; rules_version: string }>();
     if (!run) throw new ApiError(404, '採点済みのゲームが見つかりません');
-    return reply({ assessment: assessGrade(run.score, await gradeCohort(env, run.mode)) });
+    return reply({ assessment: assessGrade(run.score, await gradeCohort(env, run.mode, run.rules_version)) });
   }
   const submit = path.match(/^\/runs\/([a-f0-9-]{36})\/submit$/);
   if (submit && request.method === 'POST') {

@@ -45,7 +45,7 @@ import {
   readSession,
   storeDisplayName,
 } from './rankingClient';
-import { appendReplay, SCORING_VERSION } from './replay';
+import { appendReplay } from './replay';
 import { type PublicationStatus, ScorePublisher } from './ScorePublisher';
 import { ScoreReview } from './ScoreReview';
 import { ScoreRules } from './ScoreRules';
@@ -367,9 +367,7 @@ export default function TrainingApp() {
         <div className="training-mode-grid" role="group" aria-label="ゲームモード">
           {(Object.keys(MODES) as GameMode[]).map((key, index) => {
             const config = MODES[key];
-            const attempts = history.filter(
-              (entry) => entry.mode === key && entry.detail?.result.rulesVersion === SCORING_VERSION
-            );
+            const attempts = history.filter((entry) => entry.mode === key);
             const best = Math.max(0, ...attempts.map((entry) => entry.score));
             return (
               <button
@@ -395,7 +393,7 @@ export default function TrainingApp() {
                 <span className="training-mode-meta">
                   営業 {config.durationSec / 60}分 · {config.count}件 · 標準{config.defaultSpeed}倍速
                 </span>
-                <small>{attempts.length > 0 ? `自己ベスト ${best}点` : '未挑戦'}</small>
+                <small>{attempts.length > 0 ? `これまでの最高 ${best}点 / ${attempts.length}回` : '未挑戦'}</small>
               </button>
             );
           })}

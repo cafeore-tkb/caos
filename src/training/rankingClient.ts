@@ -13,6 +13,7 @@ export interface RankedRun {
   rulesVersion: string;
 }
 export interface Rank {
+  rulesVersion?: string;
   player_id: string;
   display_name: string;
   score: number;
@@ -34,6 +35,9 @@ export interface Ranking {
   totalPlayers: number;
   offset: number;
   rulesVersion: string;
+  currentRulesVersion?: string;
+  availableVersions?: { rulesVersion: string; attempts: number; players: number }[];
+  showingPreviousRules?: boolean;
 }
 const AUTH_KEY = 'caos-ranking-login-v1';
 const PENDING_KEY = 'caos-ranking-pending-v2';

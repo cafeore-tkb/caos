@@ -24,6 +24,7 @@ jobs:
       - run: npm install
       - run: npm run lint
       - run: npm run test:training
+      - run: npm run test:archive
       - name: Build for the canonical Pages path
         run: npm run build
         env:
