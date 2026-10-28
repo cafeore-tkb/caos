@@ -3,12 +3,12 @@
 CaOSの`main`を更新すると、[Build and deploy Pages](../.github/workflows/deploy-pages.yml)が次の順で公開する。
 
 1. 型・スタイル・練習のテスト・公開処理のテストを確認する。
-2. `/digital-master-sheet-pages/`向けにビルドし、ソースのコミットと採点ルールを`release.json`へ記録する。
+2. `/caos-game/`向けにビルドし、ソースのコミットと採点ルールを`release.json`へ記録する。
 3. 同じソースから採点APIをCloudflare Workersへ公開し、`/health`の採点ルールを照合する。
-4. 検証したビルド成果物だけを、`cafeore-tkb/digital-master-sheet-pages`の`main`にある`site/`へ送る。
+4. 検証したビルド成果物だけを、`cafeore-tkb/caos-game`の`main`にある`site/`へ送る。
 5. 公開用リポジトリのPagesワークフローが自動で動く。配信中の`release.json`が更新したコミットと一致するまで確認する。
 
-公開先は[CaOS](https://cafeore-tkb.github.io/digital-master-sheet-pages/)。[Pagesの公開履歴](https://github.com/cafeore-tkb/digital-master-sheet-pages/deployments/github-pages)でも結果を確認できる。CaOS側のActionsの完了画面にも両方のリンクを表示する。
+公開先は[CaOS](https://cafeore-tkb.github.io/caos-game/)。[Pagesの公開履歴](https://github.com/cafeore-tkb/caos-game/deployments/github-pages)でも結果を確認できる。CaOS側のActionsの完了画面にも両方のリンクを表示する。
 
 PRでは検証とビルドだけを行う。公開用のトークンとCloudflare認証は`main`の公開ジョブだけで使う。同じブランチに次の更新が入れば古い実行を止め、再実行した古いコミットからの公開も拒否する。
 
@@ -22,7 +22,7 @@ CaOSのActionsに次のシークレットを設定する。値はソースやロ
 | `CLOUDFLARE_API_TOKEN` | 既存の採点APIを公開するCloudflareトークン |
 | `CLOUDFLARE_ACCOUNT_ID` | 採点APIのCloudflareアカウント |
 
-公開用リポジトリではDeploy keyが無効になっているため、専用のfine-grained personal access tokenを使う。作成時のResource ownerは`cafeore-tkb`、Repository accessは`digital-master-sheet-pages`だけ、Repository permissionsはContentsのRead and writeに限定する。ほかのリポジトリや管理権限は付けない。組織の承認が必要な場合は承認後に使う。
+公開用リポジトリではDeploy keyが無効になっているため、専用のfine-grained personal access tokenを使う。作成時のResource ownerは`cafeore-tkb`、Repository accessは`caos-game`だけ、Repository permissionsはContentsのRead and writeに限定する。ほかのリポジトリや管理権限は付けない。組織の承認が必要な場合は承認後に使う。
 
 この専用トークンを[CaOSのActionsシークレット](https://github.com/cafeore-tkb/CaOS/settings/secrets/actions)へ`PAGES_PUBLISH_TOKEN`という名前で登録する。普段のCLIログイン用トークンは流用しない。有効期限を付け、期限の前に更新する。廃止するときは専用トークンを失効させ、CaOS側のシークレットも削除する。
 

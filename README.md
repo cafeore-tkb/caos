@@ -32,7 +32,7 @@ A・CのUIは `cafeore-pos/main` の `173c9f18b71a4435fd967916378ed4df06efdbc4`�
 
 ## プレビュー
 
-[CaOSをGitHub Pagesで開く](https://cafeore-tkb.github.io/digital-master-sheet-pages/)
+[CaOSをGitHub Pagesで開く](https://cafeore-tkb.github.io/caos-game/)
 
 `main` を更新すると、検証・ビルドの後に採点APIとGitHub Pagesを自動で公開します。[公開の流れと設定](./docs/DEPLOYMENT.md)を参照してください。
 
@@ -83,7 +83,7 @@ A・CのUIは `cafeore-pos/main` の `173c9f18b71a4435fd967916378ed4df06efdbc4`�
 
 - ソースと実績データはPrivateの `cafeore-tkb/CaOS` で管理します。
 - Private側のActionsは、PRで検証だけを実行し、`main` 更新時は検証した成果物を自動で公開します。
-- 採点APIを同じ版へ更新してから、ビルド成果物だけをPublicの `cafeore-tkb/digital-master-sheet-pages` の `site/` へ送ります。公開側のPagesワークフローが更新し、配信された版まで確認します。
+- 採点APIを同じ版へ更新してから、ビルド成果物だけをPublicの `cafeore-tkb/caos-game` の `site/` へ送ります。公開側のPagesワークフローが更新し、配信された版まで確認します。
 - `npm run publish:pages` は手動で再公開するときに使えます。通常は実行不要です。
 - `main` の成果物を `site/` 直下に配置します。
 - 実注文の生JSONは公開せず、実績データは遅延読込JavaScriptへ内包します。架空のトレーニング注文JSONはダウンロード用に公開します。
@@ -111,7 +111,7 @@ npm run lint
 npm run build
 ```
 
-本番ビルドは `dist/` に生成され、公開時のベースパスは `/digital-master-sheet-pages/` です。
+本番ビルドは `dist/` に生成され、公開時のベースパスは `/caos-game/` です。
 
 ### 操作チュートリアルと振り返り
 
