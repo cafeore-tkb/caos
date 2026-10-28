@@ -17,7 +17,8 @@
     "worker:dev": "wrangler dev --config worker/wrangler.jsonc --local --port 8787 --var ALLOWED_ORIGINS:http://localhost:3041",
     "worker:deploy": "wrangler deploy --config worker/wrangler.jsonc",
     "worker:migrate": "wrangler d1 migrations apply DB --config worker/wrangler.jsonc --remote",
-    "worker:test": "node --import tsx --test worker/*.test.ts"
+    "worker:test": "node --import tsx --test worker/*.test.ts",
+    "test:archive": "node --import tsx --test worker/archive.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

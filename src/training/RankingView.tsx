@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { type GameMode, MODES } from './engine';
 import { GradeBadge } from './GradeBadge';
 import type { GradeAssessment } from './grades';
@@ -16,6 +16,7 @@ export function RankingView({
 }) {
   const [mode, setMode] = useState<GameMode>('fast');
   const [offset, setOffset] = useState(0);
+  const [version, setVersion] = useState('all');
   const [metric, setMetric] = useState<'master' | 'business'>('master');
   const [lastName] = useState(readDisplayName);
   const [error, setError] = useState('');
@@ -30,6 +31,8 @@ export function RankingView({
       attempts: number;
       passed: number;
       assessment: GradeAssessment;
+      bestRulesVersion?: string;
+      bestBusinessRulesVersion?: string;
     }[]
   >([]);
   const requestId = useRef(0);
@@ -40,7 +43,7 @@ export function RankingView({
     try {
       const [r, profile] = await Promise.all([
         rankingApi<Ranking>(
-          `/rankings?mode=${mode}&metric=${metric}&offset=${offset}${lastName ? `&name=${encodeURIComponent(lastName)}` : ''}`,
+          `/rankings?mode=${mode}&metric=${metric}&offset=${offset}${version === 'auto' ? '' : `&rulesVersion=${encodeURIComponent(version)}`}${lastName ? `&name=${encodeURIComponent(lastName)}` : ''}`,
           null
         ),
         lastName
@@ -55,7 +58,7 @@ export function RankingView({
     } finally {
       if (current === requestId.current) setLoading(false);
     }
-  }, [mode, metric, offset, lastName]);
+  }, [mode, metric, offset, lastName, version]);
   useEffect(() => {
     void refresh();
     const timer = window.setInterval(() => {
@@ -97,9 +100,11 @@ export function RankingView({
             </button>
           ))}
         </div>
+        <p className="ranking-record-scope">これまでの自己記録（すべての採点条件）</p>
         <div className="ranking-stats">
           {(Object.keys(MODES) as GameMode[]).map((key) => {
             const s = stats.find((v) => v.mode === key);
+            const bestVersion = metric === 'master' ? s?.bestRulesVersion : s?.bestBusinessRulesVersion;
             return (
               <button
                 key={key}
@@ -107,6 +112,7 @@ export function RankingView({
                 aria-pressed={mode === key}
                 onClick={() => {
                   setMode(key);
+                  setVersion('all');
                   setOffset(0);
                   setRanking(null);
                 }}
@@ -116,6 +122,11 @@ export function RankingView({
                   {metric === 'master' ? (s?.best ?? '—') : (s?.business_best?.toLocaleString() ?? '—')}
                   <small>{metric === 'master' ? '点' : 'pt'}</small>
                 </strong>
+                {s && bestVersion && (
+                  <small>
+                    {bestVersion === ranking?.currentRulesVersion ? '現在の条件の記録' : '以前の条件の記録'}
+                  </small>
+                )}
                 <small>
                   {s && metric === 'master' && <GradeBadge score={s.best} assessment={s.assessment} />}{' '}
                   {s?.attempts ?? 0}回 / 運営目安クリア{s?.passed ?? 0}回
@@ -124,10 +135,46 @@ export function RankingView({
             );
           })}
         </div>
+        <div className="ranking-version-picker">
+          <label>
+            ランキングの採点条件
+            <select
+              aria-label="ランキングの採点条件"
+              value={version}
+              onChange={(event) => {
+                setVersion(event.target.value);
+                setOffset(0);
+              }}
+            >
+              <option value="all">すべての記録（条件別の順位）</option>
+              {(ranking?.availableVersions ?? []).map((entry) => (
+                <option key={entry.rulesVersion} value={entry.rulesVersion}>
+                  {entry.rulesVersion === ranking?.currentRulesVersion
+                    ? '現在の条件'
+                    : `以前の条件（${entry.rulesVersion.split('-').at(-1)}）`}{' '}
+                  · {entry.players}人 / {entry.attempts}回
+                </option>
+              ))}
+            </select>
+          </label>
+          <p>過去の記録も残しています。条件を切り替えて確認できます。 条件の違う記録は、順位を分けて表示します。</p>
+        </div>
         <section className="ranking-board training-panel">
           <div className="ranking-board-heading">
-            <h2>{MODES[mode].label}</h2>
-            <span>{ranking?.totalPlayers ?? 0}人</span>
+            <h2>
+              {MODES[mode].label}{' '}
+              <small>
+                {version === 'all'
+                  ? 'すべての記録'
+                  : ranking?.rulesVersion === ranking?.currentRulesVersion
+                    ? '現在の条件'
+                    : '以前の条件'}
+              </small>
+            </h2>
+            <span>
+              {ranking?.totalPlayers ?? 0}
+              {version === 'all' ? '件（条件ごとに自己ベスト）' : '人'}
+            </span>
             <button type="button" disabled={loading} onClick={() => void refresh()}>
               {loading ? '更新中…' : '更新'}
             </button>
@@ -145,34 +192,48 @@ export function RankingView({
                 </tr>
               </thead>
               <tbody>
-                {ranking?.players.map((row) => (
-                  <tr key={row.player_id} data-self={row.display_name === lastName}>
-                    <td>{row.rank}</td>
-                    <td>
-                      <strong>{row.display_name}</strong>
-                      {row.display_name === lastName && <small>前回の表示名</small>}
-                    </td>
-                    <td>
-                      <b>{row.score}</b>
-                      <GradeBadge score={row.score} assessment={row.assessment} />
-                      <small>{row.passed ? '運営目安クリア' : '運営目安は80点'}</small>
-                    </td>
-                    <td>
-                      <b>
-                        {row.business_score.toLocaleString()}
-                        <small>pt</small>
-                      </b>
-                      <small>売上 ¥{row.revenue.toLocaleString()}</small>
-                    </td>
-                    <td>
-                      {row.done}/{row.total}杯
-                    </td>
-                    <td>{row.attempts}回</td>
-                  </tr>
+                {ranking?.players.map((row, index) => (
+                  <Fragment key={`${row.rulesVersion ?? ranking.rulesVersion}-${row.player_id}`}>
+                    {version === 'all' &&
+                      (index === 0 || ranking.players[index - 1].rulesVersion !== row.rulesVersion) && (
+                        <tr className="ranking-condition-row">
+                          <td colSpan={6}>
+                            {row.rulesVersion === ranking.currentRulesVersion
+                              ? '現在の採点条件'
+                              : `以前の採点条件（${row.rulesVersion?.split('-').at(-1)}）`}
+                          </td>
+                        </tr>
+                      )}
+                    <tr data-self={row.display_name === lastName}>
+                      <td>{row.rank}</td>
+                      <td>
+                        <strong>{row.display_name}</strong>
+                        {row.display_name === lastName && <small>前回の表示名</small>}
+                      </td>
+                      <td>
+                        <b>{row.score}</b>
+                        <GradeBadge score={row.score} assessment={row.assessment} />
+                        <small>{row.passed ? '運営目安クリア' : '運営目安は80点'}</small>
+                      </td>
+                      <td>
+                        <b>
+                          {row.business_score.toLocaleString()}
+                          <small>pt</small>
+                        </b>
+                        <small>売上 ¥{row.revenue.toLocaleString()}</small>
+                      </td>
+                      <td>
+                        {row.done}/{row.total}杯
+                      </td>
+                      <td>{row.attempts}回</td>
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
-            {!loading && ranking?.players.length === 0 && <p>まだ記録がありません。最初の挑戦をどうぞ。</p>}
+            {!loading && ranking?.players.length === 0 && (
+              <p>この条件の記録はまだありません。「すべての記録」で過去の挑戦も確認できます。</p>
+            )}
           </div>
           {(ranking?.totalPlayers ?? 0) > 100 && (
             <div className="ranking-pagination">
@@ -184,7 +245,8 @@ export function RankingView({
                 前へ
               </button>
               <span>
-                {offset + 1}〜{Math.min(offset + 100, ranking?.totalPlayers ?? 0)}位
+                {offset + 1}〜{Math.min(offset + 100, ranking?.totalPlayers ?? 0)}
+                {version === 'all' ? '件目' : '位'}
               </span>
               <button
                 type="button"

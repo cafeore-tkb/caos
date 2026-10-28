@@ -52,3 +52,5 @@ Rule v4 adds per-order score explanations and fixes merge/split cup preservation
 Rule v5 adds the fixed butchi and shawn recreated scenarios with a seven-minute queue lead. Apply migration 0004 before deploying this Worker; it extends the mode constraint while preserving all old runs. The original full-day actual dataset is not included.
 
 Rule v6 derives advanced-mode staff abilities and separate single/double brew factors from the run seed. Fixed recreated orders keep their sequence. The same seed drives client timing and server replay, and old-rule results remain stored separately.
+
+Historical rankings remain available across scoring-version upgrades. `/rankings?mode=full&rulesVersion=all` returns separate bests and ranks per participant and scoring version; `rulesVersion=<version>` filters one version. The UI defaults to all versions. An unspecified version retains current-version behavior when populated and falls back to a populated earlier version otherwise. Public profiles and local best summaries retain all completed attempts. Existing scores and traces are never rewritten during this display upgrade.
