@@ -46,6 +46,7 @@ import {
 } from './rankingClient';
 import { appendReplay, SCORING_VERSION } from './replay';
 import { type PublicationStatus, ScorePublisher } from './ScorePublisher';
+import { ScoreReview } from './ScoreReview';
 import { ScoreRules } from './ScoreRules';
 import { SHIFT_FEED, SHIFT_NEXT, SHIFT_ORIGIN_MS, shiftClock, shiftReminder } from './shifts';
 import './training.css';
@@ -498,20 +499,20 @@ export default function TrainingApp() {
           <section className="training-panel">
             <h2>
               <Trophy size={18} />
-              80点の基準
+              80点を目指すには
             </h2>
             <p>
               {mode === 'full'
-                ? '割当35・完了予測25・抽出時間20・同時10・アイス配分10。'
-                : '完了35・速さ25・品質20・同時10・アイス配分10。'}
+                ? '担当を決めた杯数35点、完了見込みの速さ25点、抽出時間20点、同じ注文の仕上がり10点、アイスの担当選び10点。'
+                : '仕上げた杯数35点、8分以内の準備25点、抽出時間20点、同じ注文の仕上がり10点、アイスの担当選び10点。'}
             </p>
             <p className="training-criteria">
-              完了90%以上・品質95%以上・違反なし・緊急完了。アイス1杯は余裕のある上級生へ。
+              9割以上のカップを仕上げ、そのうち95%以上で抽出時間を守りましょう。指名と限定豆の条件を守り、緊急の淹れ直しも終えます。
             </p>
             <p>
               {mode === 'full'
-                ? '開始時8件。全割当・緊急手配後に、完了予測で自動採点。営業30分・延長なし。'
-                : '未到着も採点対象。総合練習はフル。'}
+                ? 'フルは最初に8件届きます。全注文の担当と緊急の淹れ直しを手配すると、タイムラインの完了見込みで自動採点します。ゲーム内の営業は30分です。'
+                : 'これから届く注文も採点に含みます。時間を最後まで使い、全注文を仕上げましょう。'}
             </p>
             <ScoreRules />
             <p>
@@ -620,6 +621,7 @@ function GameSession({
   const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(
     null
   );
+  const [followingNow, setFollowingNow] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [detailKey, setDetailKey] = useState<string | null>(null);
@@ -743,7 +745,7 @@ function GameSession({
             ) : (
               <>
                 経過 {clock(state.nowSec)} / {clock(scenario.durationSec)} · 完了 {result.done}/{result.total}杯 ·
-                品質OK {result.quality}杯
+                抽出時間を守ったカップ {result.quality}杯
               </>
             )}
           </p>
@@ -756,7 +758,11 @@ function GameSession({
             </p>
           )}
           <div className="training-result-body" aria-label="採点の詳細">
-            {result.forecast && <p>割当時点の予測で採点。未完了分の売上・品質・淹れ直しは見込みです。</p>}
+            {result.forecast && (
+              <p>
+                担当を決めた時点の完了見込みで採点しています。まだ終わっていないカップの売上と抽出時間、淹れ直しの結果も見込みです。
+              </p>
+            )}
             {onPublish && <ScorePublisher name={playerName} publication={publication} onRetry={onPublish} />}
             <div className="training-result-grid">
               {result.categories.map((category) => (
@@ -770,8 +776,9 @@ function GameSession({
                 </section>
               ))}
             </div>
-            <section className="training-panel">
-              <h2>次の課題</h2>
+            <ScoreReview review={result.review} />
+            <details className="training-panel">
+              <summary>練習の目標</summary>
               <ul>
                 {result.feedback.map((line) => (
                   <li key={line}>{line}</li>
@@ -782,9 +789,9 @@ function GameSession({
                   条件違反 {state.violations}回：−{result.penalties}点
                 </p>
               )}
-              {!result.ready && <p>必須条件が未達のため、上限79点。</p>}
+              {!result.ready && <p>80点以上に必要な条件が残っているため、今回は79点が上限です。</p>}
               <p>総合確認はフルで80点を目指す。</p>
-            </section>
+            </details>
             <details className="training-panel">
               <summary>操作の記録（{state.events.length}件）</summary>
               <ol className="training-event-log">
@@ -862,9 +869,10 @@ function GameSession({
           <button
             type="button"
             className="training-now"
+            aria-pressed={followingNow}
             onClick={() => setTimelineCommand({ direction: 'now', id: performance.now() })}
           >
-            現在
+            {followingNow ? '現在を表示中' : '現在に戻る'}
           </button>
         )}
         <h1 className="training-session-label">
@@ -1062,6 +1070,7 @@ function GameSession({
             .sort((a, b) => a.seconds - b.seconds)
             .slice(0, 3)}
           timelineCommand={timelineCommand}
+          onFollowNowChange={setFollowingNow}
           onCloseTicketAction={() => setDetailKey(null)}
           baristas={state.bays}
           unassignedOrders={state.unassigned}

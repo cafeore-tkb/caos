@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { type GameMode, MODES } from './engine';
 import { GradeBadge } from './GradeBadge';
 import type { ResultEntry } from './history';
+import { ScoreReview } from './ScoreReview';
 
 export function HistoryView({
   entries,
@@ -128,6 +129,7 @@ export function HistoryView({
                         ))}
                       </ul>
                     </details>
+                    {detail.result.review && <ScoreReview key={entry.id} review={detail.result.review} />}
                     <details>
                       <summary>操作の記録（{detail.events.length}件）</summary>
                       <ol className="training-event-log">

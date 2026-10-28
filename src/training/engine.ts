@@ -1,9 +1,10 @@
 import { type CaosPlace, caosBrewSec } from '../current-caos/common';
 import type { Barista, OrderTicket, UnassignedOrder } from '../types';
 import { insertTicket, mergeBoardCards } from '../utils/orderQueue';
+import { buildScoreReview } from './feedback';
 import { itemAbbr, itemCode, itemPrice, itemType, masterItem, needsBrew, seniorOnly } from './master';
 
-export const SCORING_VERSION = '2026-10-v3';
+export const SCORING_VERSION = '2026-10-v4';
 export type GameMode = 'fast' | 'middle' | 'full';
 export const MODES = {
   fast: {
@@ -12,7 +13,7 @@ export const MODES = {
     count: 6,
     defaultSpeed: 2,
     emergencyChances: 0,
-    description: '少量の注文で基本操作。',
+    description: '少ない注文で、担当の決め方と抽出の完了を練習します。',
     target: '基本操作',
   },
   middle: {
@@ -21,8 +22,8 @@ export const MODES = {
     count: 12,
     defaultSpeed: 3,
     emergencyChances: 1,
-    description: '指名・限定豆を並行して対応。',
-    target: '並行判断',
+    description: '指名と限定豆の条件を見ながら、複数の注文を進めます。',
+    target: '複数の注文への対応',
   },
   full: {
     label: 'フル',
@@ -30,7 +31,7 @@ export const MODES = {
     count: 44,
     defaultSpeed: 4,
     emergencyChances: 2,
-    description: '混雑・緊急対応まで総合練習。',
+    description: '混雑した店で、注文の振り分けと緊急の淹れ直しを練習します。',
     target: '店舗運営',
   },
 } as const;
@@ -56,18 +57,23 @@ export interface CupResult {
   arrivedSec: number;
   nominee?: number;
   completedSec?: number;
+  startedSec?: number;
+  requiredBrewSec?: number;
   brewRatio?: number;
   joinedAtSec?: number;
   completedBayId?: number;
   completedBatch?: string;
   mergedWith?: string;
-  iceDecision?: { opportunity: boolean; senior: boolean };
+  iceDecision?: { opportunity: boolean; senior: boolean; atSec?: number; bayId?: number };
 }
 export interface GameEvent {
   id: number;
   atSec: number;
   kind: string;
   message: string;
+  cupIds?: string[];
+  orderIds?: number[];
+  bayId?: number;
 }
 export interface EmergencyTrial {
   id: number;
@@ -332,14 +338,25 @@ function schedule(bay: Barista, nowSec: number, startFirst = false): Barista {
   });
   return { ...bay, queue, status: queue.some((ticket) => ticket.status === 'brewing') ? 'brewing' : 'standby' };
 }
-const toUnassigned = (ticket: OrderTicket | UnassignedOrder): UnassignedOrder => ({
-  ...ticket,
-  badgeTag: `${ticket.cupCount}杯`,
-  predictedTimeStr: `${'totalDurationSec' in ticket ? ticket.totalDurationSec : brewDuration(ticket.beanName, ticket.cupCount)}秒`,
-  recommendedBaristas: '条件に合う担当者',
-  recommendedBayIds: ticket.preferredBaristaId ? [ticket.preferredBaristaId] : [1, 2, 3, 4, 5, 6],
-  cardColor: 'blue',
-});
+const toUnassigned = (ticket: OrderTicket | UnassignedOrder): UnassignedOrder => {
+  const {
+    status: _status,
+    startTimeSec: _start,
+    endTimeSec: _end,
+    completedAtSec: _completed,
+    timeRemainingSec: _remaining,
+    totalDurationSec: _duration,
+    ...card
+  } = ticket as OrderTicket;
+  return {
+    ...card,
+    badgeTag: `${ticket.cupCount}杯`,
+    predictedTimeStr: `${'totalDurationSec' in ticket ? ticket.totalDurationSec : brewDuration(ticket.beanName, ticket.cupCount)}秒`,
+    recommendedBaristas: '条件に合う担当者',
+    recommendedBayIds: ticket.preferredBaristaId ? [ticket.preferredBaristaId] : [1, 2, 3, 4, 5, 6],
+    cardColor: 'blue',
+  };
+};
 
 function advanceEmergencies(state: GameState, previousSec: number): GameState {
   const due = state.emergencies
@@ -374,6 +391,12 @@ function advanceEmergencies(state: GameState, previousSec: number): GameState {
       `${ticket.id} 緊急淹れ直しが必要です。カップを選んで手配してください`
     );
     next.events[next.events.length - 1] = { ...next.events[next.events.length - 1], atSec };
+    if (trial.cupId)
+      next.events[next.events.length - 1] = {
+        ...next.events[next.events.length - 1],
+        cupIds: [trial.cupId],
+        orderIds: [state.cups[trial.cupId].orderId],
+      };
   }
   return next;
 }
@@ -383,7 +406,36 @@ const pendingFor = (state: GameState, ticket: OrderTicket | UnassignedOrder) =>
   );
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
-  const next = reduceGame(state, action);
+  let next = reduceGame(state, action);
+  // Keep the identity of the cups involved even after moving, merging or discarding a card.
+  if (next.events.length > state.events.length && action.type !== 'tick') {
+    const cards = [...state.unassigned, ...state.bays.flatMap((bay) => [...bay.queue, ...(bay.pastTickets ?? [])])];
+    const keys = action.type === 'merge' ? [action.first, action.second] : 'key' in action ? [action.key] : [];
+    const affected = cards.filter((card) => keys.includes(keyOf(card)));
+    if (action.type === 'complete' || action.type === 'start' || action.type === 'unstart') {
+      const first = state.bays.find((bay) => bay.id === action.bayId)?.queue[0];
+      if (first) affected.push(first);
+    }
+    const cupIds = [
+      ...new Set(
+        'cupIds' in action && action.cupIds ? action.cupIds : affected.flatMap((card) => card.trainingCupIds ?? [])
+      ),
+    ];
+    const orderIds = [...new Set(cupIds.flatMap((id) => (state.cups[id] ? [state.cups[id].orderId] : [])))];
+    next = {
+      ...next,
+      events: next.events.map((event, index) =>
+        index < state.events.length
+          ? event
+          : {
+              ...event,
+              cupIds,
+              orderIds,
+              ...('bayId' in action && action.bayId !== null ? { bayId: action.bayId } : {}),
+            }
+      ),
+    };
+  }
   if (
     next !== state &&
     next.status === 'active' &&
@@ -646,7 +698,14 @@ function reduceGame(state: GameState, action: GameAction): GameState {
     if (ids.length !== action.cupCount) return state;
     const cups = { ...state.cups };
     for (const id of ids)
-      cups[id] = { ...cups[id], completedSec: undefined, brewRatio: undefined, joinedAtSec: undefined };
+      cups[id] = {
+        ...cups[id],
+        completedSec: undefined,
+        startedSec: undefined,
+        requiredBrewSec: undefined,
+        brewRatio: undefined,
+        joinedAtSec: undefined,
+      };
     const remake: UnassignedOrder = {
       ...toUnassigned(source),
       ticketUid: `rebrew-${source.ticketUid}-${state.events.length}`,
@@ -755,22 +814,27 @@ function reduceGame(state: GameState, action: GameAction): GameState {
     );
   }
   if (action.type === 'split') {
+    const unassigned = state.unassigned.find((entry) => keyOf(entry) === action.key);
     const card =
-      state.unassigned.find((entry) => keyOf(entry) === action.key) ??
+      unassigned ??
       state.bays
         .flatMap((bay) => bay.queue)
         .find((entry) => keyOf(entry) === action.key && entry.status === 'scheduled');
     if (card?.cupCount !== 2 || !card.trainingCupIds?.includes(action.cupId)) return state;
     const parts = card.trainingCupIds.map((id) => ({
-      ...toUnassigned(card as OrderTicket),
+      ...toUnassigned(card),
       id: `#${String(state.cups[id].orderId).padStart(3, '0')}`,
-      ticketUid: `split-${id}`,
+      ticketUid: `split-${state.events.length}-${id}`,
       sourceOrderIds: undefined,
       cupCount: 1,
       trainingCupIds: [id],
       sourceCups: card.sourceCups?.filter((cup) => cup.id === id),
+      preferredBaristaId: state.cups[id].nominee,
+      orderedAtSec: card.isRebrew ? card.orderedAtSec : state.cups[id].arrivedSec,
       badgeTag: '1杯',
     }));
+    const retainedPart = parts.find((part) => !part.trainingCupIds.includes(action.cupId));
+    if (!retainedPart) return state;
     return withEvent(
       {
         ...state,
@@ -782,10 +846,9 @@ function reduceGame(state: GameState, action: GameAction): GameState {
                 entry !== card
                   ? entry
                   : {
-                      ...entry,
-                      cupCount: 1,
-                      trainingCupIds: entry.trainingCupIds?.filter((id) => id !== action.cupId),
-                      sourceCups: entry.sourceCups?.filter((cup) => cup.id !== action.cupId),
+                      ...retainedPart,
+                      ticketUid: entry.ticketUid,
+                      status: 'scheduled' as const,
                       totalDurationSec: brewDuration(entry.beanName, 1),
                     }
               ),
@@ -795,7 +858,7 @@ function reduceGame(state: GameState, action: GameAction): GameState {
         ),
         unassigned: [
           ...state.unassigned.filter((entry) => entry !== card),
-          ...('status' in card ? parts.filter((part) => part.trainingCupIds.includes(action.cupId)) : parts),
+          ...(unassigned ? parts : parts.filter((part) => part.trainingCupIds.includes(action.cupId))),
         ],
       },
       'split',
@@ -879,6 +942,8 @@ function reduceGame(state: GameState, action: GameAction): GameState {
       cups[id] = {
         ...cups[id],
         completedSec: state.nowSec,
+        startedSec: Math.max(ticket.startTimeSec ?? state.nowSec, cups[id].joinedAtSec ?? 0),
+        requiredBrewSec: ticket.totalDurationSec,
         completedBayId: bay.id,
         completedBatch: `${bay.id}:${state.nowSec}:${[...(ticket.trainingCupIds ?? [])].sort().join(',')}`,
         brewRatio:
@@ -992,7 +1057,7 @@ function recordIceDecision(state: GameState, card: UnassignedOrder | OrderTicket
   for (const id of card.trainingCupIds ?? [])
     cups[id] = {
       ...cups[id],
-      iceDecision: { opportunity, senior: Boolean(target.canHandleSpecial) },
+      iceDecision: { opportunity, senior: Boolean(target.canHandleSpecial), atSec: state.nowSec, bayId: target.id },
     };
   return cups;
 }
@@ -1009,6 +1074,8 @@ export function forecastCups(state: GameState) {
         cups[id] = {
           ...cups[id],
           completedSec: end,
+          startedSec: Math.max(start, cups[id].joinedAtSec ?? start),
+          requiredBrewSec: ticket.totalDurationSec,
           completedBayId: bay.id,
           completedBatch: ticket.ticketUid ?? ticket.id,
           brewRatio: Math.min(1, (end - Math.max(start, cups[id].joinedAtSec ?? start)) / ticket.totalDurationSec),
@@ -1045,12 +1112,14 @@ export function scoreGame(state: GameState) {
   const forecastTargetSec = Math.max(state.scenario.durationSec, ((total / 2) * 360) / state.bays.length);
   const categories = [
     {
+      id: 'completion' as const,
       label: forecastMode ? '仕上がる見込みの杯数' : '仕上げた杯数',
       points: 35 * ratio(done.length),
       max: 35,
       detail: `${done.length} / ${total}杯`,
     },
     {
+      id: 'speed' as const,
       label: forecastMode ? '完了予測の速さ' : '8分以内の提供準備',
       points: forecastMode
         ? endSec === null
@@ -1065,24 +1134,29 @@ export function scoreGame(state: GameState) {
         : `${timely.length} / ${total}杯（品質を満たした杯のみ）`,
     },
     {
-      label: forecastMode ? '抽出時間の確保' : '抽出品質',
+      id: 'quality' as const,
+      label: '抽出時間を守る',
       points: 20 * ratio(good.length),
       max: 20,
       detail: `${good.length} / ${total}杯（${forecastMode ? '未完了分は予定抽出時間で計算' : '予定時間の90%以上'}）`,
     },
     {
-      label: '同一注文の仕上がり',
+      id: 'together' as const,
+      label: '同じ注文をそろえて仕上げる',
       points: 10 * ratio(together.length, groups.size),
       max: 10,
       detail: `${together.length} / ${groups.size}件（全杯を60秒以内の差で仕上げ）`,
     },
     {
-      label: 'アイス1杯の配分',
+      id: 'ice' as const,
+      label: 'アイス1杯を上級生へ',
       points: 10 * iceRatio,
       max: 10,
       detail: iceChoices.length
         ? `上級生へ ${seniorIce.length} / ${iceChoices.length}杯（上級生の待ち時間が＋60秒以内の場面）`
-        : '指名・2杯抽出・上級生が忙しい場面は対象外',
+        : done.length
+          ? '指名・2杯抽出・上級生が忙しい場面は対象外'
+          : '抽出が終わったカップがないため0点',
     },
   ];
   const penalties = Math.min(20, state.violations * 2);
@@ -1102,6 +1176,15 @@ export function scoreGame(state: GameState) {
     Math.min(100, Math.round(categories.reduce((sum, category) => sum + category.points, 0) - penalties))
   );
   const score = ready ? raw : Math.min(79, raw);
+  const review = buildScoreReview(state, cups, {
+    categories,
+    forecastMode,
+    targetSec: forecastTargetSec,
+    penalties,
+    raw,
+    score,
+    emergencyPending,
+  });
   const feedback = [
     done.length < total
       ? `残り${total - done.length}杯。空いている担当へ分散。`
@@ -1165,6 +1248,7 @@ export function scoreGame(state: GameState) {
     total,
     quality: good.length,
     ready,
+    review,
     feedback,
     label:
       score >= 80

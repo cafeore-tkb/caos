@@ -69,7 +69,12 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
         emergency: Boolean(input.isRebrew),
         emergencyReason: input.isRebrew ? (input.rebrewReason ?? '') : '',
         orderedAt: new Date(
-          epoch + (sourceCup?.orderedAtSec ?? input.orderedAtSec ?? firstSeen.get(key) ?? props.currentTimeSec) * 1000
+          epoch +
+            ((input.isRebrew ? input.orderedAtSec : sourceCup?.orderedAtSec) ??
+              input.orderedAtSec ??
+              firstSeen.get(key) ??
+              props.currentTimeSec) *
+              1000
         ),
         item: {
           id: input.beanName,

@@ -13,7 +13,7 @@ import type { UnfinishedView } from "./UnfinishedOrders";
 // 管制盤 A・C。ドリッパーのカードは押すとその段階の操作のアイコンを上に出し（cardMenu）、長押しで右の詳細（待機）・緊急の入力（抽出中・終わり）のパネル
 export const CONTROL_VIEWS = {
   a: { label: "タイムライン", timelineControls: true },
-  c: { label: "キュー", timelineControls: false },
+  c: { label: "待ち列", timelineControls: false },
 } as const;
 export type ControlViewMode = keyof typeof CONTROL_VIEWS;
 
