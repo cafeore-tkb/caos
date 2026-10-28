@@ -1,8 +1,10 @@
 import type { D1Database } from '@cloudflare/workers-types';
 import { z } from 'zod';
+import butchi from '../public/training/butchi.json';
 import fast from '../public/training/fast.json';
 import full from '../public/training/full.json';
 import middle from '../public/training/middle.json';
+import shawn from '../public/training/shawn.json';
 import { type GameMode, parseScenario } from '../src/training/engine';
 import { assessGrade, type GradeCohort } from '../src/training/grades';
 import { randomScenario } from '../src/training/randomScenario';
@@ -12,8 +14,14 @@ export interface Env {
   DB: D1Database;
   ALLOWED_ORIGINS: string;
 }
-const scenarios = { fast: parseScenario(fast), middle: parseScenario(middle), full: parseScenario(full) };
-const modeSchema = z.enum(['fast', 'middle', 'full']);
+const scenarios = {
+  fast: parseScenario(fast),
+  middle: parseScenario(middle),
+  full: parseScenario(full),
+  butchi: parseScenario(butchi),
+  shawn: parseScenario(shawn),
+};
+const modeSchema = z.enum(['fast', 'middle', 'full', 'butchi', 'shawn']);
 const displayNameSchema = z.string().trim().min(1, '表示名を入力してください').max(30, '表示名は30文字まで');
 type Player = { id: string; display_name: string };
 type Run = {

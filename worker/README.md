@@ -12,7 +12,7 @@ Use Node 22. `npm install`, then:
 - Backend integration: `npm run worker:test` while the API is running. This creates fictional accounts only in the local database by default.
 - Remote database: `npm run worker:migrate`
 - Remote API: `npm run worker:deploy`
-- Automatic release: updating CaOS `main` validates the app, deploys the matching Worker, then publishes and verifies GitHub Pages. See `docs/DEPLOYMENT.md`.
+- Automatic release: updating caos `main` validates the app, checks the matching Worker rules, then publishes and verifies GitHub Pages directly from the same repository. See `docs/DEPLOYMENT.md`.
 - Manual frontend fallback: `npm run publish:pages` from main
 
 `rankingConfig.ts` contains only the public Worker origin; `VITE_RANKING_API_URL` can override it. Never put credentials in Vite variables. D1 identifiers are resource metadata. Wrangler uses the operator's existing authentication.
@@ -48,3 +48,5 @@ Full v3 evaluates queued work using the same timeline start and end times, witho
 
 
 Rule v4 adds per-order score explanations and fixes merge/split cup preservation and remake registration timestamps. Deploy the Worker and UI from the same revision. Existing v3 results remain stored and are excluded from the v4 ranking cohort.
+
+Rule v5 adds the fixed butchi and shawn recreated scenarios with a seven-minute queue lead. Apply migration 0004 before deploying this Worker; it extends the mode constraint while preserving all old runs. The original full-day actual dataset is not included.

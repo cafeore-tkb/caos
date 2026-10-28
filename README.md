@@ -32,7 +32,7 @@ A・CのUIは `cafeore-pos/main` の `173c9f18b71a4435fd967916378ed4df06efdbc4`�
 
 ## プレビュー
 
-[CaOSをGitHub Pagesで開く](https://cafeore-tkb.github.io/caos-game/)
+[CaOSをGitHub Pagesで開く](https://cafeore-tkb.github.io/caos/)
 
 `main` を更新すると、検証・ビルドの後に採点APIとGitHub Pagesを自動で公開します。[公開の流れと設定](./docs/DEPLOYMENT.md)を参照してください。
 
@@ -70,23 +70,17 @@ A・CのUIは `cafeore-pos/main` の `173c9f18b71a4435fd967916378ed4df06efdbc4`�
 - 開発サーバー（`npm run dev`）では Vite の中継（`/cafeore-pos-api`）を通して本番APIにつなぎます。ローカルのAPIを使うときは `VITE_CAFEORE_API_BASE_URL=http://localhost:8080` を指定します。
 - 公開版はブラウザから本番APIへ直接つなぐため、APIの `FRONTEND_ORIGINS`（infraリポジトリの `gcp/cloud_run.tf`）に `https://cafeore-tkb.github.io` が入っている必要があります。入っていないとWebSocketの接続が403で拒否され、DBアイコンの点が黄色（再接続中）のままになります。
 
-## 実データ・テストプレイ
+## 注文を再現したゲーム
 
-- ヘッダーの「テスト」から、2025年の実注文を使ったテストプレイを開始できます。
-- 開始前に時間帯と30分／1時間を選択します。ヘッダーの `1x / 2x / 5x / 10x` に合わせて、時計・タイムライン・注文到着・抽出時間が実時間基準で一緒に進みます。
-- 「終了・実績」を押すと、売上、商品構成、ピーク、提供時間、担当量、分割注文の仕上がりΔを表示します。
-- 指定された `2025/data/day1.json` は空ファイルだったため、同じリポジトリにあるダミー除去済み `2025/data/day12.json` を軽量化して同梱しています。
-- 実績データはビルド時に遅延読込用JavaScriptへ内包し、公開サイトに生JSONのURLを作りません。
-- データ出典: [cafeore-tkb/sohosai-analysis](https://github.com/cafeore-tkb/sohosai-analysis/tree/main/2025/data)
+「ぶっちー」は11/2の11:30〜12:00の37件、「しょーん」は11/3の16:00〜16:30の42件をゲーム用に再構成しています。開始時に7分ぶんをキューへ入れ、その後の注文も元の時刻より7分早く届きます。注文番号・商品数・注文の並びを保ち、商品名を現行マスターへ置き換えています。提供時刻・会計額・全日分の実績は同梱しません。
+
+縁ブレンド・も花も香ブレンド・トートセットはよいん、トラジャはブラジル、ライチはアロマ、ピンクブルボンはケニア、ブルマンはチロソとして扱います。再現モードでは注文内容・到着順を抽選しません。
 
 ## 公開構成
 
-- ソースと実績データはPrivateの `cafeore-tkb/CaOS` で管理します。
-- Private側のActionsは、PRで検証だけを実行し、`main` 更新時は検証した成果物を自動で公開します。
-- 採点APIを同じ版へ更新してから、ビルド成果物だけをPublicの `cafeore-tkb/caos-game` の `site/` へ送ります。公開側のPagesワークフローが更新し、配信された版まで確認します。
-- `npm run publish:pages` は手動で再公開するときに使えます。通常は実行不要です。
-- `main` の成果物を `site/` 直下に配置します。
-- 実注文の生JSONは公開せず、実績データは遅延読込JavaScriptへ内包します。架空のトレーニング注文JSONはダウンロード用に公開します。
+ソースとPagesを公開リポジトリ `cafeore-tkb/caos` で管理します。公開先は https://cafeore-tkb.github.io/caos/ です。ルートがゲーム画面で、`#training` からも同じ画面を開けます。管制盤は `#control` です。
+
+`main` の更新で検証・ビルド・GitHub Pagesへの公開を自動実行します。同じリポジトリのGitHub標準の権限を使うため、公開用の個人トークンは不要です。詳しくは [公開手順](docs/DEPLOYMENT.md) を参照してください。
 
 ## タッチ操作
 
@@ -111,7 +105,7 @@ npm run lint
 npm run build
 ```
 
-本番ビルドは `dist/` に生成され、公開時のベースパスは `/caos-game/` です。
+本番ビルドは `dist/` に生成され、公開時のベースパスは `/caos/` です。
 
 ### 操作チュートリアルと振り返り
 

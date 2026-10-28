@@ -7,7 +7,7 @@ const revision = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }
 const base =
   target === 'api'
     ? 'https://caos-training-ranking.210on.workers.dev/health'
-    : 'https://cafeore-tkb.github.io/caos-game/release.json';
+    : 'https://cafeore-tkb.github.io/caos/release.json';
 
 for (let attempt = 1; attempt <= 40; attempt++) {
   try {

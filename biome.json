@@ -9,7 +9,6 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
-      "!src/data/sohosai-2025-day12.json",
       "!src/current-caos/components",
       "!src/current-caos/common",
       "!src/current-caos/hooks",

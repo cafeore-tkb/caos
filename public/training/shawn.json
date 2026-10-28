@@ -1,0 +1,458 @@
+{
+  "schemaVersion": 1,
+  "kind": "recreated",
+  "mode": "shawn",
+  "title": "しょーん・30分の注文に挑戦",
+  "durationSec": 1800,
+  "queueLeadSec": 420,
+  "orders": [
+    {
+      "orderId": 892,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        },
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 893,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 894,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 895,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 896,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 897,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 898,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 899,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 900,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 901,
+      "atSec": 0,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 902,
+      "atSec": 45,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 2
+        },
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        },
+        {
+          "name": "アイスミルク",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 903,
+      "atSec": 101,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        },
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 904,
+      "atSec": 131,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 2
+        }
+      ]
+    },
+    {
+      "orderId": 905,
+      "atSec": 178,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 906,
+      "atSec": 233,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 2
+        },
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 907,
+      "atSec": 272,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 908,
+      "atSec": 304,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 909,
+      "atSec": 336,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 910,
+      "atSec": 369,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 911,
+      "atSec": 393,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 912,
+      "atSec": 418,
+      "items": [
+        {
+          "name": "アイスミルク",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 913,
+      "atSec": 484,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 914,
+      "atSec": 513,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 915,
+      "atSec": 544,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 916,
+      "atSec": 582,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 917,
+      "atSec": 626,
+      "items": [
+        {
+          "name": "アロマナティーボ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 918,
+      "atSec": 655,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        },
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 919,
+      "atSec": 706,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 920,
+      "atSec": 737,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 921,
+      "atSec": 761,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 922,
+      "atSec": 803,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 923,
+      "atSec": 851,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 924,
+      "atSec": 889,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 925,
+      "atSec": 914,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 926,
+      "atSec": 980,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 927,
+      "atSec": 1013,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 928,
+      "atSec": 1039,
+      "items": [
+        {
+          "name": "アイスオレ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 929,
+      "atSec": 1080,
+      "items": [
+        {
+          "name": "アイスコーヒー",
+          "quantity": 1
+        },
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 930,
+      "atSec": 1138,
+      "items": [
+        {
+          "name": "アロマナティーボ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 931,
+      "atSec": 1178,
+      "items": [
+        {
+          "name": "チロソ",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 932,
+      "atSec": 1255,
+      "items": [
+        {
+          "name": "余音ブレンド",
+          "quantity": 1
+        }
+      ]
+    },
+    {
+      "orderId": 933,
+      "atSec": 1295,
+      "items": [
+        {
+          "name": "珈琲・俺ブレンド",
+          "quantity": 1
+        }
+      ]
+    }
+  ]
+}

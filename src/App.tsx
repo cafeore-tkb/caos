@@ -8,7 +8,6 @@ import {
 } from './components/AuxiliaryPanel';
 import { type ControlViewMode, ControlWorkspace } from './components/ControlWorkspace';
 import { type RebrewDecision, RebrewPanel } from './components/RebrewPanel';
-import { TestPlaySetup } from './components/TestPlaySetup';
 import { TicketDetailModal } from './components/TicketDetailModal';
 import { type NavTab, TopHeader } from './components/TopHeader';
 import { INITIAL_BARISTAS, INITIAL_BEANS, INITIAL_LEARNING_LOGS } from './data/initialData';
@@ -17,7 +16,6 @@ import type {
   Barista,
   BeanCode,
   BeanItem,
-  HistoricalDataset,
   HistoricalOrder,
   LearningEngineLog,
   OrderTicket,
@@ -224,9 +222,6 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
   const [timelineCommand, setTimelineCommand] = useState<{ direction: 'back' | 'now' | 'forward'; id: number } | null>(
     null
   );
-  const [historicalOrders, setHistoricalOrders] = useState<HistoricalOrder[]>([]);
-  const [testDataLoading, setTestDataLoading] = useState(true);
-  const [testSetupOpen, setTestSetupOpen] = useState(false);
   const [pastOpen, setPastOpen] = useState(false);
   const [testPlaySession, setTestPlaySession] = useState<TestPlaySession | null>(
     () => standaloneSnapshot?.testPlaySession || null
@@ -281,25 +276,6 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
   useEffect(() => {
     const clock = window.setInterval(() => setRealTime(new Date()), 1000);
     return () => window.clearInterval(clock);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    setTestDataLoading(true);
-    import('./data/sohosai-2025-day12.json')
-      .then((module) => {
-        const dataset = module.default as HistoricalDataset;
-        if (!cancelled) setHistoricalOrders(dataset.orders);
-      })
-      .catch(() => {
-        if (!cancelled) setHistoricalOrders([]);
-      })
-      .finally(() => {
-        if (!cancelled) setTestDataLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   // cafeore-pos の注文を取り込む。届いた一覧のうち、当日の未提供・未準備で新しく届いた注文を未割当へ足し、
@@ -880,32 +856,6 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
     soundManager.playDispatch();
   };
 
-  const handleStartTestPlay = (startMs: number, durationMinutes: 30 | 60) => {
-    const endMs = startMs + durationMinutes * 60_000;
-    const orders = historicalOrders
-      .filter((order) => {
-        const createdAt = new Date(order.createdAt).getTime();
-        return createdAt >= startMs && createdAt < endMs;
-      })
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    setBaristas(makeCleanBaristas());
-    setBeans(INITIAL_BEANS);
-    setUnassignedOrders([]);
-    setLearningLogs(INITIAL_LEARNING_LOGS);
-    setSelectedOrderId(null);
-    undoSnapshotRef.current = null;
-    arrivalsAfterUndoSnapshotRef.current = [];
-    setUndoLabel(null);
-    setSelectedTicketKey(null);
-    setAssignSlotData(null);
-    setRebrewSource(null);
-    historicalOrderCursor.current = 0;
-    setTestPlaySession({ status: 'active', startMs, endMs, currentMs: startMs, durationMinutes, orders });
-    setIsRunning(true);
-    setActiveTab('control');
-    setTestSetupOpen(false);
-  };
-
   const handleEndTestPlay = () => {
     setTestPlaySession((session) => (session ? { ...session, status: 'finished' } : session));
     setIsRunning(false);
@@ -1001,7 +951,6 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
               ? `${Math.max(0, Math.ceil((testPlaySession.endMs - testPlaySession.currentMs) / 60_000))}分`
               : null
           }
-          onOpenTestPlay={() => setTestSetupOpen(true)}
           onEndTestPlay={handleEndTestPlay}
           posStatus={posStatus}
           onSearchOrder={(no) => {
@@ -1144,15 +1093,6 @@ export default function App({ suspended = false }: { suspended?: boolean }) {
           baristas={baristas}
           onClose={() => setRebrewSource(null)}
           onConfirm={handleConfirmRebrew}
-        />
-      )}
-
-      {testSetupOpen && (
-        <TestPlaySetup
-          orders={historicalOrders}
-          loading={testDataLoading}
-          onClose={() => setTestSetupOpen(false)}
-          onStart={handleStartTestPlay}
         />
       )}
     </div>

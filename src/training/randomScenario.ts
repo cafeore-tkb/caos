@@ -3,6 +3,7 @@ import { needsBrew, seniorOnly } from './master';
 
 /** Swap coffee names, preserving quantities, restricted slots, inventory and revenue per seed. */
 export function randomScenario(template: Scenario, seed: number): Scenario {
+  if (template.kind === 'recreated') return structuredClone(template);
   let value = (seed ^ 0x9e3779b9) >>> 0;
   const random = () => {
     value += 0x6d2b79f5;

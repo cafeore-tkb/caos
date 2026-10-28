@@ -39,7 +39,7 @@ export function HistoryView({
           <p>このブラウザに100回保存。サイトデータを消すと記録も消えます。</p>
         </header>
         <div className="training-history-filters" role="group" aria-label="履歴のモード">
-          {(['all', 'fast', 'middle', 'full'] as const).map((key) => (
+          {(['all', ...Object.keys(MODES)] as (GameMode | 'all')[]).map((key) => (
             <button
               type="button"
               key={key}

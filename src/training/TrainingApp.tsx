@@ -426,7 +426,9 @@ export default function TrainingApp() {
               <p className="training-data-mix">
                 {!customScenario && (
                   <>
-                    注文内容・到着時刻は毎回抽選。
+                    {scenario.kind === 'recreated'
+                      ? '注文と到着順は固定。開始時に7分ぶんの注文が入り、その後も7分先の注文が届きます。'
+                      : '注文内容・到着時刻は毎回抽選。'}
                     <br />
                   </>
                 )}
@@ -652,7 +654,8 @@ function GameSession({
     }
   }, [state, onFinish, lesson]);
   const shiftLesson = lesson?.id === 'shift';
-  const boardClockOrigin = shiftLesson ? SHIFT_ORIGIN_MS : TRAINING_CLOCK_ORIGIN;
+  const recreatedStartMinutes = scenario.mode === 'butchi' ? 90 : scenario.mode === 'shawn' ? 360 : 0;
+  const boardClockOrigin = shiftLesson ? SHIFT_ORIGIN_MS : TRAINING_CLOCK_ORIGIN + recreatedStartMinutes * 60_000;
   const result = scoreGame(state);
   const pendingEmergencies = state.emergencies.filter((trial) => trial.status === 'pending');
   const occurredEmergencies = state.emergencies.filter((trial) => trial.triggeredAtSec !== undefined);

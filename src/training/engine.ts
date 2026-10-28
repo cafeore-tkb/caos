@@ -4,8 +4,8 @@ import { insertTicket, mergeBoardCards } from '../utils/orderQueue';
 import { buildScoreReview } from './feedback';
 import { itemAbbr, itemCode, itemPrice, itemType, masterItem, needsBrew, seniorOnly } from './master';
 
-export const SCORING_VERSION = '2026-10-v4';
-export type GameMode = 'fast' | 'middle' | 'full';
+export const SCORING_VERSION = '2026-10-v5';
+export type GameMode = 'fast' | 'middle' | 'full' | 'butchi' | 'shawn';
 export const MODES = {
   fast: {
     label: 'ファスト',
@@ -34,6 +34,24 @@ export const MODES = {
     description: '混雑した店で、注文の振り分けと緊急の淹れ直しを練習します。',
     target: '店舗運営',
   },
+  butchi: {
+    label: 'ぶっちー',
+    durationSec: 1800,
+    count: 37,
+    defaultSpeed: 4,
+    emergencyChances: 0,
+    description: '11:30から30分の注文を再現。7分先の注文を見ながら進めます。',
+    target: '注文の再現',
+  },
+  shawn: {
+    label: 'しょーん',
+    durationSec: 1800,
+    count: 42,
+    defaultSpeed: 4,
+    emergencyChances: 0,
+    description: '16:00から30分の注文を再現。7分先の注文を見ながら進めます。',
+    target: '注文の再現',
+  },
 } as const;
 export interface ScenarioOrder {
   orderId: number;
@@ -43,7 +61,8 @@ export interface ScenarioOrder {
 }
 export interface Scenario {
   schemaVersion: 1;
-  kind: 'synthetic';
+  kind: 'synthetic' | 'recreated';
+  queueLeadSec?: number;
   mode: GameMode;
   title: string;
   durationSec: number;
@@ -132,7 +151,9 @@ export function parseScenario(input: unknown): Scenario {
   const value = input as Scenario;
   if (
     value.schemaVersion !== 1 ||
-    value.kind !== 'synthetic' ||
+    !['synthetic', 'recreated'].includes(value.kind) ||
+    (value.kind === 'recreated' && (!['butchi', 'shawn'].includes(value.mode) || value.queueLeadSec !== 420)) ||
+    (value.kind === 'synthetic' && ['butchi', 'shawn'].includes(value.mode)) ||
     !Object.hasOwn(MODES, value.mode) ||
     !Number.isInteger(value.durationSec) ||
     value.durationSec !== MODES[value.mode].durationSec ||

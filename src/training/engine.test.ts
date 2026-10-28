@@ -131,7 +131,7 @@ function runService(mode: GameMode, seed = 1, variedSeed?: number) {
 }
 
 test('all three synthetic scenarios use the supplied master and allow a competent operator to pass', () => {
-  for (const mode of Object.keys(MODES) as GameMode[]) {
+  for (const mode of ['fast', 'middle', 'full'] as const) {
     const scenario = load(mode);
     assert.equal(scenario.orders.length, MODES[mode].count);
     const state = runService(mode);
@@ -445,7 +445,7 @@ test('replacing every original cup cannot credit it before the remake completes'
 
 test('all default scenarios keep nomination, limited coffee and comments occasional', () => {
   const nominees = new Set<number>();
-  for (const mode of Object.keys(MODES) as GameMode[]) {
+  for (const mode of ['fast', 'middle', 'full'] as const) {
     const { orders } = load(mode);
     const nominated = orders.filter((order) => order.items.some((item) => item.nominee));
     const limited = orders.filter((order) => order.items.some((item) => seniorOnly(item.name)));

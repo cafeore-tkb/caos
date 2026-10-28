@@ -5,11 +5,11 @@ const App = lazy(() => import('./App.tsx'));
 const TrainingApp = lazy(() => import('./training/TrainingApp.tsx'));
 
 function Root() {
-  const [training, setTraining] = useState(() => location.hash === '#training');
-  const [visitedLive, setVisitedLive] = useState(() => location.hash !== '#training');
+  const [training, setTraining] = useState(() => location.hash !== '#control');
+  const [visitedLive, setVisitedLive] = useState(() => location.hash === '#control');
   useEffect(() => {
     const change = () => {
-      const next = location.hash === '#training';
+      const next = location.hash !== '#control';
       setTraining(next);
       if (!next) setVisitedLive(true);
     };

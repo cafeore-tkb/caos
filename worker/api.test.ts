@@ -173,3 +173,21 @@ test('public rankings accept a display name only after scoring, group names acro
   assert.equal(forecast.data.result.total, 66);
   assert.ok(forecast.data.result.score <= 79, 'unarrived cups cannot earn a passing score through forecasts');
 });
+
+test('recreated modes are issued with a fixed order timeline and seven minutes already queued', async () => {
+  const session = await request('/session', {});
+  assert.equal(session.status, 200);
+  for (const [mode, count, initial] of [
+    ['butchi', 37, 8],
+    ['shawn', 42, 10],
+  ] as const) {
+    const first = await request('/runs', { mode }, session.data.token);
+    const second = await request('/runs', { mode }, session.data.token);
+    assert.equal(first.status, 200, JSON.stringify(first.data));
+    assert.equal(second.status, 200, JSON.stringify(second.data));
+    assert.equal(first.data.scenario.orders.length, count);
+    assert.equal(startGame(first.data.scenario).arrived.length, initial);
+    assert.deepEqual(first.data.scenario, second.data.scenario);
+    assert.equal((await request(`/rankings?mode=${mode}`)).status, 200);
+  }
+});

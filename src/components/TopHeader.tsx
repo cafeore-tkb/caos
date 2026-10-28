@@ -1,15 +1,4 @@
-import {
-  BarChart3,
-  Bean,
-  CalendarClock,
-  Database,
-  Gamepad2,
-  History,
-  Search,
-  Undo2,
-  Volume2,
-  VolumeX,
-} from 'lucide-react';
+import { BarChart3, Bean, Database, Gamepad2, History, Search, Undo2, Volume2, VolumeX } from 'lucide-react';
 import type React from 'react';
 import { useState } from 'react';
 import settingsIcon from '../current-caos/icons/change-dripper.svg';
@@ -38,7 +27,6 @@ interface TopHeaderProps {
   onUndo: () => void;
   testPlaying: boolean;
   testProgressLabel: string | null;
-  onOpenTestPlay: () => void;
   onEndTestPlay: () => void;
   posStatus: PosConnectionStatus;
   onSearchOrder?: (no: number) => void;
@@ -130,14 +118,6 @@ export const TopHeader: React.FC<TopHeaderProps> = (props) => {
               className={`h-2 w-2 rounded-full ${props.posStatus === 'open' ? 'bg-emerald-500' : 'bg-amber-400'}`}
             />
           </output>
-          <button
-            type="button"
-            onClick={props.testPlaying ? props.onEndTestPlay : props.onOpenTestPlay}
-            className={`${cell} !border-blue-300 !bg-blue-50 text-blue-900`}
-          >
-            <CalendarClock size={16} />
-            {props.testPlaying ? `終了 ${props.testProgressLabel ?? ''}` : 'テスト'}
-          </button>
           <a href="#training" className={`${cell} !border-emerald-800 !bg-emerald-800 text-white`}>
             <Gamepad2 size={16} />
             ゲーム

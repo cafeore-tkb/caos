@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { type GameMode, MODES, parseScenario, type ScenarioOrder } from '../src/training/engine';
+import { MODES, parseScenario, type ScenarioOrder } from '../src/training/engine';
 import { seniorOnly, TRAINING_MASTER } from '../src/training/master';
 
 // Deterministic synthetic orders. Never reads production order/customer data.
@@ -7,7 +7,7 @@ const MIX = {
   fast: { nominated: [4], limited: [4], commented: [0] },
   middle: { nominated: [1, 9], limited: [7], commented: [0, 9] },
   full: { nominated: [3, 21, 37], limited: [15, 37], commented: [0, 21, 37] },
-} satisfies Record<GameMode, { nominated: number[]; limited: number[]; commented: number[] }>;
+} satisfies Record<'fast' | 'middle' | 'full', { nominated: number[]; limited: number[]; commented: number[] }>;
 const brewNames = TRAINING_MASTER.items
   .filter((item) => TRAINING_MASTER.item_types.find((type) => type.name === item.item_type)?.needs_brew)
   .map((item) => item.name);
@@ -15,7 +15,7 @@ const regularNames = brewNames.filter((name) => !seniorOnly(name));
 const limitedNames = brewNames.filter(seniorOnly);
 const nominees = [4, 2, 5, 3, 6, 1];
 
-for (const mode of Object.keys(MODES) as GameMode[]) {
+for (const mode of ['fast', 'middle', 'full'] as const) {
   const config = MODES[mode];
   const mix = MIX[mode];
   const orders: ScenarioOrder[] = Array.from({ length: config.count }, (_, i) => {
