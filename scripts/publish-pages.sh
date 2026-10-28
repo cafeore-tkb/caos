@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-publish_dir="$(mktemp -d /tmp/digital-master-sheet-pages-publish.XXXXXX)"
+publish_dir="$(mktemp -d /tmp/caos-game-publish.XXXXXX)"
 cleanup() {
   rm -rf "$publish_dir"
 }
@@ -17,8 +17,8 @@ if [[ "$source_branch" != "main" ]]; then
   exit 1
 fi
 
-VITE_BASE_PATH="/digital-master-sheet-pages/" npm run build
+VITE_BASE_PATH="/caos-game/" npm run build
 node --import tsx scripts/write-release.ts
 
-git clone --depth 1 https://github.com/cafeore-tkb/digital-master-sheet-pages.git "$publish_dir"
+git clone --depth 1 https://github.com/cafeore-tkb/caos-game.git "$publish_dir"
 SOURCE_REVISION="$(git rev-parse HEAD)" bash scripts/sync-pages.sh "$repo_root/dist" "$publish_dir"
