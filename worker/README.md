@@ -12,7 +12,8 @@ Use Node 22. `npm install`, then:
 - Backend integration: `npm run worker:test` while the API is running. This creates fictional accounts only in the local database by default.
 - Remote database: `npm run worker:migrate`
 - Remote API: `npm run worker:deploy`
-- Public frontend: `npm run publish:pages` from main
+- Automatic release: updating CaOS `main` validates the app, deploys the matching Worker, then publishes and verifies GitHub Pages. See `docs/DEPLOYMENT.md`.
+- Manual frontend fallback: `npm run publish:pages` from main
 
 `rankingConfig.ts` contains only the public Worker origin; `VITE_RANKING_API_URL` can override it. Never put credentials in Vite variables. D1 identifiers are resource metadata. Wrangler uses the operator's existing authentication.
 

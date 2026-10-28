@@ -1,4 +1,4 @@
-name: Build Pages bundle
+name: Build and deploy Pages
 
 on:
   pull_request:
@@ -9,9 +9,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      scoring-version: ${{ steps.release.outputs.scoring-version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,12 +31,81 @@ jobs:
         run: npm run lint
       - name: Test training
         run: npm run test:training
+      - name: Test Pages publishing
+        run: npm run test:publish
       - name: Build
         run: npm run build
         env:
           VITE_BASE_PATH: /digital-master-sheet-pages/
+      - name: Record release revision
+        id: release
+        run: node --import tsx scripts/write-release.ts
       - name: Upload Pages bundle
         uses: actions/upload-artifact@v4
         with:
           name: pages-site
           path: dist
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install deployment dependencies
+        run: npm install
+      - name: Download verified Pages bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: pages-site
+          path: dist
+      - name: Check deployment configuration
+        env:
+          PAGES_DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$PAGES_DEPLOY_KEY" || { echo 'PAGES_DEPLOY_KEY is missing'; exit 1; }
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo 'CLOUDFLARE_API_TOKEN is missing'; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'CLOUDFLARE_ACCOUNT_ID is missing'; exit 1; }
+      - name: Refuse an outdated main revision
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
+          test "$latest" = "$GITHUB_SHA" || { echo 'A newer main revision exists; refusing to publish an older build.'; exit 1; }
+      - name: Checkout public Pages repository
+        uses: actions/checkout@v4
+        with:
+          repository: cafeore-tkb/digital-master-sheet-pages
+          ref: main
+          path: .pages-publish
+          ssh-key: ${{ secrets.PAGES_DEPLOY_KEY }}
+      - name: Deploy matching scoring API
+        run: npm run worker:deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: 'false'
+      - name: Check scoring API version
+        run: node --import tsx scripts/verify-release.ts api
+      - name: Publish bundle to Pages repository
+        run: bash scripts/sync-pages.sh dist .pages-publish
+        env:
+          SOURCE_REVISION: ${{ github.sha }}
+      - name: Wait for Pages release
+        run: node --import tsx scripts/verify-release.ts pages
+      - name: Link deployed site
+        run: |
+          echo '### Pages deployment' >> "$GITHUB_STEP_SUMMARY"
+          echo '[Open CaOS](https://cafeore-tkb.github.io/digital-master-sheet-pages/)' >> "$GITHUB_STEP_SUMMARY"
+          echo '[Pages deployment history](https://github.com/cafeore-tkb/digital-master-sheet-pages/deployments/github-pages)' >> "$GITHUB_STEP_SUMMARY"
+          echo "Source revision: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"

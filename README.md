@@ -34,7 +34,7 @@ A・CのUIは `cafeore-pos/main` の `173c9f18b71a4435fd967916378ed4df06efdbc4`�
 
 [CaOSをGitHub Pagesで開く](https://cafeore-tkb.github.io/digital-master-sheet-pages/)
 
-`main` のソースをビルドし、`npm run publish:pages` で公開します。
+`main` を更新すると、検証・ビルドの後に採点APIとGitHub Pagesを自動で公開します。[公開の流れと設定](./docs/DEPLOYMENT.md)を参照してください。
 
 ## 画面
 
@@ -82,8 +82,9 @@ A・CのUIは `cafeore-pos/main` の `173c9f18b71a4435fd967916378ed4df06efdbc4`�
 ## 公開構成
 
 - ソースと実績データはPrivateの `cafeore-tkb/CaOS` で管理します。
-- Private側のActionsはPages用ビルドを検証し、成果物を保存します。
-- `npm run publish:pages` を実行すると、ビルド済みの `site/` だけをPublicの `cafeore-tkb/digital-master-sheet-pages` へ送り、公開側のPagesワークフローが更新します。
+- Private側のActionsは、PRで検証だけを実行し、`main` 更新時は検証した成果物を自動で公開します。
+- 採点APIを同じ版へ更新してから、ビルド成果物だけをPublicの `cafeore-tkb/digital-master-sheet-pages` の `site/` へ送ります。公開側のPagesワークフローが更新し、配信された版まで確認します。
+- `npm run publish:pages` は手動で再公開するときに使えます。通常は実行不要です。
 - `main` の成果物を `site/` 直下に配置します。
 - 実注文の生JSONは公開せず、実績データは遅延読込JavaScriptへ内包します。架空のトレーニング注文JSONはダウンロード用に公開します。
 
