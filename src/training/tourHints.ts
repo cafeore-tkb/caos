@@ -158,8 +158,8 @@ export function tourHint(lesson: Lesson, step: number, state: GameState, mode: s
             }
           : finishHint(state)
         : {
-            message: 'カップを選び、理由 → 赤い確定ボタン。',
-            queries: [q('form button[type="submit"]'), button('抽出ミス'), button('淹れ直しを手配')],
+            message: '該当カード →「緊急（淹れ直し）」。カップと理由を選び、赤い確定ボタンへ。',
+            queries: [q('form button[type="submit"]'), button('緊急（淹れ直し）'), card(brewing(state)?.ticketUid)],
           };
     }
     case 'shift': {

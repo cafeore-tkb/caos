@@ -50,3 +50,5 @@ Full v3 evaluates queued work using the same timeline start and end times, witho
 Rule v4 adds per-order score explanations and fixes merge/split cup preservation and remake registration timestamps. Deploy the Worker and UI from the same revision. Existing v3 results remain stored and are excluded from the v4 ranking cohort.
 
 Rule v5 adds the fixed butchi and shawn recreated scenarios with a seven-minute queue lead. Apply migration 0004 before deploying this Worker; it extends the mode constraint while preserving all old runs. The original full-day actual dataset is not included.
+
+Rule v6 derives advanced-mode staff abilities and separate single/double brew factors from the run seed. Fixed recreated orders keep their sequence. The same seed drives client timing and server replay, and old-rule results remain stored separately.

@@ -1,6 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { MODES, parseScenario, type ScenarioOrder } from '../src/training/engine';
-import { seniorOnly, TRAINING_MASTER } from '../src/training/master';
+import { itemType, seniorOnly, TRAINING_MASTER } from '../src/training/master';
 
 // Deterministic synthetic orders. Never reads production order/customer data.
 const MIX = {
@@ -20,7 +20,7 @@ for (const mode of ['fast', 'middle', 'full'] as const) {
   const mix = MIX[mode];
   const orders: ScenarioOrder[] = Array.from({ length: config.count }, (_, i) => {
     const limitedIndex = mix.limited.indexOf(i);
-    const name =
+    let name =
       limitedIndex >= 0
         ? limitedNames[limitedIndex % limitedNames.length]
         : mode === 'fast'
@@ -35,6 +35,7 @@ for (const mode of ['fast', 'middle', 'full'] as const) {
             ? 6
             : 1
           : nominees[nomineeIndex % nominees.length];
+    if (mode === 'full' && nominee && itemType(name)?.iced_brew) name = 'ブラジル';
     const items: ScenarioOrder['items'] = [
       {
         name,

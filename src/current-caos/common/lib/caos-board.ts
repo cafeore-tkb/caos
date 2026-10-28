@@ -103,6 +103,7 @@ export interface CaosBoardCup {
 
 /** 盤面のカード（1 回のドリップ。最大 2 杯） */
 export interface CaosCard {
+  brewDurationSec?: number;
   /** 画面の中でカードを指すキー。dripId、無ければ（未割当）カップの ID の組 */
   key: string;
   dripId: string | null;

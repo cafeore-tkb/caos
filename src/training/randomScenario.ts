@@ -1,5 +1,6 @@
-import type { Scenario } from './engine';
-import { needsBrew, seniorOnly } from './master';
+import { freshBays, type Scenario } from './engine';
+import { itemType, needsBrew, seniorOnly } from './master';
+import { simulatedRoster } from './roster';
 
 /** Swap coffee names, preserving quantities, restricted slots, inventory and revenue per seed. */
 export function randomScenario(template: Scenario, seed: number): Scenario {
@@ -26,6 +27,22 @@ export function randomScenario(template: Scenario, seed: number): Scenario {
       const j = Math.floor(random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
+  // Keep nominated iced orders feasible when their nominated assignee is hot-only.
+  const hotOnly = new Set(
+    template.mode === 'full'
+      ? simulatedRoster(freshBays(), seed)
+          .filter((bay) => bay.hotOnly)
+          .map((bay) => bay.id)
+      : []
+  );
+  const reserved = new Map<Scenario['orders'][number]['items'][number], string>();
+  for (const order of template.orders)
+    for (const item of order.items) {
+      if (!item.nominee || !hotOnly.has(item.nominee) || !needsBrew(item.name)) continue;
+      const pool = pools.get(signature(item));
+      const index = pool?.findIndex((name) => !itemType(name)?.iced_brew) ?? -1;
+      if (pool && index >= 0) reserved.set(item, pool.splice(index, 1)[0]);
+    }
   return {
     ...template,
     orders: template.orders.map((slot, index) => {
@@ -35,7 +52,8 @@ export function randomScenario(template: Scenario, seed: number): Scenario {
         ...slot,
         items: slot.items.map((item) => ({
           ...item,
-          name: needsBrew(item.name) ? (pools.get(signature(item))?.pop() ?? item.name) : item.name,
+          name:
+            reserved.get(item) ?? (needsBrew(item.name) ? (pools.get(signature(item))?.pop() ?? item.name) : item.name),
         })),
         atSec: slot.atSec - jitter,
       };

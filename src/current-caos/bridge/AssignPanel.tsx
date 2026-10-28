@@ -43,7 +43,13 @@ export const AssignPanel: React.FC<{
   const { lanes: assignees, shiftFeed } = useCaosLanes();
   const selectedOrder = unassignedOrders.find((order) => order.key === selectedOrderUid);
   // 指名の番号のあるカードは、その番号のドリッパーだけ選べる
-  const allowed = (id: number) => !selectedOrder || caosDripperAllowed(selectedOrder, id);
+  const allowed = (id: number) =>
+    !selectedOrder ||
+    (caosDripperAllowed(selectedOrder, id) &&
+      !(
+        assignees.find((person) => person.dripper === id)?.hotOnly &&
+        selectedOrder.cups.some((cup) => cup.item.item_type.iced_brew)
+      ));
 
   return (
     <SidePanel

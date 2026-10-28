@@ -70,6 +70,8 @@ export interface Barista {
   bayNumber: number;
   name: string;
   canHandleSpecial?: boolean;
+  hotOnly?: boolean;
+  trainingBrewFactors?: { one: number; two: number };
   coefficient: number; // initial: SP-capable 0.97, others 1.05
   coefficientColor: 'green' | 'orange' | 'blue' | 'purple';
   status: 'brewing' | 'imminent' | 'standby' | 'ready';

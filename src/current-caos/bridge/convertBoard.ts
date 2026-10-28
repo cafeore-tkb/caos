@@ -93,6 +93,7 @@ export function convertBoard(props: ControlViewProps, firstSeen = new Map<string
     });
     return {
       key,
+      brewDurationSec: ticket?.totalDurationSec,
       dripId: state.dripId,
       dripper: bayId,
       dripperPosition: state.dripperPosition,
