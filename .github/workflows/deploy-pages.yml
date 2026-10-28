@@ -69,11 +69,11 @@ jobs:
           path: dist
       - name: Check deployment configuration
         env:
-          PAGES_DEPLOY_KEY: ${{ secrets.PAGES_DEPLOY_KEY }}
+          PAGES_PUBLISH_TOKEN: ${{ secrets.PAGES_PUBLISH_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          test -n "$PAGES_DEPLOY_KEY" || { echo 'PAGES_DEPLOY_KEY is missing'; exit 1; }
+          test -n "$PAGES_PUBLISH_TOKEN" || { echo 'PAGES_PUBLISH_TOKEN is missing'; exit 1; }
           test -n "$CLOUDFLARE_API_TOKEN" || { echo 'CLOUDFLARE_API_TOKEN is missing'; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'CLOUDFLARE_ACCOUNT_ID is missing'; exit 1; }
       - name: Refuse an outdated main revision
@@ -88,7 +88,7 @@ jobs:
           repository: cafeore-tkb/digital-master-sheet-pages
           ref: main
           path: .pages-publish
-          ssh-key: ${{ secrets.PAGES_DEPLOY_KEY }}
+          token: ${{ secrets.PAGES_PUBLISH_TOKEN }}
       - name: Deploy matching scoring API
         run: npm run worker:deploy
         env:
@@ -109,3 +109,4 @@ jobs:
           echo '[Open CaOS](https://cafeore-tkb.github.io/digital-master-sheet-pages/)' >> "$GITHUB_STEP_SUMMARY"
           echo '[Pages deployment history](https://github.com/cafeore-tkb/digital-master-sheet-pages/deployments/github-pages)' >> "$GITHUB_STEP_SUMMARY"
           echo "Source revision: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Scoring rules: ${{ needs.build.outputs.scoring-version }}' >> "$GITHUB_STEP_SUMMARY"
