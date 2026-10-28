@@ -13,6 +13,7 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "test:training": "node --import tsx --test src/training/*.test.ts src/current-caos/logic/cardPresentation.test.ts src/current-caos/logic/orderHighlights.test.ts",
+    "test:publish": "node --import tsx --test scripts/publish-pages.test.ts",
     "training:generate": "node --import tsx scripts/generate-training.ts",
     "worker:dev": "wrangler dev --config worker/wrangler.jsonc --local --port 8787 --var ALLOWED_ORIGINS:http://localhost:3041",
     "worker:deploy": "wrangler deploy --config worker/wrangler.jsonc",

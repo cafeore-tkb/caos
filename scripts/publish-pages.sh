@@ -2,7 +2,7 @@
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
-publish_dir="$(mktemp -d /tmp/digital-master-sheet-pages-publish.XXXXXX)"
+publish_dir="$(mktemp -d /tmp/caos-game-publish.XXXXXX)"
 cleanup() {
   rm -rf "$publish_dir"
 }
@@ -17,22 +17,8 @@ if [[ "$source_branch" != "main" ]]; then
   exit 1
 fi
 
-VITE_BASE_PATH="/digital-master-sheet-pages/" npm run build
+VITE_BASE_PATH="/caos-game/" npm run build
+node --import tsx scripts/write-release.ts
 
-git clone --depth 1 https://github.com/cafeore-tkb/digital-master-sheet-pages.git "$publish_dir"
-rm -rf "$publish_dir/site"
-mkdir -p "$publish_dir/site"
-cp -R "$repo_root/dist/." "$publish_dir/site/"
-
-git -C "$publish_dir" add -A site
-
-if git -C "$publish_dir" diff --cached --quiet; then
-  echo "Pages bundle is already up to date."
-  exit 0
-fi
-
-source_revision="$(git -C "$repo_root" rev-parse --short HEAD)"
-git -C "$publish_dir" config user.name "digital-master-sheet publisher"
-git -C "$publish_dir" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-git -C "$publish_dir" commit -m "Deploy ${source_branch} source ${source_revision}"
-git -C "$publish_dir" push origin main
+git clone --depth 1 https://github.com/cafeore-tkb/caos-game.git "$publish_dir"
+SOURCE_REVISION="$(git rev-parse HEAD)" bash scripts/sync-pages.sh "$repo_root/dist" "$publish_dir"
