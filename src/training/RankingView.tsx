@@ -2,7 +2,16 @@ import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { type GameMode, MODES } from './engine';
 import { GradeBadge } from './GradeBadge';
 import type { GradeAssessment } from './grades';
-import { type DeviceSession, type Ranking, rankingApi, readDisplayName, readPending, syncRuns } from './rankingClient';
+import { RankingResult } from './RankingResult';
+import {
+  type DeviceSession,
+  type Rank,
+  type Ranking,
+  rankingApi,
+  readDisplayName,
+  readPending,
+  syncRuns,
+} from './rankingClient';
 import { ScoreRules } from './ScoreRules';
 
 export function RankingView({
@@ -14,6 +23,7 @@ export function RankingView({
   onBack: () => void;
   onGame: () => void;
 }) {
+  const [selected, setSelected] = useState<Rank | null>(null);
   const [mode, setMode] = useState<GameMode>('fast');
   const [offset, setOffset] = useState(0);
   const [version, setVersion] = useState('all');
@@ -76,9 +86,7 @@ export function RankingView({
           メニュー
         </button>
         <header className="training-title">
-          <span className="training-eyebrow">COFFEE LEAGUE</span>
           <h1>みんなのランキング</h1>
-          <p>プレイ前に名前を入力すると、結果が自動で載ります。</p>
         </header>
         <div className="ranking-account">
           <span>{lastName ? `前回の表示名：${lastName}` : '表示名だけで参加できます。'}</span>
@@ -100,11 +108,10 @@ export function RankingView({
             </button>
           ))}
         </div>
-        <p className="ranking-record-scope">これまでの自己記録（すべての採点条件）</p>
+
         <div className="ranking-stats">
           {(Object.keys(MODES) as GameMode[]).map((key) => {
             const s = stats.find((v) => v.mode === key);
-            const bestVersion = metric === 'master' ? s?.bestRulesVersion : s?.bestBusinessRulesVersion;
             return (
               <button
                 key={key}
@@ -122,15 +129,7 @@ export function RankingView({
                   {metric === 'master' ? (s?.best ?? '—') : (s?.business_best?.toLocaleString() ?? '—')}
                   <small>{metric === 'master' ? '点' : 'pt'}</small>
                 </strong>
-                {s && bestVersion && (
-                  <small>
-                    {bestVersion === ranking?.currentRulesVersion ? '現在の条件の記録' : '以前の条件の記録'}
-                  </small>
-                )}
-                <small>
-                  {s && metric === 'master' && <GradeBadge score={s.best} assessment={s.assessment} />}{' '}
-                  {s?.attempts ?? 0}回 / 運営目安クリア{s?.passed ?? 0}回
-                </small>
+                <small>自己最高 · {s?.attempts ?? 0}回</small>
               </button>
             );
           })}
@@ -157,7 +156,7 @@ export function RankingView({
               ))}
             </select>
           </label>
-          <p>過去の記録も残しています。条件を切り替えて確認できます。 条件の違う記録は、順位を分けて表示します。</p>
+          <p>行を押すとリザルト。採点条件ごとに順位を分けています。</p>
         </div>
         <section className="ranking-board training-panel">
           <div className="ranking-board-heading">
@@ -204,16 +203,25 @@ export function RankingView({
                           </td>
                         </tr>
                       )}
-                    <tr data-self={row.display_name === lastName}>
+                    <tr
+                      className="ranking-result-row"
+                      data-self={row.display_name === lastName}
+                      onClick={() => setSelected(row)}
+                    >
                       <td>{row.rank}</td>
                       <td>
-                        <strong>{row.display_name}</strong>
-                        {row.display_name === lastName && <small>前回の表示名</small>}
+                        <button
+                          type="button"
+                          className="ranking-name-button"
+                          aria-label={`${row.display_name}のリザルトを見る`}
+                          onClick={() => setSelected(row)}
+                        >
+                          {row.display_name}
+                        </button>
                       </td>
                       <td>
                         <b>{row.score}</b>
                         <GradeBadge score={row.score} assessment={row.assessment} />
-                        <small>{row.passed ? '運営目安クリア' : '運営目安は80点'}</small>
                       </td>
                       <td>
                         <b>
@@ -284,6 +292,7 @@ export function RankingView({
             {error}
           </p>
         )}
+        {selected && <RankingResult row={selected} mode={mode} onClose={() => setSelected(null)} />}
         <footer className="training-actionbar">
           <p>同じ表示名の自己ベスト。30秒ごとに更新。</p>
           <button type="button" className="training-primary" onClick={onGame}>

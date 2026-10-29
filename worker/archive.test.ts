@@ -6,6 +6,7 @@ import test from 'node:test';
 import { SCORING_VERSION } from '../src/training/engine';
 import type { GradeAssessment } from '../src/training/grades';
 import type { Ranking } from '../src/training/rankingClient';
+import type { RunSummary } from '../src/training/runSummary';
 import worker, { type Env } from './index';
 
 function fixture() {
@@ -146,6 +147,56 @@ test('previous completed-run grades retain ownership protection and use their ac
     assert.equal(me.status, 200);
     assert.equal(me.body.stats[0].best, 95);
     assert.equal(me.body.stats[0].assessment.population, 2);
+  } finally {
+    f.db.close();
+  }
+});
+
+test('public result uses the selected best run, preserves old scores and hides private replay data', async () => {
+  const f = fixture();
+  try {
+    const id = '22345678-1234-1234-1234-123456789012';
+    f.insert(id, 'a', '2026-10-v3', 95);
+    const ranking = await f.get('/rankings?mode=full&rulesVersion=all');
+    assert.equal(ranking.body.players[0].run_id, id);
+    const old = await f.get<RunSummary>(`/results/${id}`);
+    assert.equal(old.status, 200);
+    assert.equal(old.body.score, 95);
+    assert.equal(old.body.conditions, null);
+    assert.deepEqual(old.body.categories, []);
+    const currentId = '32345678-1234-1234-1234-123456789012';
+    f.insert(currentId, 'a', SCORING_VERSION, 70);
+    const draw = await f.get<RunSummary>(`/results/${currentId}`);
+    assert.equal(draw.body.conditions?.source, 'draw');
+    assert.equal(draw.body.conditions?.roster.length, 6);
+    assert.equal(draw.body.conditions?.emergencies.length, 2);
+    assert.ok(draw.body.conditions);
+    const conditions = {
+      ...draw.body.conditions,
+      source: 'saved',
+      emergencies: [{ id: 1, drawn: true, status: 'resolved', orderId: 76, bayId: 3, reason: '異物混入', atSec: 300 }],
+    };
+    f.db.prepare('UPDATE runs SET result_json=? WHERE id=?').run(
+      JSON.stringify({
+        conditions,
+        categories: [{ label: '抽出時間', points: 15, max: 20, detail: '45 / 60杯' }],
+        penalties: 2,
+        feedback: ['古い注文を優先。'],
+        seed: 'must not leak',
+        trace: 'private',
+      }),
+      currentId
+    );
+    const saved = await f.get<RunSummary>(`/results/${currentId}`);
+    assert.equal(saved.body.conditions?.source, 'saved');
+    assert.equal(saved.body.conditions?.emergencies[0].status, 'resolved');
+    assert.equal(saved.body.categories[0].points, 15);
+    assert.equal(saved.body.penalties, 2);
+    for (const hidden of ['seed', 'trace', 'player_id', 'trainingBrewFactors', 'token'])
+      assert.ok(!JSON.stringify(saved.body).includes(hidden));
+    assert.equal((await f.get('/results/42345678-1234-1234-1234-123456789012')).status, 404);
+    f.db.prepare('UPDATE runs SET completed_at=NULL WHERE id=?').run(currentId);
+    assert.equal((await f.get(`/results/${currentId}`)).status, 404);
   } finally {
     f.db.close();
   }
