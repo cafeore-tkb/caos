@@ -427,3 +427,261 @@
   font-weight: 800;
   text-align: left;
 }
+
+.ranking-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #d9ccba;
+}
+.ranking-result-header h2 {
+  font-size: 22px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.ranking-result-dialog .ranking-result-header small {
+  margin: 0;
+}
+.ranking-result-header button {
+  padding: 6px 12px;
+  border: 1px solid #b8a78e;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.ranking-result-content {
+  padding: 12px 18px 18px;
+}
+.ranking-result-numbers {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.ranking-result-numbers strong {
+  font-size: 30px;
+}
+.ranking-result-dialog .ranking-result-numbers small {
+  display: inline;
+  font-size: 13px;
+}
+.ranking-result-dialog .ranking-result-meta {
+  font-size: 11px;
+  color: #71695e;
+  margin: 6px 0;
+}
+.ranking-result-dialog h3 {
+  font-size: 16px;
+  margin: 16px 0 6px;
+}
+.ranking-result-dialog p,
+.ranking-result-dialog li {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.ranking-result-dialog ul {
+  padding-left: 18px;
+}
+.ranking-result-conditions > div,
+.ranking-result-breakdown > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e5dbca;
+  padding: 5px 0;
+  font-size: 13px;
+}
+.ranking-result-conditions dt {
+  color: #71695e;
+}
+.ranking-result-conditions dd,
+.ranking-result-breakdown dd {
+  margin: 0;
+  text-align: right;
+}
+.ranking-result-breakdown dd {
+  white-space: nowrap;
+  font-weight: 700;
+}
+.ranking-result-dialog .ranking-result-breakdown small {
+  margin: 1px 0 0;
+  font-size: 10px;
+}
+
+/* Keep the ranking itself in view, including on tablet-sized screens. */
+.training-ranking-screen {
+  padding: 10px 16px;
+}
+.training-ranking-screen .training-title {
+  padding-right: 110px;
+}
+.training-ranking-screen .training-title h1 {
+  font-size: 24px;
+  margin: 0;
+}
+.training-ranking-screen .training-back {
+  min-height: 34px;
+  padding: 4px 12px;
+  font-size: 14px;
+}
+.training-ranking-screen .ranking-account {
+  gap: 8px;
+  font-size: 12px;
+  margin: 2px 0;
+}
+.training-ranking-screen .ranking-account button {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.training-ranking-screen .training-history-filters {
+  margin: 4px 0;
+  gap: 6px;
+}
+.training-ranking-screen .training-history-filters button {
+  min-height: 30px;
+  padding: 3px 10px;
+  font-size: 13px;
+}
+.training-ranking-screen .ranking-stats {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.training-ranking-screen .ranking-stats button {
+  padding: 5px 9px;
+  gap: 0 4px;
+  border-width: 1px;
+  font-size: 13px;
+}
+.training-ranking-screen .ranking-stats strong {
+  font-size: 22px;
+}
+.training-ranking-screen .ranking-stats small {
+  font-size: 10px;
+}
+.training-ranking-screen .ranking-version-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  border: 0;
+  background: transparent;
+  padding: 5px 0;
+  margin: 0;
+  gap: 4px 12px;
+}
+.training-ranking-screen .ranking-version-picker label {
+  font-size: 11px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.training-ranking-screen .ranking-version-picker select {
+  min-height: 30px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.training-ranking-screen .ranking-version-picker p {
+  font-size: 11px;
+  margin: 0;
+}
+.training-ranking-screen .ranking-board-heading {
+  padding: 5px 12px;
+  gap: 8px;
+  font-size: 12px;
+}
+.training-ranking-screen .ranking-board-heading h2 {
+  font-size: 16px;
+}
+.training-ranking-screen .ranking-board-heading button {
+  min-height: 28px;
+  padding: 2px 8px;
+}
+.training-ranking-screen .ranking-board th,
+.training-ranking-screen .ranking-board td {
+  padding: 6px 12px;
+}
+.training-ranking-screen .ranking-board td:first-child,
+.training-ranking-screen .ranking-board td b {
+  font-size: 19px;
+}
+.training-ranking-screen .ranking-board .ranking-condition-row td:first-child {
+  padding: 4px 12px;
+  font-size: 11px;
+}
+.training-ranking-screen .ranking-board .training-grade {
+  display: inline-flex;
+  margin: 0 0 0 6px;
+  font-size: 11px;
+}
+.ranking-result-row {
+  cursor: pointer;
+}
+.ranking-result-row:hover,
+.ranking-result-row:focus-within {
+  background: #e9e2d0;
+}
+.ranking-name-button {
+  padding: 3px 0;
+  min-height: 30px;
+  text-align: left;
+  font-weight: 800;
+  color: #245842;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ranking-name-button:focus-visible {
+  outline: 2px solid #245842;
+  outline-offset: 3px;
+}
+.training-ranking-screen .training-actionbar {
+  margin-top: 6px;
+  padding-top: 6px;
+  gap: 8px;
+}
+.training-ranking-screen .training-actionbar p {
+  font-size: 11px;
+  margin: 0;
+}
+.training-ranking-screen .training-actionbar .training-primary {
+  min-height: 34px;
+  padding: 4px 16px;
+  font-size: 14px;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+@media (max-width: 600px) {
+  .training-ranking-screen {
+    padding: 8px;
+  }
+  .training-ranking-screen .training-title h1 {
+    font-size: 20px;
+  }
+  .training-ranking-screen .ranking-stats {
+    gap: 3px;
+  }
+  .training-ranking-screen .ranking-stats button {
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+  }
+  .training-ranking-screen .ranking-stats strong {
+    font-size: 18px;
+  }
+  .training-ranking-screen .ranking-version-picker label {
+    flex-wrap: wrap;
+    gap: 2px 6px;
+  }
+  .training-ranking-screen .ranking-board th,
+  .training-ranking-screen .ranking-board td {
+    padding: 5px 8px;
+  }
+  .ranking-result-content {
+    padding: 10px 12px;
+  }
+}
+
+.training-ranking-screen .ranking-board td b small {
+  display: inline;
+  margin-left: 2px;
+}

@@ -13,6 +13,7 @@ export interface RankedRun {
   rulesVersion: string;
 }
 export interface Rank {
+  run_id?: string;
   rulesVersion?: string;
   player_id: string;
   display_name: string;

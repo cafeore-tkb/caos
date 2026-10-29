@@ -5,10 +5,11 @@ import fast from '../public/training/fast.json';
 import full from '../public/training/full.json';
 import middle from '../public/training/middle.json';
 import shawn from '../public/training/shawn.json';
-import { type GameMode, parseScenario } from '../src/training/engine';
+import { type GameMode, parseScenario, startGame } from '../src/training/engine';
 import { assessGrade, type GradeCohort } from '../src/training/grades';
 import { randomScenario } from '../src/training/randomScenario';
 import { replayRun, SCORING_VERSION } from '../src/training/replay';
+import { type RunConditions, summarizeConditions } from '../src/training/runSummary';
 
 export interface Env {
   DB: D1Database;
@@ -171,7 +172,7 @@ async function route(request: Request, env: Env) {
         ROW_NUMBER() OVER(PARTITION BY r.rules_version,r.participant_id ORDER BY ${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,r.id ASC) AS best
       FROM runs r JOIN participants p ON p.id=r.participant_id WHERE mode=? AND (?='all' OR rules_version=?) AND completed_at IS NOT NULL
     ), ranked AS (
-      SELECT rules_version AS rulesVersion,participant_id AS player_id,display_name,score,business_score,revenue,done,total,quality,elapsed_sec,passed,completed_at,attempts,
+      SELECT id AS run_id,rules_version AS rulesVersion,participant_id AS player_id,display_name,score,business_score,revenue,done,total,quality,elapsed_sec,passed,completed_at,attempts,
         RANK() OVER(PARTITION BY rules_version ORDER BY ${column} DESC) AS rank FROM attempts WHERE best=1
     ) SELECT * FROM ranked ORDER BY CASE WHEN rulesVersion=? THEN 0 ELSE 1 END,rulesVersion DESC,${column} DESC,score DESC,done DESC,quality DESC,elapsed_sec ASC,completed_at ASC,player_id ASC LIMIT 100 OFFSET ?`;
     const ranks = await env.DB.prepare(query).bind(mode, rulesVersion, rulesVersion, SCORING_VERSION, offset).all();
@@ -205,6 +206,58 @@ async function route(request: Request, env: Env) {
       ),
       viewerId: viewer?.id ?? '',
       offset,
+    });
+  }
+  const publicResult = path.match(/^\/results\/([a-f0-9-]{36})$/);
+  if (publicResult && request.method === 'GET') {
+    const row = await env.DB.prepare(
+      `SELECT r.*,p.display_name FROM runs r JOIN participants p ON p.id=r.participant_id WHERE r.id=? AND r.completed_at IS NOT NULL`
+    )
+      .bind(publicResult[1])
+      .first<
+        Run & {
+          display_name: string;
+          score: number;
+          business_score: number;
+          done: number;
+          total: number;
+          quality: number;
+        }
+      >();
+    if (!row) throw new ApiError(404, '公開された結果が見つかりません');
+    let result: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(row.result_json ?? '{}');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) result = parsed;
+    } catch {
+      /* Older records may lack detailed results. */
+    }
+    const categories = z
+      .array(z.object({ label: z.string(), points: z.number(), max: z.number(), detail: z.string() }))
+      .safeParse(result.categories);
+    // Only the current engine can reconstruct a draw accurately. Never replay old rules as new rules.
+    const conditions =
+      (result.conditions as RunConditions | undefined) ??
+      (row.rules_version === SCORING_VERSION
+        ? summarizeConditions(startGame(randomScenario(scenarios[row.mode], row.seed), row.seed), 'draw')
+        : null);
+    return reply({
+      displayName: row.display_name,
+      mode: row.mode,
+      rulesVersion: row.rules_version,
+      completedAt: row.completed_at,
+      score: row.score,
+      businessScore: row.business_score,
+      done: row.done,
+      total: row.total,
+      quality: row.quality,
+      forecast: Boolean(result.forecast),
+      categories: categories.success ? categories.data : [],
+      penalties: typeof result.penalties === 'number' ? result.penalties : null,
+      feedback: Array.isArray(result.feedback)
+        ? result.feedback.filter((v): v is string => typeof v === 'string').slice(0, 3)
+        : [],
+      conditions,
     });
   }
   const player = await authenticated(request, env);
@@ -282,7 +335,7 @@ async function route(request: Request, env: Env) {
     }
     if (replay.state.nowSec > ((Date.now() - run.started_at + 10000) / 1000) * 10)
       throw new ApiError(400, 'ゲーム時間が一致しません');
-    const r = replay.result;
+    const r = { ...replay.result, conditions: summarizeConditions(replay.state, 'saved') };
     await env.DB.prepare(
       'INSERT INTO participants(id,display_name,created_at) VALUES(?,?,?) ON CONFLICT(display_name) DO NOTHING'
     )

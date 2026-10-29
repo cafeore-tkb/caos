@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { writeFileSync } from 'node:fs';
 import test from 'node:test';
 import { allowedBay, type GameAction, gameReducer, scoreGame, startGame } from '../src/training/engine';
+import { summarizeConditions } from '../src/training/runSummary';
 
 const base = process.env.TEST_API_URL ?? 'http://localhost:8787';
 const nonce = process.env.TEST_NONCE ?? crypto.randomUUID().replaceAll('-', '').slice(0, 9);
@@ -122,7 +123,11 @@ test('public rankings accept a display name only after scoring, group names acro
   await new Promise((resolve) => setTimeout(resolve, 20500));
   const paid = await request(`/runs/${paidRun.data.id}/submit`, { displayName: nameB, actions }, a.data.token);
   assert.equal(paid.status, 200, JSON.stringify(paid.data));
-  assert.deepEqual(paid.data.result, scoreGame(state));
+  assert.deepEqual(paid.data.result, { ...scoreGame(state), conditions: summarizeConditions(state, 'saved') });
+  const detail = await request(`/results/${paidRun.data.id}`);
+  assert.equal(detail.status, 200);
+  assert.deepEqual(detail.data.conditions, paid.data.result.conditions);
+  assert.equal(detail.data.score, paid.data.result.score);
   assert.ok(paid.data.result.business.revenue > 0);
   const final = await request('/rankings?mode=fast&metric=business');
   assert.equal(final.data.totalPlayers, initial.data.totalPlayers + 2);
@@ -167,7 +172,10 @@ test('public rankings accept a display name only after scoring, group names acro
     a.data.token
   );
   assert.equal(forecast.status, 200, JSON.stringify(forecast.data));
-  assert.deepEqual(forecast.data.result, scoreGame(full));
+  assert.deepEqual(
+    forecast.data.result,
+    JSON.parse(JSON.stringify({ ...scoreGame(full), conditions: summarizeConditions(full, 'saved') }))
+  );
   assert.equal(forecast.data.result.forecast.actualDone, 0);
   assert.equal(forecast.data.result.forecast.projectedDone, 12);
   assert.equal(forecast.data.result.total, 66);
